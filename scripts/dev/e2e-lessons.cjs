@@ -1,23 +1,18 @@
 // Plays through every lesson in the browser: continues read steps, steps through demos,
 // picks the correct quiz answer, and types each exercise solution into the move box.
 // Usage: npx tsx scripts/dev/dump-lessons.ts > /tmp/lessons.json && node scripts/dev/e2e-lessons.cjs /tmp/lessons.json [unitId]
-const { chromium } = (() => { try { return require('playwright'); } catch { return require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright'); } })();
 const fs = require('fs');
-(async () => {
+const { open, run } = require('./harness.cjs');
+
+run(async () => {
   const units = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
   const only = process.argv[3];
-  const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 }, ignoreHTTPSErrors: true });
-  const page = await ctx.newPage();
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  await page.addInitScript(() => localStorage.setItem('tempo.profile.v1', JSON.stringify({ v: 1, onboarded: true, xp: 0, settings: { sound: false } })));
-  const base = process.env.BASE || 'http://localhost:4173/';
+  const { browser, page, errors, goto } = await open();
   let ok = 0, bad = 0;
   for (const u of units) {
     if (only && u.id !== only) continue;
     for (const l of u.lessons) {
-      await page.goto(base + '#/lesson/' + l.id);
+      await goto('lesson/' + l.id);
       await page.waitForSelector('.lesson-nav');
       let failed = null;
       for (const [i, s] of l.steps.entries()) {
@@ -54,4 +49,4 @@ const fs = require('fs');
   console.log(`${ok} lessons completed, ${bad} failed`);
   if (errors.length) console.log('PAGE ERRORS', [...new Set(errors)].slice(0, 10));
   await browser.close();
-})();
+});

@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Chess } from 'chess.js';
-import { Board, type BoardMove, type SquareTone } from '../chess/Board';
-import { FILES, playUci, randomItem, shuffle, colorName } from '../chess/utils';
+import { useMemo, useState } from 'react';
+import { Chess, type Move } from 'chess.js';
+import { Board, type SquareTone } from '../chess/Board';
+import { FILES, playUci, randomItem, shuffle, colorName, turnOf } from '../chess/utils';
 import { puzzles } from '../data/puzzles';
 import { getProfile, logActivity, updateProfile, useProfile } from '../store/profile';
+import { useTimeouts } from '../lib/hooks';
 import { navigate } from '../router';
-import { Button, PageHeader, Pill, Segmented } from '../components/ui';
+import { BoardColumn } from '../components/BoardColumn';
+import { Button, Countdown, Feedback, PageHeader, Pill, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { sound } from '../chess/sound';
 import type { Arrow, Mark } from '../content/types';
@@ -30,11 +32,11 @@ function CoordsDrill({ mode }: { mode: 'find' | 'name' }) {
   const [target, setTarget] = useState('e4');
   const [score, setScore] = useState(0);
   const [misses, setMisses] = useState(0);
-  const [left, setLeft] = useState(30);
+  const [endsAt, setEndsAt] = useState(0);
   const [tones, setTones] = useState<Record<string, SquareTone>>({});
   const [options, setOptions] = useState<string[]>([]);
   const [newBest, setNewBest] = useState(false);
-  const scoreRef = useRef(0);
+  const { later } = useTimeouts();
   const key = `coords-${mode}-${side}`;
 
   const nextTarget = (prev?: string) => {
@@ -48,34 +50,24 @@ function CoordsDrill({ mode }: { mode: 'find' | 'name' }) {
   };
 
   const start = () => {
-    scoreRef.current = 0;
     setScore(0);
     setMisses(0);
-    setLeft(30);
+    setEndsAt(Date.now() + 30_000);
     setTones({});
     setPhase('run');
     nextTarget();
   };
 
-  useEffect(() => {
-    if (phase !== 'run') return;
-    const t = window.setInterval(() => setLeft((l) => Math.max(0, l - 1)), 1000);
-    return () => window.clearInterval(t);
-  }, [phase]);
-
-  useEffect(() => {
-    if (phase !== 'run' || left > 0) return;
+  const timeUp = () => {
     setPhase('done');
-    setNewBest(saveBest(key, scoreRef.current));
+    setNewBest(saveBest(key, score));
     sound('complete');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [left, phase]);
+  };
 
   const answer = (sq: string) => {
     if (phase !== 'run') return;
     if (sq === target) {
-      scoreRef.current++;
-      setScore(scoreRef.current);
+      setScore((s) => s + 1);
       setTones({ [sq]: 'good' });
       sound('tick');
     } else {
@@ -83,14 +75,14 @@ function CoordsDrill({ mode }: { mode: 'find' | 'name' }) {
       setTones({ [sq]: 'bad', [target]: 'hint' });
       sound('bad');
     }
-    window.setTimeout(() => setTones({}), 250);
+    later(() => setTones({}), 250);
     nextTarget(target);
   };
 
   const best = p.vision[key] ?? 0;
   return (
     <div className="trainer">
-      <div className="trainer-board">
+      <BoardColumn>
         <div className="coord-prompt" aria-live="polite">
           {phase === 'run' ? (mode === 'find' ? <span className="mono">{target}</span> : <span className="faint">Name the marked square</span>) : <span className="faint">{mode === 'find' ? 'Click the named square' : 'Name the marked square'}</span>}
         </div>
@@ -102,7 +94,7 @@ function CoordsDrill({ mode }: { mode: 'find' | 'name' }) {
           tones={mode === 'name' && phase === 'run' ? { ...tones, [target]: 'focus' } : tones}
           drawable={false}
         />
-      </div>
+      </BoardColumn>
       <aside className="panel">
         <div className="panel-section">
           <h2>{mode === 'find' ? 'Find the square' : 'Name the square'}</h2>
@@ -112,7 +104,7 @@ function CoordsDrill({ mode }: { mode: 'find' | 'name' }) {
           <div className="rush-head">
             <div>
               <div className="stat-label">Time</div>
-              <div className={`stat-value num ${left <= 5 ? 'danger' : ''}`}>{left}s</div>
+              <Countdown endsAt={endsAt} warnAt={5} onExpire={timeUp} />
             </div>
             <div>
               <div className="stat-label">Score</div>
@@ -134,15 +126,12 @@ function CoordsDrill({ mode }: { mode: 'find' | 'name' }) {
           </div>
         )}
         {phase === 'done' && (
-          <div className={`feedback ${newBest ? 'feedback-good' : 'feedback-info'}`}>
-            <Icon name={newBest ? 'trophy' : 'check'} />
-            <div>
-              <strong>
-                {score} correct{newBest ? ' · new best' : ''}
-              </strong>
-              <span className="feedback-body">{misses ? `${misses} miss${misses > 1 ? 'es' : ''}. ` : 'No misses. '}Best as {side}: {Math.max(best, score)}</span>
-            </div>
-          </div>
+          <Feedback
+            tone={newBest ? 'good' : 'info'}
+            icon={newBest ? 'trophy' : 'check'}
+            title={`${score} correct${newBest ? ' · new best' : ''}`}
+            body={`${misses ? `${misses} miss${misses > 1 ? 'es' : ''}. ` : 'No misses. '}Best as ${side}: ${Math.max(best, score)}`}
+          />
         )}
         {phase !== 'run' && (
           <>
@@ -204,12 +193,13 @@ function KnightDrill() {
   const [round, setRound] = useState(0);
   const [pos, setPos] = useState('b1');
   const [target, setTarget] = useState('c7');
-  const [used, setUsed] = useState(0);
   const [perfect, setPerfect] = useState(0);
   const [t0, setT0] = useState(0);
   const [phase, setPhase] = useState<'ready' | 'run' | 'done'>('ready');
   const [elapsed, setElapsed] = useState(0);
   const [trail, setTrail] = useState<string[]>([]);
+  const used = Math.max(0, trail.length - 1);
+  const { later } = useTimeouts();
 
   const newRound = () => {
     let a = randomItem(ALL_SQUARES);
@@ -220,7 +210,6 @@ function KnightDrill() {
     }
     setPos(a);
     setTarget(b);
-    setUsed(0);
     setTrail([a]);
   };
   const start = () => {
@@ -240,7 +229,6 @@ function KnightDrill() {
     sound('move');
     const u = used + 1;
     setPos(sq);
-    setUsed(u);
     setTrail((t) => [...t, sq]);
     if (sq === target) {
       const isPerfect = u === optimal;
@@ -255,7 +243,7 @@ function KnightDrill() {
       } else {
         sound('good');
         setRound(round + 1);
-        window.setTimeout(newRound, 300);
+        later(newRound, 300);
       }
     }
   };
@@ -263,7 +251,7 @@ function KnightDrill() {
   const marks: Mark[] = [{ square: target, color: 'green' }];
   return (
     <div className="trainer">
-      <div className="trainer-board">
+      <BoardColumn>
         <div className="board-caption">
           <span>{phase === 'run' ? `Round ${round + 1} of ${ROUNDS}` : 'Knight routes'}</span>
           {phase === 'run' && (
@@ -273,23 +261,13 @@ function KnightDrill() {
           )}
         </div>
         <Board fen={fenWithKnight(pos)} onSquareClick={click} marks={phase === 'run' ? marks : []} arrows={phase === 'run' ? arrows : []} drawable={false} />
-      </div>
+      </BoardColumn>
       <aside className="panel">
         <div className="panel-section">
           <h2>Knight routes</h2>
           <p className="muted">Take the knight to the ringed square in as few moves as possible. Knights are the piece club players most often lose track of; this makes their geometry automatic.</p>
         </div>
-        {phase === 'done' && (
-          <div className="feedback feedback-good">
-            <Icon name="trophy" />
-            <div>
-              <strong>
-                {perfect}/{ROUNDS} shortest routes
-              </strong>
-              <span className="feedback-body">in {elapsed} seconds</span>
-            </div>
-          </div>
-        )}
+        {phase === 'done' && <Feedback tone="good" icon="trophy" title={`${perfect}/${ROUNDS} shortest routes`} body={`in ${elapsed} seconds`} />}
         {phase !== 'run' && (
           <Button variant="primary" size="l" icon="play" onClick={start}>
             {phase === 'done' ? 'Again' : `Start ${ROUNDS} rounds`}
@@ -323,14 +301,15 @@ function ChecksDrill() {
   const [tones, setTones] = useState<Record<string, SquareTone>>({});
   const [gaveUp, setGaveUp] = useState(false);
   const [solved, setSolved] = useState(0);
+  const { later } = useTimeouts();
   const all = useMemo(() => {
     const c = new Chess(fen);
     return c.moves({ verbose: true }).filter((m) => m.san.includes('+') || m.san.includes('#'));
   }, [fen]);
   const done = gaveUp || found.length === all.length;
-  const onMove = (m: BoardMove) => {
+  const onMove = (m: Move) => {
     if (done) return;
-    const hit = all.find((x) => x.from === m.from && x.to === m.to && (!x.promotion || x.promotion === (m.promotion ?? 'q')));
+    const hit = all.find((x) => x.san === m.san);
     if (hit && !found.includes(hit.san)) {
       sound('good');
       const next = [...found, hit.san];
@@ -347,14 +326,14 @@ function ChecksDrill() {
       sound('bad');
       setTones({ [m.to]: 'bad' });
     }
-    window.setTimeout(() => setTones({}), 400);
+    later(() => setTones({}), 400);
   };
-  const turn = fen.split(' ')[1] as 'w' | 'b';
+  const turn = turnOf(fen);
   const arrows: Arrow[] = done ? all.filter((m) => !found.includes(m.san)).map((m) => ({ from: m.from, to: m.to, color: 'red' })) : [];
   const foundArrows: Arrow[] = all.filter((m) => found.includes(m.san)).map((m) => ({ from: m.from, to: m.to, color: 'green' }));
   return (
     <div className="trainer">
-      <div className="trainer-board">
+      <BoardColumn>
         <div className="board-caption">
           <span className="player-tag">
             <span className={`side-dot ${turn}`} /> {colorName(turn)} to move
@@ -364,7 +343,7 @@ function ChecksDrill() {
           </span>
         </div>
         <Board fen={fen} orientation={turn === 'w' ? 'white' : 'black'} interactive={!done} playerColor={turn} onMove={onMove} tones={tones} arrows={[...foundArrows, ...arrows]} />
-      </div>
+      </BoardColumn>
       <aside className="panel">
         <div className="panel-section">
           <h2>Find every check</h2>
@@ -387,15 +366,7 @@ function ChecksDrill() {
                 </Pill>
               ))}
         </div>
-        {done && (
-          <div className={`feedback ${gaveUp ? 'feedback-warn' : 'feedback-good'}`}>
-            <Icon name={gaveUp ? 'eye' : 'check'} />
-            <div>
-              <strong>{gaveUp ? 'Missed checks in red' : 'All checks found'}</strong>
-              <span className="feedback-body">Positions cleared this session: {solved}</span>
-            </div>
-          </div>
-        )}
+        {done && <Feedback tone={gaveUp ? 'warn' : 'good'} icon={gaveUp ? 'eye' : 'check'} title={gaveUp ? 'Missed checks in red' : 'All checks found'} body={`Positions cleared this session: ${solved}`} />}
         <div className="btn-row">
           {done ? (
             <Button variant="primary" iconRight="right" onClick={() => { setFen(pickScanPosition()); setFound([]); setGaveUp(false); }}>

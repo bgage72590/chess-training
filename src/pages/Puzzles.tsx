@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { PuzzleFeedback, PuzzleSolver, type SolverApi } from '../components/PuzzleSolver';
 import { puzzles, puzzleById, THEMES, PRACTICE_THEMES, type Puzzle } from '../data/puzzles';
 import { getProfile, logActivity, updateProfile, useProfile, type Profile } from '../store/profile';
 import { glicko } from '../lib/rating';
 import { review, MASTERED_BOX } from '../lib/srs';
 import { dueReviewPuzzles } from '../lib/due';
+import { useKeydown, useTimeouts } from '../lib/hooks';
 import { navigate } from '../router';
-import { Button, PageHeader, Pill, Segmented } from '../components/ui';
+import { Button, Countdown, Feedback, PageHeader, Pill, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { sound } from '../chess/sound';
 
@@ -21,7 +22,8 @@ function pickPuzzle(p: Profile, theme: string | undefined, exclude: Set<string>,
   return top[Math.floor(Math.random() * top.length)];
 }
 
-function recordPuzzle(pz: Puzzle, clean: boolean, opts: { rated: boolean; review?: boolean }) {
+/** Records a first attempt. `streak` is the clean-solve streak after it (rated sessions). */
+function recordPuzzle(pz: Puzzle, clean: boolean, opts: { rated: boolean; review?: boolean; streak?: number }) {
   let delta = 0;
   updateProfile((d) => {
     const P = d.puzzles;
@@ -35,6 +37,7 @@ function recordPuzzle(pz: Puzzle, clean: boolean, opts: { rated: boolean; review
       P.history.push({ t: Date.now(), r: next.r });
       if (P.history.length > 500) P.history.splice(0, P.history.length - 500);
     }
+    if (opts.streak) P.bestStreak = Math.max(P.bestStreak, opts.streak);
     P.seen[pz.id] = { ok: clean, t: Date.now() };
     for (const th of pz.themes) {
       const s = (P.themes[th] ??= { ok: 0, fail: 0 });
@@ -100,14 +103,9 @@ function RatedSession({ theme }: { theme?: string }) {
       key={key}
       puzzle={puzzle}
       onFirstResult={(o) => {
-        const d = recordPuzzle(puzzle, o.clean, { rated: true });
-        setDelta(d);
-        setSession((s) => ({ ok: s.ok + (o.clean ? 1 : 0), n: s.n + 1, streak: o.clean ? s.streak + 1 : 0 }));
-        if (o.clean) {
-          updateProfile((dd) => {
-            dd.puzzles.bestStreak = Math.max(dd.puzzles.bestStreak, session.streak + 1);
-          });
-        }
+        const streak = o.clean ? session.streak + 1 : 0;
+        setDelta(recordPuzzle(puzzle, o.clean, { rated: true, streak }));
+        setSession((s) => ({ ok: s.ok + (o.clean ? 1 : 0), n: s.n + 1, streak }));
       }}
     >
       {(api) => (
@@ -135,15 +133,11 @@ function RatedSession({ theme }: { theme?: string }) {
 function PanelBody({ api, puzzle, onNext, nextLabel = 'Next puzzle' }: { api: SolverApi; puzzle: Puzzle; onNext: () => void; nextLabel?: string }) {
   const finished = api.status === 'solved' || api.status === 'viewing';
   // Keyboard: Enter/→ for next when finished, H for hint.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
-      if (finished && (e.key === 'Enter' || e.key === 'ArrowRight')) onNext();
-      if (!finished && e.key.toLowerCase() === 'h') api.hint();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [finished, onNext, api]);
+  useKeydown((e) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+    if (finished && (e.key === 'Enter' || e.key === 'ArrowRight')) onNext();
+    if (!finished && e.key.toLowerCase() === 'h') api.hint();
+  });
 
   return (
     <div className="panel-section">
@@ -152,15 +146,7 @@ function PanelBody({ api, puzzle, onNext, nextLabel = 'Next puzzle' }: { api: So
         {api.status === 'intro' ? 'Get ready…' : api.goal}
       </div>
       <PuzzleFeedback api={api} />
-      {api.status === 'solving' && api.mistakes > 0 && (
-        <div className="feedback feedback-warn">
-          <Icon name="refresh" />
-          <div>
-            <strong>Try again</strong>
-            <span className="feedback-body">This one no longer counts for rating, so take your time.</span>
-          </div>
-        </div>
-      )}
+      {api.status === 'solving' && api.mistakes > 0 && <Feedback tone="warn" icon="refresh" title="Try again" body="This one no longer counts for rating, so take your time." />}
       {finished && <ThemeList themes={puzzle.themes} />}
       {finished && (
         <p className="faint" style={{ fontSize: '0.82rem' }}>
@@ -248,7 +234,7 @@ function RushSession() {
   const [phase, setPhase] = useState<'ready' | 'running' | 'over'>('ready');
   const [score, setScore] = useState(0);
   const [strikes, setStrikes] = useState(0);
-  const [left, setLeft] = useState(RUSH_SECONDS);
+  const [endsAt, setEndsAt] = useState(0);
   const [puzzle, setPuzzle] = useState<Puzzle | null>(null);
   const [key, setKey] = useState(0);
   const used = useRef(new Set<string>());
@@ -256,6 +242,7 @@ function RushSession() {
   const strikesRef = useRef(0);
   const endedRef = useRef(false);
   const prevBest = useRef(0);
+  const { later, clear } = useTimeouts();
 
   const nextPuzzle = (solved: number) => {
     const target = 500 + solved * 55;
@@ -273,7 +260,7 @@ function RushSession() {
     prevBest.current = getProfile().puzzles.rushBest;
     setScore(0);
     setStrikes(0);
-    setLeft(RUSH_SECONDS);
+    setEndsAt(Date.now() + RUSH_SECONDS * 1000);
     setPhase('running');
     nextPuzzle(0);
   };
@@ -281,6 +268,7 @@ function RushSession() {
   const end = () => {
     if (endedRef.current) return;
     endedRef.current = true;
+    clear();
     setPhase('over');
     const s = scoreRef.current;
     const tried = s + strikesRef.current;
@@ -290,20 +278,6 @@ function RushSession() {
       logActivity(d, 5 + s * 3, 'puzzles', tried);
     });
   };
-
-  // The clock only counts down; running out is handled by the effect below.
-  useEffect(() => {
-    if (phase !== 'running') return;
-    const t = window.setInterval(() => setLeft((l) => Math.max(0, l - 1)), 1000);
-    return () => window.clearInterval(t);
-  }, [phase]);
-
-  useEffect(() => {
-    if (phase !== 'running') return;
-    if (left === 0) end();
-    else if (left <= 10) sound('tick');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [left, phase]);
 
   if (phase !== 'running' || !puzzle) {
     return (
@@ -331,8 +305,6 @@ function RushSession() {
     );
   }
 
-  const mm = Math.floor(left / 60);
-  const ss = String(left % 60).padStart(2, '0');
   return (
     <PuzzleSolver
       key={key}
@@ -342,12 +314,12 @@ function RushSession() {
         if (clean) {
           scoreRef.current += 1;
           setScore(scoreRef.current);
-          window.setTimeout(() => nextPuzzle(scoreRef.current), 350);
+          later(() => nextPuzzle(scoreRef.current), 350);
         } else {
           strikesRef.current += 1;
           setStrikes(strikesRef.current);
-          if (strikesRef.current >= 3) window.setTimeout(end, 900);
-          else window.setTimeout(() => nextPuzzle(scoreRef.current), 1100);
+          if (strikesRef.current >= 3) later(end, 900);
+          else later(() => nextPuzzle(scoreRef.current), 1100);
         }
       }}
     >
@@ -356,9 +328,7 @@ function RushSession() {
           <div className="rush-head">
             <div>
               <div className="stat-label">Time</div>
-              <div className={`stat-value num ${left <= 10 ? 'danger' : ''}`}>
-                {mm}:{ss}
-              </div>
+              <Countdown endsAt={endsAt} warnAt={10} tick onExpire={end} format={(s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`} />
             </div>
             <div>
               <div className="stat-label">Solved</div>
@@ -387,13 +357,19 @@ function RushSession() {
   );
 }
 
+let themeCounts: Map<string, number> | null = null;
+/** Puzzles per theme, counted once. */
+function countThemes() {
+  if (!themeCounts) {
+    themeCounts = new Map();
+    for (const z of puzzles) for (const t of z.themes) themeCounts.set(t, (themeCounts.get(t) ?? 0) + 1);
+  }
+  return themeCounts;
+}
+
 function ThemePicker({ value, onChange }: { value?: string; onChange: (t?: string) => void }) {
   const p = useProfile();
-  const counts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const z of puzzles) for (const t of z.themes) m.set(t, (m.get(t) ?? 0) + 1);
-    return m;
-  }, []);
+  const counts = countThemes();
   return (
     <div className="theme-picker">
       <button className={`theme-chip ${!value ? 'on' : ''}`} onClick={() => onChange(undefined)}>

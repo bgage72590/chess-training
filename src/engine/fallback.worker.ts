@@ -3,6 +3,7 @@
 // (uci, isready, setoption, ucinewgame, position fen, go depth/movetime, stop).
 // Alpha-beta with quiescence and piece-square tables on top of chess.js: roughly club strength.
 import { Chess, type Move, type PieceSymbol } from 'chess.js';
+import { parseUci } from '../chess/utils';
 
 const post = (s: string) => (self as DedicatedWorkerGlobalScope).postMessage(s);
 
@@ -45,9 +46,13 @@ function evaluate(c: Chess): number {
   return c.turn() === 'w' ? s : -s;
 }
 
+/** Captures (most valuable victim first), promotions, then checks. Scores once per move. */
 function order(moves: Move[]): Move[] {
   const score = (m: Move) => (m.captured ? 10 * VAL[m.captured] - VAL[m.piece] + 10000 : 0) + (m.promotion ? 8000 : 0) + (m.san.includes('+') ? 500 : 0);
-  return moves.sort((a, b) => score(b) - score(a));
+  return moves
+    .map((m) => ({ m, s: score(m) }))
+    .sort((a, b) => b.s - a.s)
+    .map((x) => x.m);
 }
 
 function timeUp() {
@@ -134,7 +139,8 @@ function go(opts: { depth?: number; movetime?: number }) {
       lines.sort((a, b) => b.score - a.score);
       bestLines = lines;
       // Search the best moves first next iteration.
-      root.sort((a, b) => lines.findIndex((l) => l.move === a.lan) - lines.findIndex((l) => l.move === b.lan));
+      const rank = new Map(lines.map((l, i) => [l.move, i]));
+      root.sort((a, b) => rank.get(a.lan)! - rank.get(b.lan)!);
       lines.slice(0, multipv).forEach((l, i) => post(`info depth ${d} multipv ${i + 1} score ${scoreStr(l.score)} nodes ${nodes} pv ${l.pv.join(' ')}`));
       if (Math.abs(lines[0].score) > MATE - 1000) break;
     } catch {
@@ -171,7 +177,7 @@ self.onmessage = (e: MessageEvent) => {
     const [fen, moves] = rest.split(' moves ');
     try {
       pos = new Chess(fen);
-      for (const u of moves?.split(' ') ?? []) pos.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] as PieceSymbol | undefined });
+      for (const u of moves?.split(' ') ?? []) pos.move(parseUci(u));
     } catch {
       post('info string CRITICAL ERROR: bad position');
     }

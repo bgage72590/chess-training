@@ -15,14 +15,21 @@ function audio(): AudioContext | null {
   }
 }
 
+// A 50 ms decaying noise burst, built once per audio context and reused by every knock.
+let noiseBuf: AudioBuffer | null = null;
+function noise(a: AudioContext): AudioBuffer {
+  if (noiseBuf?.sampleRate === a.sampleRate) return noiseBuf;
+  const len = Math.floor(a.sampleRate * 0.05);
+  noiseBuf = a.createBuffer(1, len, a.sampleRate);
+  const data = noiseBuf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+  return noiseBuf;
+}
+
 function knock(a: AudioContext, t: number, freq: number, gain: number, decay = 0.07) {
   // Filtered noise burst + short sine body: reads as a piece set down on a wooden board.
-  const len = Math.floor(a.sampleRate * 0.05);
-  const buf = a.createBuffer(1, len, a.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
-  const noise = a.createBufferSource();
-  noise.buffer = buf;
+  const src = a.createBufferSource();
+  src.buffer = noise(a);
   const bp = a.createBiquadFilter();
   bp.type = 'bandpass';
   bp.frequency.value = freq * 3;
@@ -30,8 +37,8 @@ function knock(a: AudioContext, t: number, freq: number, gain: number, decay = 0
   const g = a.createGain();
   g.gain.setValueAtTime(gain, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
-  noise.connect(bp).connect(g).connect(a.destination);
-  noise.start(t);
+  src.connect(bp).connect(g).connect(a.destination);
+  src.start(t);
 
   const osc = a.createOscillator();
   osc.type = 'sine';

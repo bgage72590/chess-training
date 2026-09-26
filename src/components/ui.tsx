@@ -1,7 +1,8 @@
-import { Fragment, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Icon } from './Icon';
+import { sound } from '../chess/sound';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'good';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 export function Button({
   variant = 'secondary',
@@ -21,7 +22,7 @@ export function Button({
   );
 }
 
-export function ProgressBar({ value, max = 1, tone = 'accent', label }: { value: number; max?: number; tone?: 'accent' | 'good' | 'info'; label?: string }) {
+export function ProgressBar({ value, max = 1, tone = 'accent', label }: { value: number; max?: number; tone?: 'accent' | 'good'; label?: string }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
   return (
     <div className={`bar bar-${tone}`} role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
@@ -90,11 +91,10 @@ export function PageHeader({ eyebrow, title, children, actions }: { eyebrow?: st
   );
 }
 
-/** A line chart of values over attempts, sized by its viewBox. */
-export function Sparkline({ values, width = 240, height = 64, showDot = true }: { values: number[]; width?: number; height?: number; showDot?: boolean }) {
-  if (values.length < 2) {
-    return <svg className="sparkline" viewBox={`0 0 ${width} ${height}`} width="100%" height={height} aria-hidden="true" />;
-  }
+/** A line chart of values over attempts, sized by its viewBox. Needs at least two values. */
+export function Sparkline({ values, height = 64 }: { values: number[]; height?: number }) {
+  const width = 240;
+  if (values.length < 2) return null;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = Math.max(1, max - min);
@@ -107,7 +107,7 @@ export function Sparkline({ values, width = 240, height = 64, showDot = true }: 
     <svg className="sparkline" viewBox={`0 0 ${width} ${height}`} width="100%" height={height} preserveAspectRatio="none" aria-hidden="true">
       <path d={area} fill="var(--accent-soft)" opacity="0.8" />
       <path d={d} fill="none" stroke="var(--accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-      {showDot && <circle cx={last[0]} cy={last[1]} r="3.5" fill="var(--accent)" />}
+      <circle cx={last[0]} cy={last[1]} r="3.5" fill="var(--accent)" />
     </svg>
   );
 }
@@ -164,6 +164,43 @@ function inline(s: string): ReactNode[] {
   return out;
 }
 
-export function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="kbd">{children}</kbd>;
+/**
+ * A feedback banner: an icon, a bold title and an optional body line. Extra lines can be
+ * passed as children (give them the `feedback-body` class).
+ */
+export function Feedback({ tone, icon, title, body, children }: { tone: 'good' | 'bad' | 'warn' | 'info'; icon: string | ReactNode; title?: ReactNode; body?: ReactNode; children?: ReactNode }) {
+  return (
+    <div className={`feedback feedback-${tone}`}>
+      {typeof icon === 'string' ? <Icon name={icon} /> : icon}
+      <div>
+        {title && <strong>{title}</strong>}
+        {body && <span className="feedback-body">{body}</span>}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Seconds left until `endsAt`, as a stat value. Only this component re-renders while the
+ * clock runs. Calls `onExpire` at zero; from `warnAt` seconds it turns red (and ticks, if asked).
+ */
+export function Countdown({ endsAt, warnAt, tick = false, onExpire, format = (s) => `${s}s` }: { endsAt: number; warnAt: number; tick?: boolean; onExpire: () => void; format?: (seconds: number) => string }) {
+  const [now, setNow] = useState(Date.now);
+  const left = Math.max(0, Math.ceil((endsAt - now) / 1000));
+  const expire = useRef(onExpire);
+  const prev = useRef<number | null>(null);
+  useEffect(() => {
+    expire.current = onExpire;
+  });
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(t);
+  }, []);
+  useEffect(() => {
+    if (left === 0) expire.current();
+    else if (tick && prev.current !== null && left < prev.current && left <= warnAt) sound('tick');
+    prev.current = left;
+  }, [left, warnAt, tick]);
+  return <div className={`stat-value num ${left <= warnAt ? 'danger' : ''}`}>{format(left)}</div>;
 }

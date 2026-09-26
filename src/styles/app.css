@@ -365,10 +365,6 @@ button {
   background: var(--surface-2);
   color: var(--ink);
 }
-.btn-good {
-  background: var(--good);
-  color: #fff;
-}
 .btn-danger {
   background: var(--bad-soft);
   color: var(--bad);
@@ -453,15 +449,6 @@ button {
   background: var(--info-soft);
   color: var(--info);
 }
-.kbd {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  padding: 1px 5px;
-  border: 1px solid var(--line-strong);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  background: var(--surface);
-}
 .bar {
   height: 6px;
   border-radius: 999px;
@@ -476,9 +463,6 @@ button {
 }
 .bar-good .bar-fill {
   background: var(--good);
-}
-.bar-info .bar-fill {
-  background: var(--info);
 }
 .ring {
   position: relative;
@@ -591,9 +575,6 @@ input[type='number'] {
 .grid-2 {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
 }
-.grid-3 {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
-}
 .grid-4 {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
 }
@@ -665,10 +646,10 @@ input[type='number'] {
   background: var(--hl-select);
 }
 .sq.dark.last::before {
-  background: var(--hl-last-dark);
+  background: var(--hl-last-dark, var(--hl-last));
 }
 .sq.dark.selected::before {
-  background: var(--hl-select-dark);
+  background: var(--hl-select-dark, var(--hl-select));
 }
 .sq.check::after {
   content: '';
@@ -797,7 +778,8 @@ input[type='number'] {
   flex-direction: column;
   gap: 10px;
   width: 100%;
-  max-width: min(100%, calc(100vh - var(--board-offset, 230px)), 760px);
+  /* --board-fit is measured by BoardColumn so the whole column fits the viewport height. */
+  max-width: min(100%, var(--board-fit, 100%), 760px);
   min-width: 0;
 }
 .board-with-eval {
@@ -865,9 +847,6 @@ input[type='number'] {
   .trainer {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
-  }
-  .trainer-board {
-    max-width: 100%;
   }
   .panel {
     position: static;
@@ -1089,37 +1068,6 @@ input[type='number'] {
     right: 16px;
     bottom: calc(76px + env(safe-area-inset-bottom, 0px));
     max-width: none;
-  }
-}
-
-/* ---------- Dialog ---------- */
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgb(8 12 18 / 0.55);
-  display: grid;
-  place-items: center;
-  padding: 16px;
-  z-index: 90;
-  animation: fade 160ms ease;
-}
-.dialog {
-  width: min(460px, 100%);
-  max-height: calc(100vh - 32px);
-  overflow-y: auto;
-  background: var(--surface);
-  border-radius: var(--radius-l);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-2);
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  animation: pop 220ms ease;
-}
-@keyframes fade {
-  from {
-    opacity: 0;
   }
 }
 

@@ -1,5 +1,5 @@
 import type { Profile } from '../store/profile';
-import { liveStreak } from '../store/profile';
+import { liveStreak, playerWon } from '../store/profile';
 import { MASTERED_BOX } from './srs';
 import { units } from '../content';
 
@@ -14,7 +14,7 @@ export interface Achievement {
 const lessonsDone = (p: Profile) => Object.values(p.lessons).filter((l) => l.done).length;
 const drillsDone = (p: Profile) => Object.values(p.drills).filter((d) => d.done).length;
 const wins = (p: Profile, minLevel = 1) =>
-  p.games.filter((g) => g.level >= minLevel && ((g.result === '1-0' && g.playerColor === 'w') || (g.result === '0-1' && g.playerColor === 'b'))).length;
+  p.games.filter((g) => g.level >= minLevel && playerWon(g)).length;
 
 export const ACHIEVEMENTS: Achievement[] = [
   { id: 'first-lesson', title: 'First Lesson', text: 'Complete a lesson.', icon: 'learn', test: (p) => lessonsDone(p) >= 1 },

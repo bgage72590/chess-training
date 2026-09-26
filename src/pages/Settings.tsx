@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { defaultProfile, replaceProfile, updateProfile, useProfile, type BoardTheme, type Profile } from '../store/profile';
+import { defaultProfile, normalizeProfile, replaceProfile, updateProfile, useProfile, type BoardTheme, type Profile } from '../store/profile';
 import { Board } from '../chess/Board';
 import { Button, PageHeader, Segmented } from '../components/ui';
 import { toast } from '../lib/toast';
@@ -38,7 +38,7 @@ export function SettingsPage() {
     try {
       const data = JSON.parse(importText) as Profile;
       if (data.v !== 1 || typeof data.xp !== 'number') throw new Error('bad');
-      replaceProfile({ ...defaultProfile(), ...data, settings: { ...defaultProfile().settings, ...data.settings } });
+      replaceProfile(normalizeProfile(data));
       setImportText('');
       toast({ title: 'Progress imported', icon: 'check', tone: 'good' });
     } catch {

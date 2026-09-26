@@ -9,26 +9,33 @@ import { PageHeader, ProgressBar } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { navigate } from '../router';
 
+const W = 640;
+const H = 200;
+const padL = 44;
+const padR = 12;
+const padT = 12;
+const padB = 24;
+
 /** Puzzle rating over attempts, with a hover crosshair and tooltip. */
 function RatingChart({ history }: { history: { t: number; r: number }[] }) {
   const [hover, setHover] = useState<number | null>(null);
-  const W = 640;
-  const H = 200;
-  const padL = 44;
-  const padR = 12;
-  const padT = 12;
-  const padB = 24;
-  if (history.length < 2) return <div className="empty">Solve a few rated puzzles to see your rating curve.</div>;
-  const vals = history.map((h) => h.r);
-  const lo = Math.floor((Math.min(...vals) - 20) / 50) * 50;
-  const hi = Math.ceil((Math.max(...vals) + 20) / 50) * 50;
-  const x = (i: number) => padL + (i / (history.length - 1)) * (W - padL - padR);
-  const y = (v: number) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
-  const step = (hi - lo) / 50 > 6 ? 100 : 50;
-  const ticks: number[] = [];
-  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
-  const d = history.map((h, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(h.r).toFixed(1)}`).join(' ');
-  const area = `${d} L${x(history.length - 1)},${H - padB} L${x(0)},${H - padB} Z`;
+  // Scales and paths depend only on the history; hovering re-renders just the crosshair.
+  const chart = useMemo(() => {
+    if (history.length < 2) return null;
+    const vals = history.map((h) => h.r);
+    const lo = Math.floor((Math.min(...vals) - 20) / 50) * 50;
+    const hi = Math.ceil((Math.max(...vals) + 20) / 50) * 50;
+    const x = (i: number) => padL + (i / (history.length - 1)) * (W - padL - padR);
+    const y = (v: number) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
+    const step = (hi - lo) / 50 > 6 ? 100 : 50;
+    const ticks: number[] = [];
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
+    const d = history.map((h, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(h.r).toFixed(1)}`).join(' ');
+    const area = `${d} L${x(history.length - 1)},${H - padB} L${x(0)},${H - padB} Z`;
+    return { vals, x, y, ticks, d, area };
+  }, [history]);
+  if (!chart) return <div className="empty">Solve a few rated puzzles to see your rating curve.</div>;
+  const { vals, x, y, ticks, d, area } = chart;
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     const px = ((e.clientX - r.left) / r.width) * W;

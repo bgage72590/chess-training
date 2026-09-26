@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Chess, type Move } from 'chess.js';
 import { endgameDrills, type EndgameDrill } from '../content';
 import { navigate } from '../router';
-import { engine, useEngineStatus, type Score } from '../engine/engine';
-import { Board, playMoveSound, type BoardMove } from '../chess/Board';
-import { colorName, parseUci } from '../chess/utils';
+import { engine, scoreToCp, useEngineStatus } from '../engine/engine';
+import { Board, playMoveSound } from '../chess/Board';
+import { colorName, drawReason, parseUci, playUci, takeBackTo, turnOf } from '../chess/utils';
 import { getProfile, logActivity, updateProfile } from '../store/profile';
-import { Button, Pill, RichText } from '../components/ui';
+import { BoardColumn } from '../components/BoardColumn';
+import { Button, Feedback, Pill, RichText } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { sound } from '../chess/sound';
 import { GOAL_LABEL } from './Endgames';
@@ -16,33 +17,18 @@ import { MoveInput } from '../components/MoveInput';
 
 type Status = 'playing' | 'thinking' | 'success' | 'failed';
 
-const learnerCp = (s: Score | undefined): number => {
-  // Engine scores are from the engine's side; flip to the learner.
-  if (!s) return 0;
-  if (s.mate !== undefined) return s.mate > 0 ? -100000 : 100000;
-  return -(s.cp ?? 0);
-};
-
 function DrillPlayer({ drill }: { drill: EndgameDrill }) {
-  const learner = drill.fen.split(' ')[1] as 'w' | 'b';
-  const [fens, setFens] = useState<string[]>([drill.fen]);
+  const learner = turnOf(drill.fen);
   const [moves, setMoves] = useState<Move[]>([]);
   const [status, setStatus] = useState<Status>('playing');
   const [message, setMessage] = useState<{ title: string; body: string } | null>(null);
   const [arrows, setArrows] = useState<Arrow[]>([]);
   const [hints, setHints] = useState(0);
   const engineStatus = useEngineStatus();
-  const alive = useRef(true);
-  useEffect(() => {
-    alive.current = true;
-    engine.init().catch(() => undefined);
-    return () => {
-      alive.current = false;
-      engine.cancelAll();
-    };
-  }, []);
+  // Leaving cancels any search; cancelled searches resolve null and their callers stop.
+  useEffect(() => () => engine.cancelAll(), []);
 
-  const fen = fens[fens.length - 1];
+  const fen = moves.length ? moves[moves.length - 1].after : drill.fen;
   const learnerMoves = moves.filter((m) => m.color === learner).length;
   const last = moves[moves.length - 1];
 
@@ -68,25 +54,18 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
     });
   };
 
-  const onMove = async (m: BoardMove) => {
+  const onMove = async (mv: Move) => {
     if (status !== 'playing') return;
-    const c = new Chess(fen);
-    let mv: Move;
-    try {
-      mv = c.move({ from: m.from, to: m.to, promotion: m.promotion });
-    } catch {
-      return;
-    }
     playMoveSound(mv.san);
     setArrows([]);
-    const afterLearner = c.fen();
-    setFens((f) => [...f, afterLearner]);
+    const afterLearner = mv.after;
     setMoves((ms) => [...ms, mv]);
     const used = learnerMoves + 1;
 
+    const c = new Chess(afterLearner);
     if (c.isCheckmate()) return succeed('Checkmate', `Delivered in ${used} move${used > 1 ? 's' : ''}.`);
     if (c.isDraw()) {
-      const why = c.isStalemate() ? 'Stalemate' : c.isInsufficientMaterial() ? 'Insufficient material' : c.isThreefoldRepetition() ? 'Threefold repetition' : 'Fifty-move rule';
+      const why = drawReason(c);
       if (drill.goal === 'draw') return succeed('Draw secured', `${why}. That is a half point saved.`);
       return fail(why, c.isStalemate() ? 'The defending king had no legal move but was not in check. Always leave it a square.' : 'The position ended in a draw. Take the move back and find a more precise plan.');
     }
@@ -99,8 +78,9 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
       setStatus('playing');
       return;
     }
-    if (!alive.current) return;
-    const evalLearner = learnerCp(res.lines[0]?.score);
+    if (!res) return;
+    // The score is from the engine's side (to move); flip it to the learner.
+    const evalLearner = -scoreToCp(res.lines[0]?.score ?? { cp: 0 });
 
     if (drill.goal === 'promote' && mv.promotion) {
       if (evalLearner >= 300) return succeed('Promoted', `The pawn queened and the position is winning (${used} moves).`);
@@ -116,16 +96,14 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
       return fail('Out of moves', `The target was ${drill.maxMoves} moves. Aim for a more direct technique.`);
     }
 
-    const reply = res.bestmove;
-    if (!reply || reply === '(none)') {
+    const reply = res.best && playUci(afterLearner, res.best);
+    if (!reply) {
       setStatus('playing');
       return;
     }
-    const c2 = new Chess(afterLearner);
-    const em = c2.move(parseUci(reply));
-    playMoveSound(em.san);
-    setFens((f) => [...f, c2.fen()]);
-    setMoves((ms) => [...ms, em]);
+    playMoveSound(reply.move.san);
+    setMoves((ms) => [...ms, reply.move]);
+    const c2 = new Chess(reply.fen);
     if (c2.isCheckmate()) return fail('You were mated', 'Take the move back and check the opponent’s forcing moves first.');
     if (c2.isDraw()) {
       if (drill.goal === 'draw') return succeed('Draw secured', 'The engine could not make progress.');
@@ -137,12 +115,8 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
 
   const takeBack = () => {
     engine.cancelAll();
-    // Remove back to the position before the learner's last move.
-    let n = moves.length;
-    while (n > 0 && moves[n - 1].color !== learner) n--;
-    if (n > 0) n--;
-    setMoves(moves.slice(0, n));
-    setFens(fens.slice(0, n + 1));
+    // Back to the position before the learner's last move.
+    setMoves(moves.slice(0, takeBackTo(moves, learner)));
     setStatus('playing');
     setMessage(null);
     setArrows([]);
@@ -151,7 +125,6 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
   const restart = () => {
     engine.cancelAll();
     setMoves([]);
-    setFens([drill.fen]);
     setStatus('playing');
     setMessage(null);
     setArrows([]);
@@ -162,10 +135,10 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
     if (status !== 'playing') return;
     setStatus('thinking');
     const r = await engine.search(fen, { depth: 18, movetime: 1200 });
-    if (!alive.current) return;
+    if (!r) return;
     setStatus('playing');
-    if (r.bestmove && r.bestmove !== '(none)') {
-      const u = parseUci(r.bestmove);
+    if (r.best) {
+      const u = parseUci(r.best);
       setArrows([{ from: u.from, to: u.to, color: 'blue' }]);
       setHints((h) => h + 1);
     }
@@ -173,7 +146,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
 
   return (
     <div className="trainer">
-      <div className="trainer-board">
+      <BoardColumn>
         <div className="board-caption">
           <span className="player-tag">
             <span className={`side-dot ${learner}`} /> You play {colorName(learner)}
@@ -184,7 +157,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
         </div>
         <Board fen={fen} orientation={learner === 'w' ? 'white' : 'black'} interactive={status === 'playing' && engineStatus !== 'failed'} playerColor={learner} onMove={onMove} lastMove={last ? [last.from, last.to] : null} arrows={arrows} />
         <MoveInput id="drill-move" fen={fen} enabled={status === 'playing' && engineStatus !== 'failed'} onMove={onMove} />
-      </div>
+      </BoardColumn>
       <aside className="panel">
         <div className="panel-section">
           <div className="btn-row">
@@ -195,15 +168,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
           <RichText text={drill.brief} />
         </div>
         <EngineNotice />
-        {message && (
-          <div className={`feedback ${status === 'success' ? 'feedback-good' : 'feedback-bad'}`}>
-            <Icon name={status === 'success' ? 'trophy' : 'x'} />
-            <div>
-              <strong>{message.title}</strong>
-              <span className="feedback-body">{message.body}</span>
-            </div>
-          </div>
-        )}
+        {message && <Feedback tone={status === 'success' ? 'good' : 'bad'} icon={status === 'success' ? 'trophy' : 'x'} title={message.title} body={message.body} />}
         <div className="btn-row">
           {status === 'success' ? (
             <>

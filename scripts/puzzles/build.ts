@@ -1,11 +1,14 @@
 // Builds src/data/puzzles.json from the generator's raw output:
-// dedupes, assigns a difficulty rating from solution features, and balances the set across ratings.
+// dedupes, re-tags themes with the current tagger, assigns a difficulty rating from solution
+// features, and balances the set across ratings.
 //
 //   npx tsx scripts/puzzles/build.ts [--max 3000]
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Chess, type PieceSymbol } from 'chess.js';
+import { playUci, pvToSan } from '../../src/chess/utils.ts';
+import type { Puzzle } from '../../src/data/puzzles.ts';
+import { tagPuzzle } from './tagger.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const RAW = path.join(here, 'out', 'raw.jsonl');
@@ -26,16 +29,6 @@ interface Raw {
   firstCheck: boolean;
   firstCapture: boolean;
   cont?: string[];
-}
-
-export interface Puzzle {
-  id: string;
-  fen: string;
-  moves: string;
-  rating: number;
-  themes: string[];
-  /** Engine continuation after the solution (UCI), used to explain the point. */
-  cont?: string;
 }
 
 /**
@@ -68,15 +61,12 @@ function main() {
   const all: (Puzzle & { raw: Raw })[] = [];
   for (const line of lines) {
     const r = JSON.parse(line) as Raw;
-    const c = new Chess(r.fen);
-    try {
-      for (const u of r.moves) c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] as PieceSymbol | undefined });
-    } catch {
-      continue;
-    }
+    if (pvToSan(r.fen, r.moves, r.moves.length).length < r.moves.length) continue; // illegal line
     const key = r.fen.split(' ').slice(0, 4).join(' ') + r.moves[0];
     if (seen.has(key)) continue;
     seen.add(key);
+    const puzzleFen = playUci(r.fen, r.moves[0])!.fen;
+    r.themes = tagPuzzle({ fen: puzzleFen, solution: r.moves.slice(1), gamePly: r.gamePly });
     all.push({ id: '', fen: r.fen, moves: r.moves.join(' '), rating: rate(r), themes: r.themes, raw: r });
   }
   // Balance: cap each 100-point band so easy puzzles do not swamp the set.
@@ -100,9 +90,7 @@ function main() {
     fen: p.fen,
     moves: p.moves,
     rating: p.rating,
-    themes: p.themes.filter((t) => t !== 'oneMove' && t !== 'short' && t !== 'long' && t !== 'veryLong').concat(
-      p.raw.moves.length <= 2 ? ['oneMove'] : p.raw.moves.length <= 4 ? ['short'] : p.raw.moves.length <= 6 ? ['long'] : ['veryLong'],
-    ),
+    themes: p.themes,
     ...(p.raw.cont?.length ? { cont: p.raw.cont.join(' ') } : {}),
   }));
   fs.mkdirSync(path.dirname(OUT), { recursive: true });

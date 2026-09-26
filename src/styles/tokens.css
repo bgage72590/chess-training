@@ -39,9 +39,7 @@
   --coord-on-light: #6a8397;
   --coord-on-dark: #eef2f5;
   --hl-last: rgb(247 206 96 / 0.55);
-  --hl-last-dark: rgb(226 176 72 / 0.74);
   --hl-select: rgb(247 206 96 / 0.8);
-  --hl-select-dark: rgb(226 176 72 / 0.9);
   --dest-dot: rgb(20 29 39 / 0.28);
   --arrow-green: #2f9e6b;
   --arrow-red: #d2463b;
@@ -111,7 +109,14 @@
   --dest-dot: rgb(10 14 20 / 0.35);
 }
 
-/* Board themes */
+/* Board themes. Dark squares use --hl-*-dark when a theme sets it, else the plain highlight. */
+.board-slate,
+.board-ink,
+.board-rose {
+  /* Gold washes out on these muted dark squares: use a deeper tone there. */
+  --hl-last-dark: rgb(226 176 72 / 0.74);
+  --hl-select-dark: rgb(226 176 72 / 0.9);
+}
 .board-slate {
   --sq-light: #dfe5ea;
   --sq-dark: #7f98ab;
@@ -120,9 +125,7 @@
 }
 .board-walnut {
   --hl-last: rgb(205 210 106 / 0.6);
-  --hl-last-dark: rgb(205 210 106 / 0.6);
   --hl-select: rgb(20 85 30 / 0.5);
-  --hl-select-dark: rgb(20 85 30 / 0.5);
   --sq-light: #f0d9b5;
   --sq-dark: #b58863;
   --coord-on-light: #a07550;
@@ -130,9 +133,7 @@
 }
 .board-tourney {
   --hl-last: rgb(255 255 51 / 0.45);
-  --hl-last-dark: rgb(255 255 51 / 0.45);
   --hl-select: rgb(255 255 51 / 0.7);
-  --hl-select-dark: rgb(255 255 51 / 0.7);
   --sq-light: #ebecd0;
   --sq-dark: #739552;
   --coord-on-light: #6c8a4e;

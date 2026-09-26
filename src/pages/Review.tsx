@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Chess, type Move } from 'chess.js';
-import { engine, whitePov, winPercent, type Score } from '../engine/engine';
-import { logActivity, updateProfile, useProfile, type GameRecord } from '../store/profile';
+import { engine, winPercent, type Score } from '../engine/engine';
+import { logActivity, playerWon, updateProfile, useProfile, type GameRecord } from '../store/profile';
 import { summarize, winFor } from '../lib/analysis';
-import { Board, playMoveSound, type BoardMove } from '../chess/Board';
-import { parseUci, pvToSan, uciOf } from '../chess/utils';
+import { Board, playMoveSound } from '../chess/Board';
+import { fullMoveOf, moveNumberLabel, parseUci, pvToSan, turnOf, uciOf } from '../chess/utils';
+import { useKeydown } from '../lib/hooks';
 import { navigate } from '../router';
-import { Button, Pill, ProgressBar } from '../components/ui';
+import { BoardColumn } from '../components/BoardColumn';
+import { Button, Feedback, Pill, ProgressBar } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { CLASS_GLYPH, CLASS_LABEL, EvalBar, EvalGraph, MoveList } from '../components/GameBits';
 import { EngineNotice } from '../components/EngineNotice';
@@ -29,11 +31,8 @@ function replay(game: GameRecord): Move[] {
 
 function useAnalysis(game: GameRecord | undefined, moves: Move[]) {
   const [progress, setProgress] = useState(0);
-  const running = useRef(false);
   useEffect(() => {
-    if (!game || game.review || running.current) return;
-    running.current = true;
-    let alive = true;
+    if (!game || game.review) return;
     (async () => {
       const fens = [game.startFen, ...moves.map((m) => m.after)];
       const evals: Score[] = [];
@@ -49,26 +48,20 @@ function useAnalysis(game: GameRecord | undefined, moves: Move[]) {
           best.push('');
         } else {
           const r = await engine.search(fens[i], { depth: 12 });
-          if (!alive) return;
-          const s = r.lines[0]?.score ?? { cp: 0 };
-          evals.push(whitePov(s, c.turn()));
-          best.push(r.bestmove);
+          if (!r) return; // cancelled: the page closed
+          evals.push(r.whiteScore ?? { cp: 0 });
+          best.push(r.best ?? '');
         }
         setProgress((i + 1) / fens.length);
       }
-      const { classes, accuracy } = summarize(evals, game.moves, best, game.startFen.split(' ')[1] as 'w' | 'b');
+      const { classes, accuracy } = summarize(evals, game.moves, best, turnOf(game.startFen));
       updateProfile((d) => {
         const g = d.games.find((x) => x.id === game.id);
         if (g) g.review = { evals, best, classes, accuracy };
         logActivity(d, 10, 'games', 0);
       });
-      running.current = false;
     })();
-    return () => {
-      alive = false;
-      engine.cancelAll();
-      running.current = false;
-    };
+    return () => engine.cancelAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id, !!game?.review]);
   return progress;
@@ -80,25 +73,28 @@ export function ReviewPage({ id }: { id: string }) {
   const moves = useMemo(() => (game ? replay(game) : []), [game?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const progress = useAnalysis(game, moves);
   const [ply, setPly] = useState(0);
-  const [retry, setRetry] = useState<{ ply: number; state: 'try' | 'good' | 'bad'; msg?: string } | null>(null);
-  const [retryFen, setRetryFen] = useState<string | null>(null);
+  /** Retrying a mistake: the ply to replay and the position on the board. */
+  const [retry, setRetry] = useState<{ ply: number; fen: string; state: 'try' | 'good' | 'bad'; msg?: string } | null>(null);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (retry) return;
-      if (e.key === 'ArrowRight') setPly((x) => Math.min(moves.length, x + 1));
-      if (e.key === 'ArrowLeft') setPly((x) => Math.max(0, x - 1));
-      if (e.key === 'Home') setPly(0);
-      if (e.key === 'End') setPly(moves.length);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [moves.length, retry]);
+  useKeydown((e) => {
+    if (retry) return;
+    if (e.key === 'ArrowRight') setPly((x) => Math.min(moves.length, x + 1));
+    if (e.key === 'ArrowLeft') setPly((x) => Math.max(0, x - 1));
+    if (e.key === 'Home') setPly(0);
+    if (e.key === 'End') setPly(moves.length);
+  });
 
   if (!game) return <div className="empty">Game not found. <Button onClick={() => navigate('games')}>All games</Button></div>;
 
   const rv = game.review;
-  const fen = ply === 0 ? game.startFen : moves[ply - 1].after;
+  /** Position before move i (i = 0 is the start). */
+  const fenAt = (i: number) => (i === 0 ? game.startFen : moves[i - 1].after);
+  const fen = fenAt(ply);
+  /** Leave any retry and show the position after `n` moves. */
+  const jump = (n: number) => {
+    setRetry(null);
+    setPly(Math.max(0, Math.min(moves.length, n)));
+  };
   const me = game.playerColor;
   const orientation = me === 'w' ? 'white' : 'black';
   const lvl = LEVELS[game.level - 1];
@@ -124,41 +120,27 @@ export function ReviewPage({ id }: { id: string }) {
 
   const startRetry = (i: number) => {
     setPly(i);
-    setRetry({ ply: i, state: 'try' });
-    setRetryFen(i === 0 ? game.startFen : moves[i - 1].after);
+    setRetry({ ply: i, fen: fenAt(i), state: 'try' });
   };
 
-  const onRetryMove = async (m: BoardMove) => {
+  const onRetryMove = async (mv: Move) => {
     if (!retry || !rv || retry.state !== 'try') return;
-    const base = retry.ply === 0 ? game.startFen : moves[retry.ply - 1].after;
-    const c = new Chess(base);
-    let mv: Move;
-    try {
-      mv = c.move({ from: m.from, to: m.to, promotion: m.promotion });
-    } catch {
-      return;
-    }
-    setRetryFen(c.fen());
+    const tried = { ...retry, fen: mv.after };
+    setRetry(tried);
     playMoveSound(mv.san);
-    const bestUci = rv.best[retry.ply];
-    if (uciOf(mv) === bestUci) {
+    const good = (msg: string) => {
       sound('good');
-      setRetry({ ...retry, state: 'good', msg: `${mv.san} is the engine's choice.` });
+      setRetry({ ...tried, state: 'good', msg });
       updateProfile((d) => logActivity(d, 8, 'puzzles', 0));
-      return;
-    }
-    const r = await engine.search(c.fen(), { depth: 12 });
-    const s = whitePov(r.lines[0]?.score ?? { cp: 0 }, c.turn());
+    };
+    if (uciOf(mv) === rv.best[retry.ply]) return good(`${mv.san} is the engine's choice.`);
+    const r = await engine.search(mv.after, { depth: 12 });
+    if (!r) return;
     const before = winFor(rv.evals[retry.ply], me);
-    const after = winFor(s, me);
-    if (before - after < 6) {
-      sound('good');
-      setRetry({ ...retry, state: 'good', msg: `${mv.san} works too: it keeps the evaluation.` });
-      updateProfile((d) => logActivity(d, 8, 'puzzles', 0));
-    } else {
-      sound('bad');
-      setRetry({ ...retry, state: 'bad', msg: `${mv.san} still costs you. Try again or reveal the best move.` });
-    }
+    const after = winFor(r.whiteScore ?? { cp: 0 }, me);
+    if (before - after < 6) return good(`${mv.san} works too: it keeps the evaluation.`);
+    sound('bad');
+    setRetry({ ...tried, state: 'bad', msg: `${mv.san} still costs you. Try again or reveal the best move.` });
   };
 
   const nextMoment = keyMoments.find(({ i }) => i > (retry?.ply ?? ply) - 1);
@@ -174,7 +156,7 @@ export function ReviewPage({ id }: { id: string }) {
             Game review · vs {lvl?.name ?? 'Coach'} · {new Date(game.t).toLocaleDateString()}
           </div>
           <h1 className="lesson-title">
-            {game.result === '1/2-1/2' ? 'Draw' : (game.result === '1-0') === (me === 'w') ? 'Win' : 'Loss'} by {game.reason.toLowerCase()}
+            {game.result === '1/2-1/2' ? 'Draw' : playerWon(game) ? 'Win' : 'Loss'} by {game.reason.toLowerCase()}
           </h1>
         </div>
       </div>
@@ -190,32 +172,32 @@ export function ReviewPage({ id }: { id: string }) {
           </div>
         </div>
       )}
-      <div className="trainer" style={{ '--board-offset': '330px' } as React.CSSProperties}>
-        <div className="trainer-board">
+      <div className="trainer">
+        <BoardColumn>
           <div className="board-with-eval">
             <EvalBar score={rv ? rv.evals[retry ? retry.ply : ply] : undefined} orientation={orientation} />
             {retry ? (
-              <Board fen={retryFen ?? fen} orientation={orientation} interactive={retry.state === 'try'} playerColor={me} onMove={onRetryMove} />
+              <Board fen={retry.fen} orientation={orientation} interactive={retry.state === 'try'} playerColor={me} onMove={onRetryMove} />
             ) : (
               <Board fen={fen} orientation={orientation} lastMove={last ? [last.from, last.to] : null} arrows={arrows} />
             )}
           </div>
-          {rv && <EvalGraph evals={rv.evals} current={ply} onSelect={(i) => { setRetry(null); setPly(i); }} classes={rv.classes} />}
+          {rv && <EvalGraph evals={rv.evals} current={ply} onSelect={jump} classes={rv.classes} />}
           <div className="btn-row" style={{ justifyContent: 'center' }}>
-            <button className="icon-btn" aria-label="Start" onClick={() => { setRetry(null); setPly(0); }}>
+            <button className="icon-btn" aria-label="Start" onClick={() => jump(0)}>
               <Icon name="first" />
             </button>
-            <button className="icon-btn" aria-label="Previous move" onClick={() => { setRetry(null); setPly(Math.max(0, ply - 1)); }}>
+            <button className="icon-btn" aria-label="Previous move" onClick={() => jump(ply - 1)}>
               <Icon name="prev" />
             </button>
-            <button className="icon-btn" aria-label="Next move" onClick={() => { setRetry(null); setPly(Math.min(moves.length, ply + 1)); }}>
+            <button className="icon-btn" aria-label="Next move" onClick={() => jump(ply + 1)}>
               <Icon name="next" />
             </button>
-            <button className="icon-btn" aria-label="End" onClick={() => { setRetry(null); setPly(moves.length); }}>
+            <button className="icon-btn" aria-label="End" onClick={() => jump(moves.length)}>
               <Icon name="last" />
             </button>
           </div>
-        </div>
+        </BoardColumn>
         <aside className="panel">
           {rv && (
             <div className="acc-row">
@@ -241,22 +223,15 @@ export function ReviewPage({ id }: { id: string }) {
             <div className="panel-section">
               <div className="eyebrow">Retry the moment</div>
               <p>Find a better move than the one you played.</p>
-              {retry.msg && (
-                <div className={`feedback ${retry.state === 'good' ? 'feedback-good' : 'feedback-bad'}`}>
-                  <Icon name={retry.state === 'good' ? 'check' : 'x'} />
-                  <div>
-                    <span className="feedback-body">{retry.msg}</span>
-                  </div>
-                </div>
-              )}
+              {retry.msg && <Feedback tone={retry.state === 'good' ? 'good' : 'bad'} icon={retry.state === 'good' ? 'check' : 'x'} body={retry.msg} />}
               <div className="btn-row">
                 {retry.state === 'bad' && (
-                  <Button onClick={() => { setRetry({ ply: retry.ply, state: 'try' }); setRetryFen(retry.ply === 0 ? game.startFen : moves[retry.ply - 1].after); }} icon="refresh">
+                  <Button onClick={() => startRetry(retry.ply)} icon="refresh">
                     Try again
                   </Button>
                 )}
                 {retry.state !== 'good' && (
-                  <Button variant="ghost" icon="eye" onClick={() => { setRetry(null); setPly(retry.ply + 1); }}>
+                  <Button variant="ghost" icon="eye" onClick={() => jump(retry.ply + 1)}>
                     Reveal
                   </Button>
                 )}
@@ -266,7 +241,7 @@ export function ReviewPage({ id }: { id: string }) {
                   </Button>
                 ) : (
                   retry.state === 'good' && (
-                    <Button variant="primary" onClick={() => { setRetry(null); setPly(retry.ply + 1); }}>
+                    <Button variant="primary" onClick={() => jump(retry.ply + 1)}>
                       Back to review
                     </Button>
                   )
@@ -287,7 +262,7 @@ export function ReviewPage({ id }: { id: string }) {
                 </div>
                 {bestHere && cls !== 'best' && cls !== 'good' && (
                   <p className="muted">
-                    Better was <strong className="mono">{pvToSan(moveIdx === 0 ? game.startFen : moves[moveIdx - 1].after, [bestHere])[0]}</strong>. Win chance{' '}
+                    Better was <strong className="mono">{pvToSan(fenAt(moveIdx), [bestHere])[0]}</strong>. Win chance{' '}
                     {Math.round(winFor(rv.evals[moveIdx], moves[moveIdx].color))}% → {Math.round(winFor(rv.evals[moveIdx + 1], moves[moveIdx].color))}%.
                   </p>
                 )}
@@ -299,7 +274,7 @@ export function ReviewPage({ id }: { id: string }) {
               </div>
             )
           )}
-          <MoveList sans={moves.map((m) => m.san)} current={ply} onSelect={(i) => { setRetry(null); setPly(i); }} classes={rv?.classes} />
+          <MoveList sans={moves.map((m) => m.san)} current={ply} onSelect={jump} classes={rv?.classes} />
           {rv && keyMoments.length > 0 && !retry && (
             <div className="panel-section">
               <h3>Your key moments</h3>
@@ -308,8 +283,7 @@ export function ReviewPage({ id }: { id: string }) {
                   <button key={i} className="moment" onClick={() => startRetry(i)}>
                     <span className={`glyph glyph-${c}`}>{CLASS_GLYPH[c]}</span>
                     <span className="mono">
-                      {Math.floor(i / 2) + 1}
-                      {i % 2 === 0 ? '.' : '...'}
+                      {moveNumberLabel(i, fullMoveOf(game.startFen), turnOf(game.startFen))}
                       {moves[i].san}
                     </span>
                     <span className="faint">{Math.round(winFor(rv.evals[i], me) - winFor(rv.evals[i + 1], me))}% lost</span>
@@ -319,15 +293,7 @@ export function ReviewPage({ id }: { id: string }) {
               </div>
             </div>
           )}
-          {rv && keyMoments.length === 0 && (
-            <div className="feedback feedback-good">
-              <Icon name="star" />
-              <div>
-                <strong>No mistakes or blunders</strong>
-                <span className="feedback-body">Try the next level up.</span>
-              </div>
-            </div>
-          )}
+          {rv && keyMoments.length === 0 && <Feedback tone="good" icon="star" title="No mistakes or blunders" body="Try the next level up." />}
           <div className="faint" style={{ fontSize: '0.8rem' }}>
             Final evaluation: {rv ? `${Math.round(winPercent(rv.evals[rv.evals.length - 1]))}% for White` : '—'}
           </div>

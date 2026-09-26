@@ -1,18 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
-import { Chess, type Color, type PieceSymbol } from 'chess.js';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { Chess, type Color, type Move, type PieceSymbol } from 'chess.js';
 import type { Arrow, Mark, MarkColor } from '../content/types';
-import { FILES } from './utils';
+import { colorName, FILES } from './utils';
 import { diffPieces, parsePlacement, type PieceState } from './pieces';
 import { useSettings } from '../store/profile';
 import { sound } from './sound';
 
 export type SquareTone = 'good' | 'bad' | 'hint' | 'focus';
-
-export interface BoardMove {
-  from: string;
-  to: string;
-  promotion?: PieceSymbol;
-}
 
 export interface BoardProps {
   fen: string;
@@ -21,20 +15,16 @@ export interface BoardProps {
   interactive?: boolean;
   /** If set, only this color may be moved by the user. */
   playerColor?: Color;
-  onMove?: (move: BoardMove) => void;
+  /** Called with the legal move the user made (from the board or a promotion choice). */
+  onMove?: (move: Move) => void;
   lastMove?: [string, string] | null;
   arrows?: Arrow[];
   marks?: Mark[];
   tones?: Record<string, SquareTone>;
   onSquareClick?: (square: string) => void;
   coordinates?: boolean;
-  showDests?: boolean;
   /** Allow right-click arrows and circles. */
   drawable?: boolean;
-  /** Hide pieces (for blindfold/vision drills). */
-  hidePieces?: boolean;
-  className?: string;
-  ariaLabel?: string;
 }
 
 const ARROW_VAR: Record<MarkColor, string> = {
@@ -56,11 +46,7 @@ export function Board({
   tones,
   onSquareClick,
   coordinates,
-  showDests = true,
   drawable = true,
-  hidePieces = false,
-  className = '',
-  ariaLabel,
 }: BoardProps) {
   const settings = useSettings();
   const showCoords = coordinates ?? settings.coordinates;
@@ -68,7 +54,11 @@ export function Board({
   const [pieces, setPieces] = useState<PieceState[]>(() => diffPieces([], parsePlacement(fen)));
   const moveHint = useRef<[string, string] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [drag, setDrag] = useState<{ from: string; x: number; y: number; size: number; moved: boolean; wasSelected: boolean } | null>(null);
+  // Drag state lives in a ref: pointer moves update the dragged piece's transform directly
+  // instead of re-rendering the whole board. `dragging` only flips once the drag starts.
+  const drag = useRef<{ from: string; x: number; y: number; rect: DOMRect; moved: boolean; wasSelected: boolean } | null>(null);
+  const dragEl = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
   const [promo, setPromo] = useState<{ from: string; to: string } | null>(null);
   const [userShapes, setUserShapes] = useState<{ from: string; to?: string; color: MarkColor }[]>([]);
   const drawStart = useRef<string | null>(null);
@@ -99,14 +89,16 @@ export function Board({
   }, [fen]);
 
   const turn = chess?.turn() ?? 'w';
-  const canMove = interactive && !!chess && (!playerColor || playerColor === turn) && !chess.isGameOver();
+  const gameOver = useMemo(() => !chess || chess.isGameOver(), [chess]);
+  const canMove = interactive && !gameOver && (!playerColor || playerColor === turn);
 
+  // Legal moves grouped by origin square; the chosen Move is what onMove receives.
   const dests = useMemo(() => {
-    const m = new Map<string, { to: string; promotion?: PieceSymbol; captured: boolean }[]>();
+    const m = new Map<string, Move[]>();
     if (!canMove || !chess) return m;
     for (const mv of chess.moves({ verbose: true })) {
       const list = m.get(mv.from) ?? [];
-      list.push({ to: mv.to, promotion: mv.promotion, captured: !!mv.captured });
+      list.push(mv);
       m.set(mv.from, list);
     }
     return m;
@@ -118,9 +110,8 @@ export function Board({
   }, [chess]);
 
   const squareAt = (clientX: number, clientY: number): string | null => {
-    const el = ref.current;
-    if (!el) return null;
-    const r = el.getBoundingClientRect();
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return null;
     const x = Math.floor(((clientX - r.left) / r.width) * 8);
     const y = Math.floor(((clientY - r.top) / r.height) * 8);
     if (x < 0 || x > 7 || y < 0 || y > 7) return null;
@@ -132,12 +123,9 @@ export function Board({
   const tryMove = (from: string, to: string) => {
     const opts = dests.get(from)?.filter((d) => d.to === to) ?? [];
     if (!opts.length) return false;
-    if (opts.length > 1 || opts[0].promotion) {
-      if (settings.autoQueen) {
-        finishMove(from, to, 'q');
-      } else {
-        setPromo({ from, to });
-      }
+    if (opts[0].promotion) {
+      if (settings.autoQueen) finishMove(from, to, 'q');
+      else setPromo({ from, to });
       return true;
     }
     finishMove(from, to);
@@ -145,10 +133,12 @@ export function Board({
   };
 
   const finishMove = (from: string, to: string, promotion?: PieceSymbol) => {
-    moveHint.current = [from, to];
+    const mv = dests.get(from)?.find((d) => d.to === to && d.promotion === promotion);
     setSelected(null);
     setPromo(null);
-    onMove?.({ from, to, promotion });
+    if (!mv) return;
+    moveHint.current = [from, to];
+    onMove?.(mv);
   };
 
   const onPointerDown = (e: RPointerEvent<HTMLDivElement>) => {
@@ -168,10 +158,9 @@ export function Board({
       tryMove(selected, sq);
       return;
     }
-    const piece = chess?.get(sq as never);
-    if (piece && piece.color === turn && dests.has(sq)) {
-      const r = ref.current!.getBoundingClientRect();
-      setDrag({ from: sq, x: e.clientX - r.left, y: e.clientY - r.top, size: r.width, moved: false, wasSelected: selected === sq });
+    if (dests.has(sq)) {
+      const rect = ref.current!.getBoundingClientRect();
+      drag.current = { from: sq, x: e.clientX - rect.left, y: e.clientY - rect.top, rect, moved: false, wasSelected: selected === sq };
       setSelected(sq);
       ref.current!.setPointerCapture?.(e.pointerId);
     } else {
@@ -179,13 +168,26 @@ export function Board({
     }
   };
 
+  const dragTransform = (d: { x: number; y: number; rect: DOMRect }) =>
+    `translate(${d.x - d.rect.width / 16}px, ${d.y - d.rect.height / 16}px) scale(1.08)`;
+
   const onPointerMove = (e: RPointerEvent<HTMLDivElement>) => {
-    if (!drag) return;
-    const r = ref.current!.getBoundingClientRect();
-    const x = e.clientX - r.left;
-    const y = e.clientY - r.top;
-    const moved = drag.moved || Math.hypot(x - drag.x, y - drag.y) > r.width / 40;
-    setDrag({ ...drag, x, y, size: r.width, moved });
+    const d = drag.current;
+    if (!d) return;
+    const x = e.clientX - d.rect.left;
+    const y = e.clientY - d.rect.top;
+    if (!d.moved && Math.hypot(x - d.x, y - d.y) > d.rect.width / 40) {
+      d.moved = true;
+      setDragging(d.from);
+    }
+    d.x = x;
+    d.y = y;
+    if (dragEl.current) dragEl.current.style.transform = dragTransform(d);
+  };
+
+  const endDrag = () => {
+    drag.current = null;
+    setDragging(null);
   };
 
   const onPointerUp = (e: RPointerEvent<HTMLDivElement>) => {
@@ -202,9 +204,9 @@ export function Board({
       });
       return;
     }
-    if (!drag) return;
-    const d = drag;
-    setDrag(null);
+    const d = drag.current;
+    if (!d) return;
+    endDrag();
     const sq = squareAt(e.clientX, e.clientY);
     if (!d.moved) {
       // A click: select, or deselect when clicking the selected piece again.
@@ -228,7 +230,7 @@ export function Board({
       if (checkSquare === sq) cls.push('check');
       const tone = tones?.[sq];
       if (tone) cls.push(`tone-${tone}`);
-      const dest = selected && showDests ? dests.get(selected)?.find((d) => d.to === sq) : undefined;
+      const dest = selected ? dests.get(selected)?.find((d) => d.to === sq) : undefined;
       squares.push(
         <div key={sq} className={cls.join(' ')} data-square={sq}>
           {dest && <span className={dest.captured ? 'dest capture' : 'dest'} />}
@@ -256,31 +258,28 @@ export function Board({
   return (
     <div
       ref={ref}
-      className={`board board-${settings.boardTheme} ${canMove ? 'can-move' : ''} ${className}`}
+      className={`board board-${settings.boardTheme}${canMove ? ' can-move' : ''}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={() => setDrag(null)}
+      onPointerCancel={endDrag}
       onContextMenu={(e) => e.preventDefault()}
       role="img"
-      aria-label={ariaLabel ?? `Chess board, ${turn === 'w' ? 'White' : 'Black'} to move`}
+      aria-label={`Chess board, ${colorName(turn)} to move`}
     >
       <div className="squares">{squares}</div>
-      {!hidePieces &&
-        pieces.map((p) => {
-          const { x, y } = xy(p.square);
-          const dragging = drag && drag.moved && drag.from === p.square;
-          const style = dragging
-            ? { transform: `translate(${drag.x - drag.size / 16}px, ${drag.y - drag.size / 16}px) scale(1.08)` }
-            : { transform: `translate(${x * 100}%, ${y * 100}%)` };
-          return (
-            <div
-              key={p.id}
-              className={`piece pc-${p.color}${p.type.toUpperCase()}${dragging ? ' dragging' : ''}`}
-              style={style}
-            />
-          );
-        })}
+      {pieces.map((p) => {
+        const { x, y } = xy(p.square);
+        const isDragged = dragging === p.square && drag.current;
+        return (
+          <div
+            key={p.id}
+            ref={isDragged ? dragEl : undefined}
+            className={`piece pc-${p.color}${p.type.toUpperCase()}${isDragged ? ' dragging' : ''}`}
+            style={{ transform: isDragged ? dragTransform(drag.current!) : `translate(${x * 100}%, ${y * 100}%)` }}
+          />
+        );
+      })}
       {allShapes.length > 0 && (
         <svg className="shapes" viewBox="0 0 8 8" aria-hidden="true">
           <defs>
@@ -346,19 +345,4 @@ export function playMoveSound(san: string | undefined) {
   else if (san.includes('x')) sound('capture');
   else if (san.startsWith('O-O')) sound('castle');
   else sound('move');
-}
-
-/** Keeps a board sized to its container, returning a ref and the size in px. */
-export function useElementWidth<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
-  const [w, setW] = useState(0);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setW(el.clientWidth));
-    ro.observe(el);
-    setW(el.clientWidth);
-    return () => ro.disconnect();
-  }, []);
-  return [ref, w] as const;
 }

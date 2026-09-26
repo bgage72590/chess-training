@@ -3,7 +3,7 @@
 // the viewer's private subtree (data/users/<id>/...). Everywhere else this is a no-op and
 // progress stays in localStorage.
 import { useSyncExternalStore } from 'react';
-import { defaultProfile, getProfile, replaceProfile, subscribeProfile, type GameRecord, type Profile } from './profile';
+import { getProfile, normalizeProfile, replaceProfile, subscribeProfile, type GameRecord, type Profile } from './profile';
 
 interface DocSnap {
   exists: boolean;
@@ -82,12 +82,13 @@ export async function startCloudSync() {
     const p = getProfile();
     try {
       const { games, ...rest } = p;
-      await profileRef.set({ v: 1, updatedAt: p.updatedAt, json: JSON.stringify(rest) });
+      // Games (with their reviews) are the bulky part: only rewrite them when they changed.
       const gamesJson = JSON.stringify(games);
-      if (gamesJson !== lastGamesJson) {
-        await gamesRef.set({ v: 1, updatedAt: p.updatedAt, json: gamesJson });
-        lastGamesJson = gamesJson;
-      }
+      await Promise.all([
+        profileRef.set({ v: 1, updatedAt: p.updatedAt, json: JSON.stringify(rest) }),
+        gamesJson !== lastGamesJson && gamesRef.set({ v: 1, updatedAt: p.updatedAt, json: gamesJson }),
+      ]);
+      lastGamesJson = gamesJson;
       setState('synced');
     } catch (e) {
       const code = (e as { code?: string }).code;
@@ -118,10 +119,9 @@ export async function startCloudSync() {
     if (remoteBody && remoteAt > (local.updatedAt ?? 0)) {
       const rest = JSON.parse(String(remoteBody.json)) as Omit<Profile, 'games'>;
       const gamesBody = gs.exists ? gs.data() : undefined;
-      const games = gamesBody ? (JSON.parse(String(gamesBody.json)) as GameRecord[]) : [];
-      lastGamesJson = JSON.stringify(games);
-      const base0 = defaultProfile();
-      replaceProfile({ ...base0, ...rest, games, settings: { ...base0.settings, ...rest.settings }, puzzles: { ...base0.puzzles, ...rest.puzzles } }, { keepTimestamp: true });
+      lastGamesJson = gamesBody ? String(gamesBody.json) : '[]';
+      const games = JSON.parse(lastGamesJson) as GameRecord[];
+      replaceProfile(normalizeProfile({ ...rest, games }), { keepTimestamp: true });
       setState('synced');
     } else if (local.updatedAt > remoteAt) {
       await write();

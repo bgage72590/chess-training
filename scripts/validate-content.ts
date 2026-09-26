@@ -11,7 +11,8 @@
 import { Chess, validateFen, type Move } from 'chess.js';
 import { units, openings, endgameDrills } from '../src/content/index.ts';
 import type { Arrow, Mark, MoveStep, LessonStep } from '../src/content/types.ts';
-import { UciEngine, winPercent, type Score } from './lib/uci.ts';
+import { UciEngine, scoreToCp, winPercent, type Score, type SearchOptions, type SearchResult } from './lib/uci.ts';
+import { acceptsMove, isSquare, nullMoveFen, playUci, sanToUci, uciOf } from '../src/chess/utils.ts';
 
 const args = process.argv.slice(2);
 const flag = (f: string) => args.includes(f);
@@ -34,14 +35,25 @@ const warn = (where: string, msg: string) => {
   console.log(`  WARN   ${where}: ${msg}`);
 };
 
-const SQUARE = /^[a-h][1-8]$/;
 const fmt = (s: Score) => (s.mate !== undefined ? `#${s.mate}` : `${((s.cp ?? 0) / 100).toFixed(2)}`);
-const uciOf = (m: Move) => m.from + m.to + (m.promotion ?? '');
 
 let engine: UciEngine | null = null;
-async function eng() {
-  if (!engine) engine = await UciEngine.create({ hashMb: 128 });
-  return engine;
+const cache = new Map<string, Promise<SearchResult>>();
+/**
+ * Engine analysis, memoised per position and options. The engine clears its hash before
+ * every search, so each result is reproducible and independent of what ran before.
+ */
+function analyze(fen: string, o: SearchOptions): Promise<SearchResult> {
+  const key = fen + JSON.stringify(o);
+  let r = cache.get(key);
+  if (!r) {
+    r = (async () => {
+      engine ??= await UciEngine.create({ hashMb: 128, fresh: true });
+      return engine.analyze(fen, o);
+    })();
+    cache.set(key, r);
+  }
+  return r;
 }
 
 function checkFen(where: string, fen: string): Chess | null {
@@ -52,10 +64,7 @@ function checkFen(where: string, fen: string): Chess | null {
   }
   try {
     const chess = new Chess(fen);
-    const parts = fen.split(' ');
-    parts[1] = parts[1] === 'w' ? 'b' : 'w';
-    parts[3] = '-';
-    if (new Chess(parts.join(' '), { skipValidation: true }).isCheck()) {
+    if (new Chess(nullMoveFen(fen), { skipValidation: true }).isCheck()) {
       err(where, `illegal position "${fen}": the side not to move is in check`);
       return null;
     }
@@ -68,9 +77,9 @@ function checkFen(where: string, fen: string): Chess | null {
 
 function checkShapes(where: string, arrows?: Arrow[], marks?: Mark[]) {
   for (const a of arrows ?? []) {
-    if (!SQUARE.test(a.from) || !SQUARE.test(a.to)) err(where, `bad arrow ${a.from}->${a.to}`);
+    if (!isSquare(a.from) || !isSquare(a.to)) err(where, `bad arrow ${a.from}->${a.to}`);
   }
-  for (const m of marks ?? []) if (!SQUARE.test(m.square)) err(where, `bad mark ${m.square}`);
+  for (const m of marks ?? []) if (!isSquare(m.square)) err(where, `bad mark ${m.square}`);
 }
 
 function playSan(where: string, chess: Chess, san: string): Move | null {
@@ -86,14 +95,13 @@ function playSan(where: string, chess: Chess, san: string): Move | null {
 async function scoreOfMove(fen: string, uci: string, known: { pv: string[]; score: Score }[]): Promise<Score> {
   const hit = known.find((l) => l.pv[0] === uci);
   if (hit) return hit.score;
-  const r = await (await eng()).analyze(fen, { depth, searchmoves: [uci] });
+  const r = await analyze(fen, { depth, searchmoves: [uci] });
   return r.lines[0]?.score ?? { cp: 0 };
 }
 
 async function checkMoveStep(where: string, step: MoveStep) {
   const chess = checkFen(where, step.fen);
   if (!chess) return;
-  if (useEngine) (await eng()).newGame();
   if (!step.solution.length) return err(where, 'empty solution');
   if (step.solution.length % 2 === 0) err(where, 'solution must start and end with the learner move (odd length)');
   if (step.accept?.length && step.solution.length !== 1) err(where, '`accept` is only allowed for one-move solutions');
@@ -111,8 +119,7 @@ async function checkMoveStep(where: string, step: MoveStep) {
     if (!mv) return;
     if (!useEngine) continue;
     if (mv.san !== san && mv.lan !== san) warn(where, `write "${mv.san}" instead of "${san}" (canonical SAN)`);
-    const e = await eng();
-    const r = await e.analyze(fen, { depth, multipv: 3 });
+    const r = await analyze(fen, { depth, multipv: 3 });
     const best = r.lines[0];
     if (!best) continue;
     const played = await scoreOfMove(fen, uciOf(mv), r.lines);
@@ -124,18 +131,11 @@ async function checkMoveStep(where: string, step: MoveStep) {
       }
       // Ambiguity: another move nearly as good in a decisive position.
       if (winPercent(played) >= 70 || (played.mate ?? 0) > 0) {
-        const accepted = new Set([uciOf(mv), ...(i === 0 ? (step.accept ?? []).map((a) => uciOf(new Chess(fen).move(a))) : [])]);
+        const accepted = [uciOf(mv), ...(i === 0 ? (step.accept ?? []).map((a) => sanToUci(fen, a) ?? '') : [])];
         for (const l of r.lines) {
-          if (accepted.has(l.pv[0])) continue;
-          // Any mate is accepted by the app when the solution itself mates now.
-          const alt = new Chess(fen);
-          let altMove: Move | null = null;
-          try {
-            altMove = alt.move({ from: l.pv[0].slice(0, 2), to: l.pv[0].slice(2, 4), promotion: l.pv[0][4] });
-          } catch {
-            /* ignore */
-          }
-          if (isMate && altMove && alt.isCheckmate()) continue;
+          const altMove = playUci(fen, l.pv[0])?.move;
+          // Moves the lesson page would accept too are not ambiguities.
+          if (altMove && acceptsMove(altMove, accepted)) continue;
           const close =
             (played.mate !== undefined && played.mate > 0 && l.score.mate !== undefined && l.score.mate > 0 && l.score.mate <= played.mate) ||
             winPercent(l.score) >= winPercent(played) - 4;
@@ -156,7 +156,7 @@ async function checkStep(where: string, step: LessonStep) {
   switch (step.kind) {
     case 'read':
       if (step.fen) checkFen(where, step.fen);
-      if (step.lastMove && !step.lastMove.every((s) => SQUARE.test(s))) err(where, 'bad lastMove');
+      if (step.lastMove && !step.lastMove.every(isSquare)) err(where, 'bad lastMove');
       break;
     case 'quiz': {
       if (step.fen) checkFen(where, step.fen);
@@ -238,7 +238,7 @@ async function main() {
           if (mv.san !== san) warn(where, `ply ${ply}: write "${mv.san}" instead of "${san}"`);
           if (ply % 2 === learnerParity && !line.notes[ply]) warn(where, `ply ${ply} (${san}) is a learner move without a note`);
           if (!useEngine) continue;
-          const r = await (await eng()).analyze(fen, { depth: Math.min(depth, 14), multipv: 1 });
+          const r = await analyze(fen, { depth: Math.min(depth, 14), multipv: 1 });
           const best = r.lines[0];
           if (!best || best.pv[0] === uciOf(mv)) continue;
           const played = await scoreOfMove(fen, uciOf(mv), r.lines);
@@ -261,11 +261,9 @@ async function main() {
       if (chess.isGameOver()) err(where, 'position is already game over');
       if (d.tips.length < 2) warn(where, 'add at least two tips');
       if (!useEngine) continue;
-      // Clear the hash so each drill is judged independently of earlier positions.
-      (await eng()).newGame();
-      const r = await (await eng()).analyze(d.fen, { depth: Math.max(depth, 20) });
+      const r = await analyze(d.fen, { depth: Math.max(depth, 20) });
       const s = r.lines[0]?.score ?? { cp: 0 };
-      const cp = s.mate !== undefined ? (s.mate > 0 ? 10000 : -10000) : s.cp ?? 0;
+      const cp = scoreToCp(s);
       if (d.goal === 'win' && cp < 400) err(where, `goal win but engine eval is ${fmt(s)}`);
       if (d.goal === 'promote' && cp < 250) err(where, `goal promote but engine eval is ${fmt(s)}`);
       if (d.goal === 'draw' && (cp < -120 || cp > 250)) err(where, `goal draw but engine eval is ${fmt(s)} for the learner`);

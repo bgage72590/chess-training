@@ -4,25 +4,15 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { goCommand, parseInfo, type PvLine } from '../../src/engine/score.ts';
+
+export { scoreToCp, winPercent, type PvLine, type Score } from '../../src/engine/score.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ENGINES = {
   lite: path.join(root, 'node_modules/stockfish/bin/stockfish-19-lite-single.js'),
   full: path.join(root, 'node_modules/stockfish/bin/stockfish-19-single.js'),
 };
-
-/** Score from the side to move's point of view. Exactly one of cp / mate is set. */
-export interface Score {
-  cp?: number;
-  mate?: number;
-}
-
-export interface PvLine {
-  multipv: number;
-  depth: number;
-  score: Score;
-  pv: string[];
-}
 
 export interface SearchResult {
   bestmove: string;
@@ -42,27 +32,13 @@ export interface SearchOptions {
   searchmoves?: string[];
 }
 
-/** Converts a score to centipawns, mapping mates to ±(100000 - distance). */
-export function scoreToCp(s: Score): number {
-  if (s.mate !== undefined) {
-    if (s.mate === 0) return -100000;
-    return s.mate > 0 ? 100000 - s.mate * 100 : -100000 - s.mate * 100;
-  }
-  return s.cp ?? 0;
-}
-
-/** Lichess-style win percentage (0..100) for the side to move. */
-export function winPercent(s: Score): number {
-  if (s.mate !== undefined) return s.mate > 0 ? 100 : 0;
-  const cp = Math.max(-1000, Math.min(1000, s.cp ?? 0));
-  return 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
-}
-
 export class UciEngine {
   private proc: ChildProcessWithoutNullStreams;
   private waiters: { pred: (l: string) => boolean; resolve: (l: string) => void; reject: (e: Error) => void }[] = [];
   private onLine: ((l: string) => void) | null = null;
   private chain: Promise<unknown> = Promise.resolve();
+  /** Clear the hash before every search so results do not depend on earlier searches. */
+  private fresh = false;
 
   private constructor(variant: keyof typeof ENGINES) {
     this.proc = spawn(process.execPath, [ENGINES[variant]], { stdio: 'pipe' });
@@ -82,8 +58,9 @@ export class UciEngine {
     });
   }
 
-  static async create(opts: { variant?: keyof typeof ENGINES; hashMb?: number } = {}): Promise<UciEngine> {
+  static async create(opts: { variant?: keyof typeof ENGINES; hashMb?: number; fresh?: boolean } = {}): Promise<UciEngine> {
     const e = new UciEngine(opts.variant ?? 'lite');
+    e.fresh = opts.fresh ?? false;
     e.send('uci');
     await e.waitFor((l) => l === 'uciok');
     e.send(`setoption name Hash value ${opts.hashMb ?? 64}`);
@@ -115,35 +92,19 @@ export class UciEngine {
   /** Runs one search. Calls are serialized per engine instance. */
   analyze(fen: string, o: SearchOptions = {}): Promise<SearchResult> {
     const run = async () => {
-      const multipv = o.multipv ?? 1;
-      this.setOption('MultiPV', multipv);
+      if (this.fresh) this.newGame();
+      this.setOption('MultiPV', o.multipv ?? 1);
       await this.ready();
       const byPv = new Map<number, PvLine>();
       const depthMoves: string[] = [];
       this.onLine = (line) => {
-        if (!line.startsWith('info ') || !line.includes(' pv ')) return;
-        const t = line.split(' ');
-        const get = (k: string) => {
-          const i = t.indexOf(k);
-          return i >= 0 ? t[i + 1] : undefined;
-        };
-        if (t.includes('lowerbound') || t.includes('upperbound')) return;
-        const depth = Number(get('depth'));
-        const mpv = Number(get('multipv') ?? 1);
-        const si = t.indexOf('score');
-        const score: Score = t[si + 1] === 'mate' ? { mate: Number(t[si + 2]) } : { cp: Number(t[si + 2]) };
-        const pv = t.slice(t.indexOf('pv') + 1);
-        byPv.set(mpv, { multipv: mpv, depth, score, pv });
-        if (mpv === 1) depthMoves[depth] = pv[0];
+        const info = parseInfo(line);
+        if (!info) return;
+        byPv.set(info.multipv, info);
+        if (info.multipv === 1) depthMoves[info.depth] = info.pv[0];
       };
-      const pos = `position fen ${fen}` + (o.moves?.length ? ` moves ${o.moves.join(' ')}` : '');
-      this.send(pos);
-      let go = 'go';
-      if (o.depth) go += ` depth ${o.depth}`;
-      if (o.movetime) go += ` movetime ${o.movetime}`;
-      if (o.nodes) go += ` nodes ${o.nodes}`;
-      if (o.searchmoves?.length) go += ` searchmoves ${o.searchmoves.join(' ')}`;
-      this.send(go);
+      this.send(`position fen ${fen}` + (o.moves?.length ? ` moves ${o.moves.join(' ')}` : ''));
+      this.send(goCommand(o));
       const done = await this.waitFor((l) => l.startsWith('bestmove'));
       this.onLine = null;
       const bestmove = done.split(' ')[1];

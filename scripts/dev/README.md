@@ -13,4 +13,6 @@ node scripts/dev/e2e-lessons.cjs /tmp/lessons.json [unitId]   # plays through ev
 npx tsx scripts/dev/show-puzzles.ts              # prints the latest generated puzzles in SAN
 ```
 
-They need the `playwright` package (or `PLAYWRIGHT_PATH` pointing at an install) and a Chromium build.
+They share `harness.cjs` (browser launch, seeded profile, square clicks by `data-square`). They need the
+`playwright` package (or `PLAYWRIGHT_PATH` pointing at an install) and a Chromium build. `BASE` overrides
+the app URL (default `http://localhost:4173/`).

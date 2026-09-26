@@ -1,11 +1,12 @@
 // Heuristic theme tagger for generated puzzles.
 // Input: the puzzle start position (solver to move) and the solution line in UCI.
 import { Chess, type Color, type PieceSymbol, type Square } from 'chess.js';
+import { FILES, materialBalance, other, parseUci } from '../../src/chess/utils.ts';
 
-export const VALUE: Record<PieceSymbol, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
+// Piece values for tactic tests; the king counts highest so a check-through reads as a pin or skewer.
+const VALUE: Record<PieceSymbol, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
 
 type Cell = { type: PieceSymbol; color: Color } | null;
-const FILES = 'abcdefgh';
 const sq = (f: number, r: number) => (FILES[f] + (r + 1)) as Square;
 const fr = (s: string) => [FILES.indexOf(s[0]), Number(s[1]) - 1] as const;
 
@@ -74,14 +75,15 @@ function isSlider(t: PieceSymbol) {
   return t === 'b' || t === 'r' || t === 'q';
 }
 
-function material(chess: Chess, color: Color): number {
-  let m = 0;
-  for (const row of chess.board()) for (const c of row) if (c && c.color === color && c.type !== 'k') m += VALUE[c.type];
-  return m;
+/** Material of `color` minus the opponent's, in pawns. */
+export function materialDiff(chess: Chess, color: Color): number {
+  const white = materialBalance(chess.fen());
+  return color === 'w' ? white : -white;
 }
 
-export function materialDiff(chess: Chess, color: Color): number {
-  return material(chess, color) - material(chess, color === 'w' ? 'b' : 'w');
+/** Length theme from the number of solver moves. */
+export function lengthTheme(solverMoves: number): string {
+  return solverMoves === 1 ? 'oneMove' : solverMoves === 2 ? 'short' : solverMoves === 3 ? 'long' : 'veryLong';
 }
 
 /** Pieces of `color` pinned to their king or queen by an enemy slider: [pinnedSquare, pinnerSquare, target]. */
@@ -129,7 +131,7 @@ export function tagPuzzle({ fen, solution, gamePly }: TagInput): string[] {
   const themes = new Set<string>();
   const chess = new Chess(fen);
   const solver = chess.turn();
-  const opp: Color = solver === 'w' ? 'b' : 'w';
+  const opp = other(solver);
   const startMat = materialDiff(chess, solver);
   const solverMoves = Math.ceil(solution.length / 2);
   const startPins = pins(grid(chess), opp);
@@ -140,7 +142,7 @@ export function tagPuzzle({ fen, solution, gamePly }: TagInput): string[] {
   else if (gamePly <= 20) themes.add('opening');
   else themes.add('middlegame');
 
-  themes.add(solverMoves === 1 ? 'oneMove' : solverMoves === 2 ? 'short' : solverMoves === 3 ? 'long' : 'veryLong');
+  themes.add(lengthTheme(solverMoves));
 
   let minMat = startMat;
   const captured: string[] = []; // squares the solver captured on, in order
@@ -151,7 +153,7 @@ export function tagPuzzle({ fen, solution, gamePly }: TagInput): string[] {
     const mover = before[fr(uci.slice(0, 2))[0]][fr(uci.slice(0, 2))[1]]!;
     const targetBefore = before[fr(uci.slice(2, 4))[0]][fr(uci.slice(2, 4))[1]];
     const defendersOfTarget = targetBefore ? chess.attackers(uci.slice(2, 4) as Square, opp).length : 0;
-    const m = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] as PieceSymbol | undefined });
+    const m = chess.move(parseUci(uci));
     const after = grid(chess);
     const mat = materialDiff(chess, solver);
     minMat = Math.min(minMat, mat);
@@ -159,7 +161,7 @@ export function tagPuzzle({ fen, solution, gamePly }: TagInput): string[] {
       // Attraction: the king is forced to capture a sacrificed piece and then gets checked.
       if (m.piece === 'k' && m.captured && i + 1 < solution.length) {
         const next = new Chess(chess.fen());
-        const nm = next.move({ from: solution[i + 1].slice(0, 2), to: solution[i + 1].slice(2, 4), promotion: solution[i + 1][4] as PieceSymbol | undefined });
+        const nm = next.move(parseUci(solution[i + 1]));
         if (nm.san.includes('+') || nm.san.includes('#')) themes.add('attraction');
       }
       continue;
@@ -258,7 +260,7 @@ export function tagPuzzle({ fen, solution, gamePly }: TagInput): string[] {
 
   if (minMat <= startMat - 2) themes.add('sacrifice');
 
-  const first = new Chess(fen).move({ from: solution[0].slice(0, 2), to: solution[0].slice(2, 4), promotion: solution[0][4] as PieceSymbol | undefined });
+  const first = new Chess(fen).move(parseUci(solution[0]));
   if (!first.captured && !first.san.includes('+') && !first.san.includes('#') && !first.promotion) themes.add('quietMove');
 
   return [...themes];

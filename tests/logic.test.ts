@@ -3,8 +3,10 @@ import { glicko, RD_FLOOR } from '../src/lib/rating';
 import { review, INTERVALS, DAY } from '../src/lib/srs';
 import { classify, moveAccuracy, summarize } from '../src/lib/analysis';
 import { diffPieces, parsePlacement } from '../src/chess/pieces';
-import { winPercent } from '../src/engine/engine';
-import { START_FEN } from '../src/chess/utils';
+import { goCommand, parseInfo, scoreToCp, winPercent } from '../src/engine/score';
+import { acceptsMove, drawReason, moveNumberLabel, nullMoveFen, START_FEN, takeBackTo } from '../src/chess/utils';
+import { normalizeProfile, playerWon } from '../src/store/profile';
+import { Chess } from 'chess.js';
 
 describe('glicko puzzle rating', () => {
   it('rises after a win and falls after a loss', () => {
@@ -80,5 +82,70 @@ describe('board piece identity', () => {
     const rook = before.find((p) => p.square === 'h1')!;
     const after = diffPieces(before, parsePlacement('r3k2r/8/8/8/8/8/8/R4RK1 b kq - 1 1'), ['e1', 'g1']);
     expect(after.find((p) => p.square === 'f1')!.id).toBe(rook.id);
+  });
+});
+
+describe('chess helpers', () => {
+  it('takes back to before the given side\'s last move', () => {
+    const c = new Chess();
+    const moves = ['e4', 'e5', 'Nf3', 'Nc6'].map((m) => c.move(m));
+    expect(takeBackTo(moves, 'w')).toBe(2); // undo Nf3 and the reply
+    expect(takeBackTo(moves.slice(0, 3), 'w')).toBe(2); // undo Nf3 only
+    expect(takeBackTo(moves.slice(0, 1), 'b')).toBe(0);
+  });
+  it('accepts the expected move or any mate', () => {
+    const mateIn1 = new Chess('6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1');
+    const mate = mateIn1.move('Ra8');
+    const quiet = new Chess('6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1').move('Kf1');
+    expect(acceptsMove(mate, ['h2h3'])).toBe(true);
+    expect(acceptsMove(quiet, ['g1f1'])).toBe(true);
+    expect(acceptsMove(quiet, ['a1a8'])).toBe(false);
+  });
+  it('flips the side to move for threat checks', () => {
+    expect(nullMoveFen('rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2')).toBe('rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2');
+  });
+  it('names draws', () => {
+    expect(drawReason(new Chess('7k/5Q2/6K1/8/8/8/8/8 b - - 0 1'))).toBe('Stalemate');
+    expect(drawReason(new Chess('8/8/8/4k3/8/8/2K5/8 w - - 0 1'))).toBe('Insufficient material');
+  });
+  it('labels move numbers', () => {
+    expect(moveNumberLabel(0)).toBe('1.');
+    expect(moveNumberLabel(3)).toBe('2...');
+    expect(moveNumberLabel(0, 12, 'b')).toBe('12...');
+  });
+});
+
+describe('engine score helpers', () => {
+  it('parses info lines and skips bound scores', () => {
+    const l = parseInfo('info depth 12 seldepth 18 multipv 2 score cp -35 nodes 1000 pv e7e5 g1f3');
+    expect(l).toEqual({ multipv: 2, depth: 12, score: { cp: -35 }, pv: ['e7e5', 'g1f3'] });
+    expect(parseInfo('info depth 12 score mate 3 pv a1a8')?.score).toEqual({ mate: 3 });
+    expect(parseInfo('info depth 12 score cp 20 lowerbound pv e2e4')).toBeNull();
+  });
+  it('orders mates beyond any centipawn score', () => {
+    expect(scoreToCp({ mate: 1 })).toBeGreaterThan(scoreToCp({ mate: 3 }));
+    expect(scoreToCp({ mate: 3 })).toBeGreaterThan(scoreToCp({ cp: 5000 }));
+    expect(scoreToCp({ mate: -2 })).toBeLessThan(scoreToCp({ cp: -5000 }));
+  });
+  it('builds go commands with a fallback depth', () => {
+    expect(goCommand({ depth: 12 })).toBe('go depth 12');
+    expect(goCommand({}, 14)).toBe('go depth 14');
+    expect(goCommand({ movetime: 500, searchmoves: ['e2e4'] })).toBe('go movetime 500 searchmoves e2e4');
+  });
+});
+
+describe('profile', () => {
+  it('fills fields missing from older saves without announcing old levels', () => {
+    const p = normalizeProfile({ xp: 5000, settings: { sound: false } as never });
+    expect(p.settings.boardTheme).toBe('slate');
+    expect(p.settings.sound).toBe(false);
+    expect(p.puzzles.rushBest).toBe(0);
+    expect(p.streak.best).toBe(0);
+    expect(p.levelSeen).toBeGreaterThan(1);
+  });
+  it('knows who won', () => {
+    expect(playerWon({ result: '0-1', playerColor: 'b' })).toBe(true);
+    expect(playerWon({ result: '1-0', playerColor: 'b' })).toBe(false);
+    expect(playerWon({ result: '1/2-1/2', playerColor: 'w' })).toBe(false);
   });
 });

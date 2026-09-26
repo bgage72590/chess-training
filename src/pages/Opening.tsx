@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Chess } from 'chess.js';
+import { useEffect, useMemo, useState } from 'react';
+import { Chess, type Move } from 'chess.js';
 import { openings, type Opening, type OpeningLine } from '../content';
 import { navigate } from '../router';
 import { getProfile, logActivity, updateProfile, useProfile } from '../store/profile';
-import { review, MASTERED_BOX, DAY } from '../lib/srs';
-import { Board, playMoveSound, type BoardMove, type SquareTone } from '../chess/Board';
-import { uciOf } from '../chess/utils';
-import { Button, Pill, RichText } from '../components/ui';
+import { review, isDue, MASTERED_BOX, DAY } from '../lib/srs';
+import { useTimeouts } from '../lib/hooks';
+import { Board, playMoveSound, type SquareTone } from '../chess/Board';
+import { colorName, moveNumberLabel, START_FEN, turnOf, uciOf } from '../chess/utils';
+import { BoardColumn } from '../components/BoardColumn';
+import { Button, Feedback, Pill, RichText } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { sound } from '../chess/sound';
 import { MoveInput } from '../components/MoveInput';
@@ -15,19 +17,16 @@ import type { Arrow } from '../content/types';
 type Mode = 'learn' | 'drill';
 
 interface Ply {
-  san: string;
+  move: Move;
   uci: string;
-  fenBefore: string;
-  fenAfter: string;
   note?: string;
 }
 
 function expand(line: OpeningLine): Ply[] {
   const c = new Chess();
   return line.moves.split(' ').map((san, i) => {
-    const fenBefore = c.fen();
-    const m = c.move(san);
-    return { san: m.san, uci: uciOf(m), fenBefore, fenAfter: c.fen(), note: line.notes[i + 1] };
+    const move = c.move(san);
+    return { move, uci: uciOf(move), note: line.notes[i + 1] };
   });
 }
 
@@ -35,7 +34,7 @@ function lineStatus(id: string): { label: string; tone: 'neutral' | 'good' | 'wa
   const c = getProfile().lines[id];
   if (!c) return { label: 'New', tone: 'neutral' };
   if (c.box >= MASTERED_BOX) return { label: 'Mastered', tone: 'good' };
-  if (c.due <= Date.now()) return { label: 'Due', tone: 'warn' };
+  if (isDue(c)) return { label: 'Due', tone: 'warn' };
   const days = Math.max(1, Math.round((c.due - Date.now()) / DAY));
   return { label: `Review in ${days}d`, tone: 'info' };
 }
@@ -48,22 +47,19 @@ function Trainer({ opening, line, mode, onFinish }: { opening: Opening; line: Op
   const [tones, setTones] = useState<Record<string, SquareTone>>({});
   const [reveal, setReveal] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
-  const timers = useRef<number[]>([]);
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  const { later } = useTimeouts();
   const done = ply >= plies.length;
-  const fen = ply === 0 ? new Chess().fen() : plies[ply - 1].fenAfter;
-  const turn = fen.split(' ')[1];
-  const learnersMove = !done && turn === learnerTurn;
+  const fen = ply === 0 ? START_FEN : plies[ply - 1].move.after;
+  const learnersMove = !done && turnOf(fen) === learnerTurn;
 
   // Auto-play the opponent's moves.
   useEffect(() => {
     if (done || learnersMove) return;
     const t = window.setTimeout(() => {
-      playMoveSound(plies[ply].san);
+      playMoveSound(plies[ply].move.san);
       setPly((n) => n + 1);
       setTones({});
     }, ply === 0 ? 500 : 650);
-    timers.current.push(t);
     return () => window.clearTimeout(t);
   }, [ply, done, learnersMove, plies]);
 
@@ -75,17 +71,9 @@ function Trainer({ opening, line, mode, onFinish }: { opening: Opening; line: Op
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done]);
 
-  const onMove = (m: BoardMove) => {
+  const onMove = (mv: Move) => {
     if (!learnersMove) return;
-    const want = plies[ply];
-    const c = new Chess(fen);
-    let mv;
-    try {
-      mv = c.move({ from: m.from, to: m.to, promotion: m.promotion });
-    } catch {
-      return;
-    }
-    if (uciOf(mv) === want.uci) {
+    if (uciOf(mv) === plies[ply].uci) {
       playMoveSound(mv.san);
       setTones({ [mv.to]: 'good' });
       setReveal(false);
@@ -94,26 +82,26 @@ function Trainer({ opening, line, mode, onFinish }: { opening: Opening; line: Op
     } else {
       sound('bad');
       setMistakes((n) => n + 1);
-      setTones({ [m.to]: 'bad' });
+      setTones({ [mv.to]: 'bad' });
       setReveal(true);
       setFlash(mv.san);
-      timers.current.push(window.setTimeout(() => setTones({}), 700));
+      later(() => setTones({}), 700);
     }
   };
 
   const showArrow = learnersMove && (mode === 'learn' || reveal);
-  const arrows: Arrow[] = showArrow ? [{ from: plies[ply].uci.slice(0, 2), to: plies[ply].uci.slice(2, 4), color: mode === 'learn' ? 'green' : 'blue' }] : [];
-  const lastPly = ply > 0 ? plies[ply - 1] : null;
+  const arrows: Arrow[] = showArrow ? [{ from: plies[ply].move.from, to: plies[ply].move.to, color: mode === 'learn' ? 'green' : 'blue' }] : [];
+  const lastMove = ply > 0 ? plies[ply - 1].move : null;
   const pendingNote = learnersMove && mode === 'learn' ? plies[ply].note : undefined;
-  const shownNote = pendingNote ?? lastPly?.note;
-  const shownNoteSan = pendingNote ? plies[ply].san : lastPly?.san;
+  const shownNote = pendingNote ?? (ply > 0 ? plies[ply - 1].note : undefined);
+  const shownNoteSan = pendingNote ? plies[ply].move.san : lastMove?.san;
 
   return (
     <div className="trainer">
-      <div className="trainer-board">
+      <BoardColumn>
         <div className="board-caption">
           <span className="player-tag">
-            <span className={`side-dot ${learnerTurn}`} /> You play {opening.side === 'white' ? 'White' : 'Black'}
+            <span className={`side-dot ${learnerTurn}`} /> You play {colorName(learnerTurn)}
           </span>
           <span className="faint num">
             {Math.min(ply, plies.length)}/{plies.length}
@@ -125,12 +113,12 @@ function Trainer({ opening, line, mode, onFinish }: { opening: Opening; line: Op
           interactive={learnersMove}
           playerColor={learnerTurn}
           onMove={onMove}
-          lastMove={lastPly ? [lastPly.uci.slice(0, 2), lastPly.uci.slice(2, 4)] : null}
+          lastMove={lastMove ? [lastMove.from, lastMove.to] : null}
           arrows={arrows}
           tones={tones}
         />
         <MoveInput id="opening-move" fen={fen} enabled={learnersMove} onMove={onMove} />
-      </div>
+      </BoardColumn>
       <aside className="panel">
         <div className="panel-section">
           <div className="eyebrow">{mode === 'learn' ? 'Learn' : 'Drill from memory'}</div>
@@ -142,27 +130,25 @@ function Trainer({ opening, line, mode, onFinish }: { opening: Opening; line: Op
         <div className="line-moves mono">
           {plies.map((p, i) => (
             <span key={i} className={`lm ${i < ply ? 'played' : ''} ${i === ply ? 'cur' : ''}`}>
-              {i % 2 === 0 && <span className="faint">{i / 2 + 1}.</span>}
-              {i < ply || (mode === 'learn' && i === ply) ? p.san : '···'}
+              {i % 2 === 0 && <span className="faint">{moveNumberLabel(i)}</span>}
+              {i < ply || (mode === 'learn' && i === ply) ? p.move.san : '···'}
             </span>
           ))}
         </div>
         {done ? (
-          <div className={`feedback ${mistakes === 0 ? 'feedback-good' : 'feedback-warn'}`}>
-            <Icon name={mistakes === 0 ? 'check' : 'refresh'} />
-            <div>
-              <strong>{mistakes === 0 ? 'Line complete, no mistakes' : `Line complete, ${mistakes} slip${mistakes > 1 ? 's' : ''}`}</strong>
-              <span className="feedback-body">{mode === 'learn' ? 'It will come back for a memory drill tomorrow.' : mistakes === 0 ? 'The review interval grows.' : 'It will come back soon for another pass.'}</span>
-            </div>
-          </div>
+          <Feedback
+            tone={mistakes === 0 ? 'good' : 'warn'}
+            icon={mistakes === 0 ? 'check' : 'refresh'}
+            title={mistakes === 0 ? 'Line complete, no mistakes' : `Line complete, ${mistakes} slip${mistakes > 1 ? 's' : ''}`}
+            body={mode === 'learn' ? 'It will come back for a memory drill tomorrow.' : mistakes === 0 ? 'The review interval grows.' : 'It will come back soon for another pass.'}
+          />
         ) : learnersMove ? (
-          <div className="feedback feedback-info">
-            <Icon name={reveal || mode === 'learn' ? 'right' : 'bulb'} />
-            <div>
-              <strong>{mode === 'learn' ? `Play ${plies[ply].san}` : reveal ? `The move is ${plies[ply].san}` : 'Your move'}</strong>
-              {flash && <span className="feedback-body">{flash} is not in your repertoire here.</span>}
-            </div>
-          </div>
+          <Feedback
+            tone="info"
+            icon={reveal || mode === 'learn' ? 'right' : 'bulb'}
+            title={mode === 'learn' ? `Play ${plies[ply].move.san}` : reveal ? `The move is ${plies[ply].move.san}` : 'Your move'}
+            body={flash && `${flash} is not in your repertoire here.`}
+          />
         ) : (
           <div className="faint">Opponent is moving…</div>
         )}
@@ -186,13 +172,13 @@ export function OpeningPage({ id }: { id: string }) {
   const [openingId, query] = id.split('?');
   const opening = openings.find((o) => o.id === openingId);
   const p = useProfile();
+  const dueIds = (o: Opening) => o.lines.filter((l) => isDue(p.lines[l.id])).map((l) => l.id);
   const [session, setSession] = useState<{ mode: Mode; queue: string[]; i: number; key: number; finished: boolean } | null>(() => {
-    if (query === 'review' && opening) {
-      const due = opening.lines.filter((l) => p.lines[l.id] && p.lines[l.id].due <= Date.now()).map((l) => l.id);
-      return due.length ? { mode: 'drill', queue: due, i: 0, key: 0, finished: false } : null;
-    }
-    return null;
+    const due = query === 'review' && opening ? dueIds(opening) : [];
+    return due.length ? { mode: 'drill', queue: due, i: 0, key: 0, finished: false } : null;
   });
+  /** Starts a learn or drill session over the given lines. */
+  const start = (mode: Mode, queue: string[]) => setSession((s) => ({ mode, queue, i: 0, key: (s?.key ?? 0) + 1, finished: false }));
 
   if (!opening) return <div className="empty">Opening not found.</div>;
 
@@ -241,7 +227,7 @@ export function OpeningPage({ id }: { id: string }) {
               Again
             </Button>
             {session.mode === 'learn' && (
-              <Button onClick={() => setSession({ mode: 'drill', queue: [line.id], i: 0, key: session.key + 1, finished: false })} icon="repeat">
+              <Button onClick={() => start('drill', [line.id])} icon="repeat">
                 Drill it now
               </Button>
             )}
@@ -260,8 +246,8 @@ export function OpeningPage({ id }: { id: string }) {
     );
   }
 
-  const newLines = opening.lines.filter((l) => !p.lines[l.id]);
-  const dueList = opening.lines.filter((l) => p.lines[l.id] && p.lines[l.id].due <= Date.now());
+  const newLines = opening.lines.filter((l) => !p.lines[l.id]).map((l) => l.id);
+  const dueList = dueIds(opening);
   return (
     <>
       <div className="lesson-top">
@@ -288,16 +274,16 @@ export function OpeningPage({ id }: { id: string }) {
           </ul>
           <div className="btn-row">
             {newLines.length > 0 && (
-              <Button variant="primary" icon="learn" onClick={() => setSession({ mode: 'learn', queue: newLines.map((l) => l.id), i: 0, key: 0, finished: false })}>
+              <Button variant="primary" icon="learn" onClick={() => start('learn', newLines)}>
                 Learn {newLines.length} new line{newLines.length > 1 ? 's' : ''}
               </Button>
             )}
             {dueList.length > 0 && (
-              <Button variant={newLines.length ? 'secondary' : 'primary'} icon="repeat" onClick={() => setSession({ mode: 'drill', queue: dueList.map((l) => l.id), i: 0, key: 0, finished: false })}>
+              <Button variant={newLines.length ? 'secondary' : 'primary'} icon="repeat" onClick={() => start('drill', dueList)}>
                 Review {dueList.length} due
               </Button>
             )}
-            <Button variant="ghost" icon="target" onClick={() => setSession({ mode: 'drill', queue: opening.lines.map((l) => l.id), i: 0, key: 0, finished: false })}>
+            <Button variant="ghost" icon="target" onClick={() => start('drill', opening.lines.map((l) => l.id))}>
               Drill every line
             </Button>
           </div>
@@ -314,15 +300,15 @@ export function OpeningPage({ id }: { id: string }) {
                     <Pill tone={st.tone}>{st.label}</Pill>
                   </div>
                   <div className="mono faint line-preview">
-                    {sans.slice(0, 12).map((s, i) => (i % 2 === 0 ? `${i / 2 + 1}.${s}` : s)).join(' ')}
+                    {sans.slice(0, 12).map((s, i) => (i % 2 === 0 ? moveNumberLabel(i) + s : s)).join(' ')}
                     {sans.length > 12 ? ' …' : ''}
                   </div>
                 </div>
                 <div className="btn-row">
-                  <Button size="s" icon="learn" onClick={() => setSession({ mode: 'learn', queue: [l.id], i: 0, key: 0, finished: false })}>
+                  <Button size="s" icon="learn" onClick={() => start('learn', [l.id])}>
                     Learn
                   </Button>
-                  <Button size="s" variant="ghost" icon="repeat" onClick={() => setSession({ mode: 'drill', queue: [l.id], i: 0, key: 0, finished: false })}>
+                  <Button size="s" variant="ghost" icon="repeat" onClick={() => start('drill', [l.id])}>
                     Drill
                   </Button>
                 </div>

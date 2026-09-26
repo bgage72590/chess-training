@@ -2,7 +2,7 @@ import { Chess, type Color, type Move, type PieceSymbol, type Square } from 'che
 
 export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 export const FILES = 'abcdefgh';
-export const VALUE: Record<PieceSymbol, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+const VALUE: Record<PieceSymbol, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
 export interface UciMove {
   from: string;
@@ -36,8 +36,9 @@ export function sanToUci(fen: string, san: string): string | null {
   }
 }
 
-export function uciToSan(fen: string, uci: string): string {
-  return playUci(fen, uci)?.move.san ?? uci;
+/** Trainers accept the expected move(s), or any move that gives checkmate. */
+export function acceptsMove(move: Move, expected: string[]): boolean {
+  return expected.includes(uciOf(move)) || move.san.endsWith('#');
 }
 
 /** Converts a UCI principal variation into SAN strings. */
@@ -58,6 +59,28 @@ export const turnOf = (fen: string): Color => (fen.split(' ')[1] === 'b' ? 'b' :
 export const colorName = (c: Color) => (c === 'w' ? 'White' : 'Black');
 export const other = (c: Color): Color => (c === 'w' ? 'b' : 'w');
 export const fullMoveOf = (fen: string) => Number(fen.split(' ')[5] ?? 1);
+
+/** The same position with the other side to move (a "null move"), e.g. to look for threats. */
+export function nullMoveFen(fen: string): string {
+  const parts = fen.split(' ');
+  parts[1] = other(turnOf(fen));
+  parts[3] = '-';
+  return parts.join(' ');
+}
+
+export function drawReason(c: Chess): string {
+  if (c.isStalemate()) return 'Stalemate';
+  if (c.isInsufficientMaterial()) return 'Insufficient material';
+  if (c.isThreefoldRepetition()) return 'Threefold repetition';
+  return 'Fifty-move rule';
+}
+
+/** Number of moves to keep so that `color`'s last move (and any reply) is taken back. */
+export function takeBackTo(moves: { color: Color }[], color: Color): number {
+  let n = moves.length;
+  while (n > 0 && moves[n - 1].color !== color) n--;
+  return Math.max(0, n - 1);
+}
 
 export function materialBalance(fen: string): number {
   let s = 0;

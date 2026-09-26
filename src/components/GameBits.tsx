@@ -48,15 +48,11 @@ export function MoveList({
   current,
   onSelect,
   classes,
-  startTurn = 'w',
-  startMove = 1,
 }: {
   sans: string[];
   current?: number;
   onSelect?: (ply: number) => void;
   classes?: MoveClass[];
-  startTurn?: 'w' | 'b';
-  startMove?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -64,17 +60,15 @@ export function MoveList({
     el?.scrollIntoView({ block: 'nearest' });
   }, [current, sans.length]);
   const cells: React.ReactNode[] = [];
-  const offset = startTurn === 'b' ? 1 : 0;
-  const total = sans.length + offset;
-  for (let row = 0; row * 2 < total; row++) {
+  for (let row = 0; row * 2 < sans.length; row++) {
     cells.push(
       <div key={`n${row}`} className="n">
-        {startMove + row}.
+        {row + 1}.
       </div>,
     );
     for (let col = 0; col < 2; col++) {
-      const i = row * 2 + col - offset;
-      if (i < 0 || i >= sans.length) {
+      const i = row * 2 + col;
+      if (i >= sans.length) {
         cells.push(<span key={`e${row}${col}`} />);
         continue;
       }

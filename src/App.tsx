@@ -5,6 +5,7 @@ import { getProfile, levelFromXp, liveStreak, updateProfile, useProfile } from '
 import { useToasts, toast } from './lib/toast';
 import { ACHIEVEMENTS } from './lib/achievements';
 import { dueLines, dueReviewPuzzles } from './lib/due';
+import { ProgressBar } from './components/ui';
 import { HomePage } from './pages/Home';
 import { LearnPage } from './pages/Learn';
 import { LessonPage } from './pages/Lesson';
@@ -136,17 +137,29 @@ function useAchievementWatcher() {
 
 function useLevelWatcher() {
   const p = useProfile();
-  const { level } = levelFromXp(p.xp);
+  const { level, title } = levelFromXp(p.xp);
   useEffect(() => {
-    const key = 'tempo.level';
-    try {
-      const prev = Number(localStorage.getItem(key) ?? 0);
-      if (prev && level > prev) toast({ title: `Level ${level} reached`, body: `You are now a ${levelFromXp(getProfile().xp).title}.`, icon: 'star', tone: 'accent' }, 5000);
-      localStorage.setItem(key, String(level));
-    } catch {
-      /* ignore */
-    }
-  }, [level]);
+    // Read the live profile so a re-run in the same render cannot announce the level twice.
+    if (level <= getProfile().levelSeen) return;
+    updateProfile((d) => {
+      d.levelSeen = level;
+    });
+    toast({ title: `Level ${level} reached`, body: `You are now a ${title}.`, icon: 'star', tone: 'accent' }, 5000);
+  }, [level, p.levelSeen, title]);
+}
+
+function MiniStats({ streak, rating, children }: { streak: number; rating: number; children?: ReactNode }) {
+  return (
+    <div className="mini-stats">
+      <span className="flame" title="Day streak">
+        <Icon name="flame" size={16} /> {streak}
+      </span>
+      <span title="Puzzle rating">
+        <Icon name="target" size={16} /> <span className="num">{rating}</span>
+      </span>
+      {children}
+    </div>
+  );
 }
 
 function Page({ route }: { route: string }): ReactNode {
@@ -223,21 +236,12 @@ export function App() {
           ))}
         </nav>
         <div className="sidebar-foot">
-          <div className="mini-stats">
-            <span className="flame" title="Day streak">
-              <Icon name="flame" size={16} /> {streak}
-            </span>
-            <span title="Puzzle rating">
-              <Icon name="target" size={16} /> <span className="num">{p.puzzles.rating}</span>
-            </span>
-          </div>
+          <MiniStats streak={streak} rating={p.puzzles.rating} />
           <div>
             <div className="faint" style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: 5 }}>
               Level {lvl.level} · {lvl.title}
             </div>
-            <div className="bar">
-              <div className="bar-fill" style={{ width: `${(lvl.into / lvl.need) * 100}%` }} />
-            </div>
+            <ProgressBar value={lvl.into} max={lvl.need} label="Progress to the next level" />
           </div>
         </div>
       </aside>
@@ -247,17 +251,11 @@ export function App() {
           <BrandMark />
           Tempo
         </button>
-        <div className="mini-stats">
-          <span className="flame" title="Day streak">
-            <Icon name="flame" size={16} /> {streak}
-          </span>
-          <span title="Puzzle rating">
-            <Icon name="target" size={16} /> <span className="num">{p.puzzles.rating}</span>
-          </span>
+        <MiniStats streak={streak} rating={p.puzzles.rating}>
           <button className="icon-btn" style={{ width: 32, height: 32 }} aria-label="Settings" onClick={() => navigate('settings')}>
             <Icon name="settings" size={18} />
           </button>
-        </div>
+        </MiniStats>
       </header>
 
       <main className="main">

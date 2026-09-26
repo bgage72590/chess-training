@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { openings, type Opening } from '../content';
 import { navigate } from '../router';
 import { useProfile, type Profile } from '../store/profile';
-import { MASTERED_BOX } from '../lib/srs';
+import { isDue, MASTERED_BOX } from '../lib/srs';
 import { Board } from '../chess/Board';
 import { Button, PageHeader, Pill, ProgressBar, Segmented } from '../components/ui';
 import { Chess } from 'chess.js';
@@ -17,23 +17,25 @@ export function openingStats(o: Opening, p: Profile) {
     const c = p.lines[l.id];
     if (!c) continue;
     learned++;
-    if (c.due <= now) due++;
+    if (isDue(c, now)) due++;
     if (c.box >= MASTERED_BOX) mastered++;
   }
   return { learned, due, mastered, total: o.lines.length };
 }
 
+const previews = new Map<string, string>();
+/** Position after the shared start of all lines (at most 8 plies), for the card diagram. */
 function previewFen(o: Opening): string {
-  // Position after the shared start of all lines (at most 8 plies) for the card diagram.
+  const cached = previews.get(o.id);
+  if (cached) return cached;
   const lines = o.lines.map((l) => l.moves.split(' '));
-  const shared: string[] = [];
+  const c = new Chess();
   for (let i = 0; i < 8; i++) {
     const m = lines[0]?.[i];
     if (!m || !lines.every((l) => l[i] === m)) break;
-    shared.push(m);
+    c.move(m);
   }
-  const c = new Chess();
-  for (const m of shared) c.move(m);
+  previews.set(o.id, c.fen());
   return c.fen();
 }
 

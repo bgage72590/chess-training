@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Chess } from 'chess.js';
-import { Board, playMoveSound, type BoardMove, type SquareTone } from '../chess/Board';
-import { parseUci, playUci, uciOf, turnOf, colorName } from '../chess/utils';
+import type { Move } from 'chess.js';
+import { Board, playMoveSound, type SquareTone } from '../chess/Board';
+import { acceptsMove, colorName, other, parseUci, playUci, pvToSan, turnOf } from '../chess/utils';
 import type { Puzzle } from '../data/puzzles';
 import type { Arrow } from '../content/types';
 import { sound } from '../chess/sound';
-import { Icon } from './Icon';
+import { useTimeouts } from '../lib/hooks';
+import { BoardColumn } from './BoardColumn';
 import { MoveInput } from './MoveInput';
+import { Feedback } from './ui';
 
 export type PuzzleStatus = 'intro' | 'solving' | 'solved' | 'failed' | 'viewing';
 
 export interface PuzzleOutcome {
   /** Solved without a wrong move and without hints. */
   clean: boolean;
-  hinted: boolean;
 }
 
 interface Props {
@@ -45,7 +46,7 @@ const MOVE_DELAY = 420;
 
 export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, children }: Props) {
   const moves = useMemo(() => puzzle.moves.split(' '), [puzzle]);
-  const solverColor = turnOf(puzzle.fen) === 'w' ? 'b' : 'w';
+  const solverColor = other(turnOf(puzzle.fen));
   const [fen, setFen] = useState(puzzle.fen);
   const [idx, setIdx] = useState(0); // index into moves of the next expected move
   const [status, setStatus] = useState<PuzzleStatus>('intro');
@@ -55,10 +56,7 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
   const [hintLevel, setHintLevel] = useState(0);
   const [mistakes, setMistakes] = useState(0);
   const reported = useRef(false);
-  const timers = useRef<number[]>([]);
-  const later = (fn: () => void, ms: number) => {
-    timers.current.push(window.setTimeout(fn, ms));
-  };
+  const { later, clear } = useTimeouts();
 
   const report = (o: PuzzleOutcome) => {
     if (reported.current) return;
@@ -66,75 +64,61 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
     onFirstResult?.(o);
   };
 
-  // Play the opponent's setup move.
+  // Play the opponent's setup move (again, on retry).
+  const playSetupMove = () => {
+    const r = playUci(puzzle.fen, moves[0]);
+    if (!r) return;
+    setFen(r.fen);
+    setLastMove([r.move.from, r.move.to]);
+    setIdx(1);
+    setStatus('solving');
+    playMoveSound(r.move.san);
+  };
   useEffect(() => {
-    later(() => {
-      const r = playUci(puzzle.fen, moves[0]);
-      if (!r) return;
-      setFen(r.fen);
-      setLastMove([r.move.from, r.move.to]);
-      setIdx(1);
-      setStatus('solving');
-      playMoveSound(r.move.san);
-    }, 650);
-    return () => timers.current.forEach(clearTimeout);
+    later(playSetupMove, 650);
+    return clear;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [puzzle.id]);
 
+  // SAN of the whole line; illegal moves (never expected) fall back to UCI.
   const solutionSan = useMemo(() => {
-    const c = new Chess(puzzle.fen);
-    return moves.map((u) => {
-      try {
-        return c.move(parseUci(u)).san;
-      } catch {
-        return u;
-      }
-    });
+    const san = pvToSan(puzzle.fen, moves, moves.length);
+    return moves.map((u, i) => san[i] ?? u);
   }, [puzzle, moves]);
 
   const contSan = useMemo(() => {
-    if (!puzzle.cont) return [];
-    const c = new Chess(puzzle.fen);
-    try {
-      for (const u of moves) c.move(parseUci(u));
-      return puzzle.cont.split(' ').map((u) => c.move(parseUci(u)).san);
-    } catch {
-      return [];
-    }
+    const cont = puzzle.cont?.split(' ') ?? [];
+    const all = pvToSan(puzzle.fen, [...moves, ...cont], moves.length + cont.length);
+    return all.length === moves.length + cont.length ? all.slice(moves.length) : [];
   }, [puzzle, moves]);
 
   const finish = (clean: boolean) => {
     setStatus('solved');
     sound('good');
-    report({ clean, hinted: hintLevel > 0 });
+    report({ clean });
     onComplete?.(clean);
   };
 
-  const onMove = (m: BoardMove) => {
+  const onMove = (m: Move) => {
     if (status !== 'solving') return;
     const expected = moves[idx];
-    const uci = uciOf(m);
-    const r = playUci(fen, uci);
-    if (!r) return;
-    const correct = uci === expected || (expected && uci.slice(0, 4) === expected.slice(0, 4) && !expected[4] && !m.promotion) || new Chess(r.fen).isCheckmate();
+    const mate = m.san.endsWith('#');
     setArrows([]);
-    setTones({});
-    if (correct) {
-      setFen(r.fen);
-      setLastMove([r.move.from, r.move.to]);
-      playMoveSound(r.move.san);
+    if (acceptsMove(m, [expected])) {
+      setFen(m.after);
+      setLastMove([m.from, m.to]);
+      setTones({ [m.to]: 'good' });
+      playMoveSound(m.san);
       setHintLevel(0);
       const nextIdx = idx + 1;
-      if (nextIdx >= moves.length || new Chess(r.fen).isCheckmate()) {
-        setTones({ [r.move.to]: 'good' });
+      if (nextIdx >= moves.length || mate) {
         setIdx(moves.length);
         finish(mistakes === 0 && hintLevel === 0 && !reported.current);
         return;
       }
-      setTones({ [r.move.to]: 'good' });
       setIdx(nextIdx);
       later(() => {
-        const rr = playUci(r.fen, moves[nextIdx]);
+        const rr = playUci(m.after, moves[nextIdx]);
         if (!rr) return;
         setFen(rr.fen);
         setLastMove([rr.move.from, rr.move.to]);
@@ -143,41 +127,35 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
         setIdx(nextIdx + 1);
       }, MOVE_DELAY);
     } else {
-      // Show the wrong move, then take it back.
+      // Show the wrong move, then take it back. In strict mode (Rush) the puzzle ends here.
       const before = fen;
       const beforeLast = lastMove;
-      setFen(r.fen);
-      setLastMove([r.move.from, r.move.to]);
-      setTones({ [r.move.to]: 'bad' });
+      setFen(m.after);
+      setLastMove([m.from, m.to]);
+      setTones({ [m.to]: 'bad' });
       sound('bad');
       setMistakes((n) => n + 1);
-      report({ clean: false, hinted: hintLevel > 0 });
-      if (strict) {
-        setStatus('failed');
-        later(() => {
+      setStatus('failed');
+      report({ clean: false });
+      later(
+        () => {
           setFen(before);
           setLastMove(beforeLast);
           setTones({});
+          if (!strict) return setStatus('solving');
           const ex = parseUci(expected);
           setArrows([{ from: ex.from, to: ex.to, color: 'green' }]);
-        }, 650);
-        onComplete?.(false);
-        return;
-      }
-      setStatus('failed');
-      later(() => {
-        setFen(before);
-        setLastMove(beforeLast);
-        setTones({});
-        setStatus('solving');
-      }, 700);
+        },
+        strict ? 650 : 700,
+      );
+      if (strict) onComplete?.(false);
     }
   };
 
   const hint = () => {
     if (status !== 'solving') return;
     const ex = parseUci(moves[idx]);
-    report({ clean: false, hinted: true });
+    report({ clean: false });
     if (hintLevel === 0) {
       setTones({ [ex.from]: 'hint' });
       setHintLevel(1);
@@ -188,7 +166,7 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
   };
 
   const showSolution = () => {
-    report({ clean: false, hinted: true });
+    report({ clean: false });
     setStatus('viewing');
     setArrows([]);
     setTones({});
@@ -213,16 +191,11 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
   };
 
   const retry = () => {
-    timers.current.forEach(clearTimeout);
-    const r = playUci(puzzle.fen, moves[0]);
-    if (!r) return;
-    setFen(r.fen);
-    setLastMove([r.move.from, r.move.to]);
-    setIdx(1);
+    clear();
+    playSetupMove();
     setTones({});
     setArrows([]);
     setHintLevel(0);
-    setStatus('solving');
   };
 
   const mateMatch = puzzle.themes.find((t) => /^mateIn\d/.test(t));
@@ -231,8 +204,8 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
   const api: SolverApi = { status, solverColor, hint, hintLevel, showSolution, retry, solutionSan, contSan, mistakes, goal };
 
   return (
-    <div className="trainer" style={{ '--board-offset': '250px' } as React.CSSProperties}>
-      <div className="trainer-board">
+    <div className="trainer">
+      <BoardColumn>
         <div className="board-caption">
           <span className="player-tag">
             <span className={`side-dot ${solverColor}`} />
@@ -253,44 +226,20 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
           arrows={arrows}
         />
         <MoveInput id="puzzle-move" fen={fen} enabled={status === 'solving'} onMove={onMove} />
-      </div>
+      </BoardColumn>
       {children?.(api)}
     </div>
   );
 }
 
 export function PuzzleFeedback({ api }: { api: SolverApi }) {
-  if (api.status === 'solved')
-    return (
-      <div className="feedback feedback-good">
-        <Icon name="check" />
-        <div>
-          <strong>{api.mistakes ? 'Solved, after a retry' : 'Solved'}</strong>
-          <span className="feedback-body mono">{api.solutionSan.slice(1).join('  ')}</span>
-          {api.contSan.length > 0 && <span className="feedback-body faint">Then {api.contSan.join(' ')}</span>}
-        </div>
-      </div>
-    );
-  if (api.status === 'failed')
-    return (
-      <div className="feedback feedback-bad">
-        <Icon name="x" />
-        <div>
-          <strong>Not the move</strong>
-          <span className="feedback-body">Look again at checks, captures and threats.</span>
-        </div>
-      </div>
-    );
-  if (api.status === 'viewing')
-    return (
-      <div className="feedback feedback-info">
-        <Icon name="eye" />
-        <div>
-          <strong>Solution</strong>
-          <span className="feedback-body mono">{api.solutionSan.slice(1).join('  ')}</span>
-          {api.contSan.length > 0 && <span className="feedback-body faint">Then {api.contSan.join(' ')}</span>}
-        </div>
-      </div>
-    );
-  return null;
+  if (api.status === 'failed') return <Feedback tone="bad" icon="x" title="Not the move" body="Look again at checks, captures and threats." />;
+  if (api.status !== 'solved' && api.status !== 'viewing') return null;
+  const solved = api.status === 'solved';
+  return (
+    <Feedback tone={solved ? 'good' : 'info'} icon={solved ? 'check' : 'eye'} title={solved ? (api.mistakes ? 'Solved, after a retry' : 'Solved') : 'Solution'}>
+      <span className="feedback-body mono">{api.solutionSan.slice(1).join('  ')}</span>
+      {api.contSan.length > 0 && <span className="feedback-body faint">Then {api.contSan.join(' ')}</span>}
+    </Feedback>
+  );
 }

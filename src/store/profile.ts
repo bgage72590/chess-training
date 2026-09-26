@@ -80,6 +80,9 @@ export interface GameRecord {
   };
 }
 
+/** Whether the learner won this game. */
+export const playerWon = (g: Pick<GameRecord, 'result' | 'playerColor'>) => g.result === (g.playerColor === 'w' ? '1-0' : '0-1');
+
 export interface Profile {
   v: 1;
   created: number;
@@ -94,6 +97,8 @@ export interface Profile {
   games: GameRecord[];
   vision: Record<string, number>;
   achievements: Record<string, number>;
+  /** Highest level already announced with a toast. */
+  levelSeen: number;
   onboarded: boolean;
   lastVisit: string;
   /** Last local change (ms). Used to merge with the cloud copy. */
@@ -117,27 +122,33 @@ export function defaultProfile(): Profile {
     games: [],
     vision: {},
     achievements: {},
+    levelSeen: 1,
     onboarded: false,
     lastVisit: dayKey(),
     updatedAt: 0,
   };
 }
 
-function load(): Profile {
+/** Fills in fields missing from a stored, imported or synced profile (older versions). */
+export function normalizeProfile(p: Partial<Profile>): Profile {
   const base = defaultProfile();
+  return {
+    ...base,
+    ...p,
+    settings: { ...base.settings, ...p.settings },
+    puzzles: { ...base.puzzles, ...p.puzzles },
+    streak: { ...base.streak, ...p.streak },
+    // Profiles from before level tracking: do not announce levels reached long ago.
+    levelSeen: p.levelSeen ?? levelFromXp(p.xp ?? 0).level,
+  };
+}
+
+function load(): Profile {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return base;
-    const p = JSON.parse(raw) as Partial<Profile>;
-    return {
-      ...base,
-      ...p,
-      settings: { ...base.settings, ...p.settings },
-      puzzles: { ...base.puzzles, ...p.puzzles },
-      streak: { ...base.streak, ...p.streak },
-    };
+    return raw ? normalizeProfile(JSON.parse(raw) as Partial<Profile>) : defaultProfile();
   } catch {
-    return base;
+    return defaultProfile();
   }
 }
 

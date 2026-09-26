@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Chess } from 'chess.js';
+import { Chess, type Move } from 'chess.js';
 import { units, type DemoStep, type Lesson, type LessonStep, type MoveStep, type QuizStep, type Unit } from '../content';
-import { Board, playMoveSound, type BoardMove, type SquareTone } from '../chess/Board';
-import { colorName, turnOf, uciOf } from '../chess/utils';
-import { Button, ProgressBar, RichText } from '../components/ui';
+import { Board, playMoveSound, type SquareTone } from '../chess/Board';
+import { acceptsMove, colorName, fullMoveOf, moveNumberLabel, parseUci, sanToUci, turnOf, uciOf } from '../chess/utils';
+import { useKeydown, useTimeouts } from '../lib/hooks';
+import { BoardColumn } from '../components/BoardColumn';
+import { Button, Feedback, ProgressBar, RichText } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { navigate } from '../router';
 import { getProfile, logActivity, updateProfile } from '../store/profile';
@@ -43,79 +45,59 @@ function MoveStepView({ step, onDone }: { step: MoveStep; onDone: (r: StepResult
   const [state, setState] = useState<'solving' | 'wrong' | 'done'>('solving');
   const [misses, setMisses] = useState(0);
   const [showHint, setShowHint] = useState(false);
-  const timers = useRef<number[]>([]);
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  const { later } = useTimeouts();
   const learner = turnOf(step.fen);
 
-  const expectedUci = (f: string, san: string) => {
-    try {
-      return uciOf(new Chess(f).move(san));
-    } catch {
-      return '';
-    }
-  };
-
-  const onMove = (m: BoardMove) => {
+  const onMove = (mv: Move) => {
     if (state !== 'solving') return;
-    const c = new Chess(fen);
-    let mv;
-    try {
-      mv = c.move({ from: m.from, to: m.to, promotion: m.promotion });
-    } catch {
-      return;
-    }
-    const uci = uciOf(mv);
-    const want = expectedUci(fen, step.solution[idx]);
-    const alts = idx === 0 ? (step.accept ?? []).map((a) => expectedUci(fen, a)) : [];
-    const ok = uci === want || alts.includes(uci) || c.isCheckmate();
+    const want = sanToUci(fen, step.solution[idx]) ?? '';
+    const alts = idx === 0 ? (step.accept ?? []).map((a) => sanToUci(fen, a) ?? '') : [];
     setArrows([]);
-    if (ok) {
-      setFen(c.fen());
+    if (acceptsMove(mv, [want, ...alts])) {
+      setFen(mv.after);
       setLastMove([mv.from, mv.to]);
       playMoveSound(mv.san);
       setTones({ [mv.to]: 'good' });
       const next = idx + 1;
-      if (next >= step.solution.length || c.isCheckmate() || alts.includes(uci)) {
+      if (next >= step.solution.length || mv.san.endsWith('#') || alts.includes(uciOf(mv))) {
         setState('done');
         sound('good');
         onDone(misses === 0 ? 'first-try' : 'retry');
         return;
       }
       setIdx(next);
-      timers.current.push(
-        window.setTimeout(() => {
-          const r = new Chess(c.fen());
-          const reply = r.move(step.solution[next]);
-          setFen(r.fen());
-          setLastMove([reply.from, reply.to]);
-          setTones({});
-          playMoveSound(reply.san);
-          setIdx(next + 1);
-        }, 450),
-      );
+      later(() => {
+        const reply = new Chess(mv.after).move(step.solution[next]);
+        setFen(reply.after);
+        setLastMove([reply.from, reply.to]);
+        setTones({});
+        playMoveSound(reply.san);
+        setIdx(next + 1);
+      }, 450);
     } else {
       const before = fen;
-      setFen(c.fen());
+      setFen(mv.after);
       setLastMove([mv.from, mv.to]);
       setTones({ [mv.to]: 'bad' });
       sound('bad');
       setMisses((n) => n + 1);
       setShowHint(true);
       setState('wrong');
-      timers.current.push(
-        window.setTimeout(() => {
-          setFen(before);
-          setLastMove(null);
-          setTones({});
-          setState('solving');
-        }, 750),
-      );
+      later(() => {
+        setFen(before);
+        setLastMove(null);
+        setTones({});
+        setState('solving');
+      }, 750);
     }
   };
 
   const reveal = () => {
-    const want = expectedUci(fen, step.solution[idx]);
-    if (want) setArrows([{ from: want.slice(0, 2), to: want.slice(2, 4), color: 'blue' }]);
+    const want = sanToUci(fen, step.solution[idx]);
+    if (want) {
+      const u = parseUci(want);
+      setArrows([{ from: u.from, to: u.to, color: 'blue' }]);
+    }
     setMisses((n) => n + 1);
   };
 
@@ -140,34 +122,11 @@ function MoveStepView({ step, onDone }: { step: MoveStep; onDone: (r: StepResult
       {step.title && <h2>{step.title}</h2>}
       <RichText text={step.text} />
       {state === 'done' ? (
-        <div className="feedback feedback-good">
-          <Icon name="check" />
-          <div>
-            <strong>Correct</strong>
-            <span className="feedback-body">
-              <RichText text={step.success} />
-            </span>
-          </div>
-        </div>
+        <Feedback tone="good" icon="check" title="Correct" body={<RichText text={step.success} />} />
       ) : (
         <>
-          {state === 'wrong' && (
-            <div className="feedback feedback-bad">
-              <Icon name="x" />
-              <div>
-                <strong>Not quite</strong>
-              </div>
-            </div>
-          )}
-          {showHint && state !== 'wrong' && (
-            <div className="feedback feedback-info">
-              <Icon name="bulb" />
-              <div>
-                <strong>Hint</strong>
-                <span className="feedback-body">{step.hint}</span>
-              </div>
-            </div>
-          )}
+          {state === 'wrong' && <Feedback tone="bad" icon="x" title="Not quite" />}
+          {showHint && state !== 'wrong' && <Feedback tone="info" icon="bulb" title="Hint" body={step.hint} />}
           <div className="btn-row">
             {!showHint && (
               <Button icon="bulb" onClick={() => setShowHint(true)}>
@@ -208,22 +167,14 @@ function DemoStepView({ step, onDone }: { step: DemoStep; onDone: (r: StepResult
     if (next > ply) playMoveSound(positions[next].san);
     setPly(next);
   };
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') go(ply + 1);
-      if (e.key === 'ArrowLeft') go(ply - 1);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+  useKeydown((e) => {
+    if (e.key === 'ArrowRight') go(ply + 1);
+    if (e.key === 'ArrowLeft') go(ply - 1);
   });
   const note = ply > 0 ? step.notes?.[ply - 1] : undefined;
-  const start = new Chess(step.fen);
-  const moveNo = (i: number) => {
-    const full = Number(step.fen.split(' ')[5] ?? 1);
-    const offset = start.turn() === 'b' ? 1 : 0;
-    const n = full + Math.floor((i + offset) / 2);
-    return (i + offset) % 2 === 0 ? `${n}.` : i === 0 ? `${n}...` : '';
-  };
+  const startTurn = turnOf(step.fen);
+  // Number White's moves, and the first move when Black starts.
+  const moveNo = (i: number) => (i === 0 || (i + (startTurn === 'b' ? 1 : 0)) % 2 === 0 ? moveNumberLabel(i, fullMoveOf(step.fen), startTurn) : '');
   return (
     <StepLayout
       board={<Board fen={positions[ply].fen} orientation={orientationFor(step)} lastMove={positions[ply].last} arrows={ply === 0 ? step.arrows : undefined} marks={ply === 0 ? step.marks : undefined} />}
@@ -292,13 +243,7 @@ function QuizStepView({ step, onDone }: { step: QuizStep; onDone: (r: StepResult
         })}
       </div>
       {last !== undefined && (
-        <div className={`feedback ${last === correct ? 'feedback-good' : 'feedback-bad'}`}>
-          <Icon name={last === correct ? 'check' : 'x'} />
-          <div>
-            <strong>{last === correct ? 'Right' : 'Not this one'}</strong>
-            <span className="feedback-body">{step.choices[last].why}</span>
-          </div>
-        </div>
+        <Feedback tone={last === correct ? 'good' : 'bad'} icon={last === correct ? 'check' : 'x'} title={last === correct ? 'Right' : 'Not this one'} body={step.choices[last].why} />
       )}
     </>
   );
@@ -328,12 +273,12 @@ function ReadStepView({ step }: { step: Extract<LessonStep, { kind: 'read' }> })
 
 function StepLayout({ board, caption, children, below }: { board: React.ReactNode; caption?: string; children: React.ReactNode; below?: React.ReactNode }) {
   return (
-    <div className="trainer" style={{ '--board-offset': '270px' } as React.CSSProperties}>
-      <div className="trainer-board">
+    <div className="trainer">
+      <BoardColumn>
         {caption && <div className="board-caption">{caption}</div>}
         {board}
         {below}
-      </div>
+      </BoardColumn>
       <aside className="panel lesson-panel">{children}</aside>
     </div>
   );
@@ -344,16 +289,12 @@ export function LessonPage({ id }: { id: string }) {
   const found = findLesson(id);
   const [stepIdx, setStepIdx] = useState(0);
   const [results, setResults] = useState<Record<number, StepResult>>({});
-  const [finished, setFinished] = useState(false);
-  const [xpGained, setXpGained] = useState(0);
+  /** XP awarded once the lesson is complete; null while it is in progress. */
+  const [xpGained, setXpGained] = useState<number | null>(null);
   const enterRef = useRef<(() => void) | null>(null);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement) && !(e.target instanceof HTMLInputElement)) enterRef.current?.();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  useKeydown((e) => {
+    if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement) && !(e.target instanceof HTMLInputElement)) enterRef.current?.();
+  });
 
   if (!found) {
     return (
@@ -368,10 +309,11 @@ export function LessonPage({ id }: { id: string }) {
   // Demos report 'pending' once fully played through; exercises report how they were solved.
   const canContinue = step.kind === 'read' ? true : step.kind === 'demo' ? result === 'pending' : result === 'first-try' || result === 'retry';
   const isDemo = step.kind === 'demo';
+  const graded = lesson.steps.map((s, i) => ({ s, r: results[i] })).filter(({ s }) => s.kind === 'move' || s.kind === 'quiz');
+  const firstTry = graded.filter((g) => g.r === 'first-try').length;
 
   const complete = () => {
-    const graded = lesson.steps.map((s, i) => ({ s, r: results[i] })).filter(({ s }) => s.kind === 'move' || s.kind === 'quiz');
-    const score = graded.length ? graded.filter((g) => g.r === 'first-try').length / graded.length : 1;
+    const score = graded.length ? firstTry / graded.length : 1;
     const prev = getProfile().lessons[lesson.id];
     const xp = prev?.done ? 10 : 30 + graded.length * 4;
     updateProfile((d) => {
@@ -379,7 +321,6 @@ export function LessonPage({ id }: { id: string }) {
       logActivity(d, xp, 'lessons');
     });
     setXpGained(xp);
-    setFinished(true);
     sound('complete');
   };
 
@@ -387,11 +328,9 @@ export function LessonPage({ id }: { id: string }) {
     if (stepIdx + 1 >= lesson.steps.length) complete();
     else setStepIdx(stepIdx + 1);
   };
-  enterRef.current = canContinue && !finished ? next : null;
+  enterRef.current = canContinue && xpGained === null ? next : null;
 
-  if (finished) {
-    const graded = lesson.steps.map((s, i) => ({ s, r: results[i] })).filter(({ s }) => s.kind === 'move' || s.kind === 'quiz');
-    const first = graded.filter((g) => g.r === 'first-try').length;
+  if (xpGained !== null) {
     const nl = nextLessonAfter(lesson.id);
     return (
       <div className="lesson-done card">
@@ -403,7 +342,7 @@ export function LessonPage({ id }: { id: string }) {
         <p className="lede">
           {graded.length ? (
             <>
-              You solved <strong>{first}</strong> of {graded.length} exercises on the first try.
+              You solved <strong>{firstTry}</strong> of {graded.length} exercises on the first try.
             </>
           ) : (
             'Lesson finished.'

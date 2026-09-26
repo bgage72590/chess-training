@@ -8,12 +8,13 @@
 // candidate. A candidate is kept only if, at every solver move, a deeper search finds
 // exactly one decisive move, and the line ends in mate or in a clear material gain.
 // Results are appended to scripts/puzzles/out/raw.jsonl (run build.ts afterwards).
-import { Chess, type PieceSymbol } from 'chess.js';
+import { Chess } from 'chess.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { UciEngine, winPercent, type Score } from '../lib/uci.ts';
 import { materialDiff, tagPuzzle } from './tagger.ts';
+import { parseUci } from '../../src/chess/utils.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -34,7 +35,6 @@ fs.mkdirSync(path.dirname(OUT), { recursive: true });
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const rndInt = (a: number, b: number) => Math.floor(rnd(a, b + 1));
 const cp = (s: Score) => (s.mate !== undefined ? (s.mate > 0 ? 3000 - s.mate : -3000 - s.mate) : s.cp ?? 0);
-const toMove = (uci: string) => ({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] as PieceSymbol | undefined });
 
 interface Ply {
   fen: string;
@@ -76,7 +76,7 @@ async function playGame(e: UciEngine): Promise<Ply[]> {
       }
     }
     plies.push({ fen, move: pick.pv[0], best: best.score, played: pick.score });
-    chess.move(toMove(pick.pv[0]));
+    chess.move(parseUci(pick.pv[0]));
     lopsided = Math.abs(cp(best.score)) > 800 ? lopsided + 1 : 0;
     if (lopsided >= 6) break;
   }
@@ -144,7 +144,7 @@ async function buildLine(e: UciEngine, fen: string): Promise<Built | null> {
     }
     if (mateLine && best.score.mate === undefined) return reject('lost-mate'); // lost the mate thread
     solution.push(best.pv[0]);
-    chess.move(toMove(best.pv[0]));
+    chess.move(parseUci(best.pv[0]));
     if (chess.isCheckmate()) return { solution, mate, stableDepth, secondWin, cont: [] };
     if (chess.isGameOver()) return reject('game-over');
     if (mateLine && step >= 4) return reject('mate-too-long');
@@ -153,7 +153,7 @@ async function buildLine(e: UciEngine, fen: string): Promise<Built | null> {
     const reply = rr.bestmove;
     if (!reply || reply === '(none)') return reject('no-reply');
     const probe = new Chess(chess.fen());
-    probe.move(toMove(reply));
+    probe.move(parseUci(reply));
     if (!mateLine && materialDiff(probe, solver) - startMat >= 2) {
       // Material is banked after the best defence: the puzzle ends on the solver's move.
       // Guard against "wins material but the position is no longer winning".
@@ -164,12 +164,12 @@ async function buildLine(e: UciEngine, fen: string): Promise<Built | null> {
     }
     if (!mateLine && step >= 3) return reject('too-long');
     solution.push(reply);
-    chess.move(toMove(reply));
+    chess.move(parseUci(reply));
   }
   return reject('exhausted');
 }
 
-async function worker(id: number, deadline: number, seen: Set<string>, stats: { games: number; cands: number; puzzles: number }) {
+async function worker(deadline: number, seen: Set<string>, stats: { games: number; cands: number; puzzles: number }) {
   const e = await UciEngine.create({ hashMb: 32 });
   while (Date.now() < deadline) {
     const plies = await playGame(e);
@@ -179,7 +179,7 @@ async function worker(id: number, deadline: number, seen: Set<string>, stats: { 
       // Cheap filter from the players' own searches: skip when the mover was already lost.
       if (cp(p.best) < -200) continue;
       const chess = new Chess(p.fen);
-      chess.move(toMove(p.move));
+      chess.move(parseUci(p.move));
       if (chess.isGameOver()) continue;
       const puzzleFen = chess.fen();
       const key = puzzleFen.split(' ').slice(0, 4).join(' ');
@@ -206,7 +206,7 @@ async function worker(id: number, deadline: number, seen: Set<string>, stats: { 
       if (!bs || cp(bs) < -170) continue;
       const themes = tagPuzzle({ fen: puzzleFen, solution: built.solution, gamePly: i + 1 });
       const start = new Chess(puzzleFen);
-      const first = start.move(toMove(built.solution[0]));
+      const first = start.move(parseUci(built.solution[0]));
       const rec = {
         fen: p.fen,
         moves: [p.move, ...built.solution],
@@ -226,7 +226,6 @@ async function worker(id: number, deadline: number, seen: Set<string>, stats: { 
     }
   }
   e.quit();
-  void id;
 }
 
 async function main() {
@@ -237,7 +236,7 @@ async function main() {
       if (!line.trim()) continue;
       const r = JSON.parse(line);
       const c = new Chess(r.fen);
-      c.move(toMove(r.moves[0]));
+      c.move(parseUci(r.moves[0]));
       seen.add(c.fen().split(' ').slice(0, 4).join(' '));
     }
   }
@@ -247,7 +246,7 @@ async function main() {
     const min = ((Date.now() - t0) / 60000).toFixed(1);
     console.log(`[${min}m] games ${stats.games}  candidates ${stats.cands}  puzzles ${stats.puzzles}  rejects ${JSON.stringify(reasons)}`);
   }, 30_000);
-  await Promise.all(Array.from({ length: WORKERS }, (_, i) => worker(i, deadline, seen, stats)));
+  await Promise.all(Array.from({ length: WORKERS }, () => worker(deadline, seen, stats)));
   clearInterval(timer);
   console.log(`done: games ${stats.games}, candidates ${stats.cands}, puzzles ${stats.puzzles}`);
 }

@@ -1,4 +1,5 @@
-import { useProfile } from '../store/profile';
+import { playerWon, useProfile } from '../store/profile';
+import { colorName } from '../chess/utils';
 import { navigate } from '../router';
 import { Button, PageHeader, Pill } from '../components/ui';
 import { LEVELS } from './Play';
@@ -18,8 +19,7 @@ export function GamesPage() {
       ) : (
         <div className="game-list">
           {p.games.map((g) => {
-            const won = (g.result === '1-0' && g.playerColor === 'w') || (g.result === '0-1' && g.playerColor === 'b');
-            const outcome = g.result === '1/2-1/2' ? 'Draw' : won ? 'Win' : 'Loss';
+            const outcome = g.result === '1/2-1/2' ? 'Draw' : playerWon(g) ? 'Win' : 'Loss';
             const lvl = LEVELS[g.level - 1];
             return (
               <button key={g.id} className="game-row card" onClick={() => navigate(`review/${g.id}`)}>
@@ -29,7 +29,7 @@ export function GamesPage() {
                     vs {lvl?.name} <span className="faint num">~{lvl?.elo}</span>
                   </strong>
                   <span className="faint">
-                    {g.playerColor === 'w' ? 'White' : 'Black'} · {Math.ceil(g.moves.length / 2)} moves · {g.reason} · {new Date(g.t).toLocaleDateString()}
+                    {colorName(g.playerColor)} · {Math.ceil(g.moves.length / 2)} moves · {g.reason} · {new Date(g.t).toLocaleDateString()}
                   </span>
                 </div>
                 <div className="game-row-acc">

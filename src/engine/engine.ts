@@ -3,35 +3,27 @@
 // leak into analysis.
 import { useSyncExternalStore } from 'react';
 import BackupWorker from './fallback.worker.ts?worker&inline';
+import { turnOf } from '../chess/utils';
+import { goCommand, parseInfo, whitePov, type PvLine, type Score } from './score';
 
-export interface Score {
-  cp?: number;
-  mate?: number;
-}
-
-export interface PvLine {
-  multipv: number;
-  depth: number;
-  score: Score;
-  pv: string[];
-}
+export { formatScore, scoreToCp, whitePov, winPercent, type PvLine, type Score } from './score';
 
 export interface SearchResult {
-  bestmove: string;
+  /** Best move in UCI, or null when the side to move has no legal move. */
+  best: string | null;
   lines: PvLine[];
+  /** Score of the principal line from White's point of view. */
+  whiteScore?: Score;
 }
 
 export interface SearchOptions {
   depth?: number;
   movetime?: number;
-  nodes?: number;
   multipv?: number;
-  searchmoves?: string[];
   /** Stockfish "Skill Level" 0..20 (weaker play). */
   skill?: number;
   /** Limit strength to an Elo (1320..3190). */
   elo?: number;
-  onUpdate?: (lines: PvLine[]) => void;
 }
 
 export type EngineStatus = 'idle' | 'loading' | 'ready' | 'failed';
@@ -39,27 +31,9 @@ export type EngineStatus = 'idle' | 'loading' | 'ready' | 'failed';
 interface Job {
   fen: string;
   opts: SearchOptions;
-  resolve: (r: SearchResult) => void;
+  /** Resolves null when the search was cancelled. */
+  resolve: (r: SearchResult | null) => void;
   cancelled: boolean;
-}
-
-export function parseInfo(line: string): PvLine | null {
-  if (!line.startsWith('info ') || !line.includes(' pv ')) return null;
-  const t = line.split(' ');
-  if (t.includes('lowerbound') || t.includes('upperbound')) return null;
-  const get = (k: string) => {
-    const i = t.indexOf(k);
-    return i >= 0 ? t[i + 1] : undefined;
-  };
-  const si = t.indexOf('score');
-  if (si < 0) return null;
-  const score: Score = t[si + 1] === 'mate' ? { mate: Number(t[si + 2]) } : { cp: Number(t[si + 2]) };
-  return {
-    multipv: Number(get('multipv') ?? 1),
-    depth: Number(get('depth') ?? 0),
-    score,
-    pv: t.slice(t.indexOf('pv') + 1),
-  };
 }
 
 class Engine {
@@ -154,18 +128,21 @@ class Engine {
     const info = parseInfo(line);
     if (info) {
       this.lines.set(info.multipv, info);
-      if (!job.cancelled && info.multipv === (job.opts.multipv ?? 1)) {
-        job.opts.onUpdate?.([...this.lines.values()].sort((a, b) => a.multipv - b.multipv));
-      }
       return;
     }
     if (line.startsWith('bestmove')) {
-      const result: SearchResult = {
-        bestmove: line.split(' ')[1],
-        lines: [...this.lines.values()].sort((a, b) => a.multipv - b.multipv),
-      };
+      const bestmove = line.split(' ')[1];
+      const lines = [...this.lines.values()].sort((a, b) => a.multipv - b.multipv);
       this.current = null;
-      job.resolve(result);
+      job.resolve(
+        job.cancelled
+          ? null
+          : {
+              best: bestmove && bestmove !== '(none)' ? bestmove : null,
+              lines,
+              whiteScore: lines[0] && whitePov(lines[0].score, turnOf(job.fen)),
+            },
+      );
       this.next();
     }
   }
@@ -174,7 +151,7 @@ class Engine {
     if (this.current || !this.queue.length) return;
     const job = this.queue.shift()!;
     if (job.cancelled) {
-      job.resolve({ bestmove: '', lines: [] });
+      job.resolve(null);
       this.next();
       return;
     }
@@ -191,24 +168,25 @@ class Engine {
       this.send(`setoption name Skill Level value ${o.skill ?? 20}`);
     }
     this.send(`position fen ${job.fen}`);
-    let go = 'go';
-    if (o.depth) go += ` depth ${o.depth}`;
-    if (o.movetime) go += ` movetime ${o.movetime}`;
-    if (o.nodes) go += ` nodes ${o.nodes}`;
-    if (!o.depth && !o.movetime && !o.nodes) go += ' depth 14';
-    if (o.searchmoves?.length) go += ` searchmoves ${o.searchmoves.join(' ')}`;
-    this.send(go);
+    this.send(goCommand(o, 14));
   }
 
-  async search(fen: string, opts: SearchOptions = {}): Promise<SearchResult> {
-    await this.init();
-    return new Promise<SearchResult>((resolve) => {
-      this.queue.push({ fen, opts, resolve, cancelled: false });
-      this.next();
+  /** Queues a search. Resolves null if cancelAll() runs before it finishes. */
+  search(fen: string, opts: SearchOptions = {}): Promise<SearchResult | null> {
+    return new Promise<SearchResult | null>((resolve, reject) => {
+      const job: Job = { fen, opts, resolve, cancelled: false };
+      this.queue.push(job);
+      this.init().then(
+        () => this.next(),
+        (e) => {
+          this.queue = this.queue.filter((j) => j !== job);
+          reject(e);
+        },
+      );
     });
   }
 
-  /** Stops the running search (it resolves with what it has) and drops queued ones. */
+  /** Stops the running search and drops queued ones; their promises resolve null. */
   cancelAll() {
     for (const j of this.queue) j.cancelled = true;
     if (this.current) {
@@ -238,25 +216,4 @@ export const engine = new Engine();
 
 export function useEngineStatus(): EngineStatus {
   return useSyncExternalStore(engine.subscribe, () => engine.status, () => engine.status);
-}
-
-/** Lichess-style win percentage (0..100) for the side the score belongs to. */
-export function winPercent(s: Score | undefined): number {
-  if (!s) return 50;
-  if (s.mate !== undefined) return s.mate > 0 ? 100 : s.mate < 0 ? 0 : 0;
-  const cp = Math.max(-1000, Math.min(1000, s.cp ?? 0));
-  return 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
-}
-
-/** Flips a side-to-move score to White's point of view. */
-export function whitePov(s: Score, turn: 'w' | 'b'): Score {
-  if (turn === 'w') return s;
-  return s.mate !== undefined ? { mate: -s.mate } : { cp: -(s.cp ?? 0) };
-}
-
-export function formatScore(s: Score | undefined): string {
-  if (!s) return '0.0';
-  if (s.mate !== undefined) return s.mate === 0 ? '#' : `${s.mate > 0 ? '' : '-'}M${Math.abs(s.mate)}`;
-  const v = (s.cp ?? 0) / 100;
-  return `${v > 0 ? '+' : ''}${v.toFixed(1)}`;
 }

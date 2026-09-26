@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Chess, type Move } from 'chess.js';
-import { engine, useEngineStatus, winPercent, whitePov, type PvLine, type Score, type SearchOptions } from '../engine/engine';
-import { Board, playMoveSound, type BoardMove } from '../chess/Board';
-import { colorName, parseUci, START_FEN, pvToSan, uciOf } from '../chess/utils';
-import { logActivity, updateProfile, type GameRecord } from '../store/profile';
+import { engine, scoreToCp, useEngineStatus, type PvLine, type Score, type SearchOptions } from '../engine/engine';
+import { Board, playMoveSound } from '../chess/Board';
+import { colorName, drawReason, nullMoveFen, other, parseUci, playUci, pvToSan, START_FEN, takeBackTo, turnOf, uciOf } from '../chess/utils';
+import { logActivity, playerWon, updateProfile, type GameRecord } from '../store/profile';
+import { winFor } from '../lib/analysis';
 import { navigate } from '../router';
-import { Button, PageHeader, Pill, Segmented } from '../components/ui';
+import { BoardColumn } from '../components/BoardColumn';
+import { Button, Feedback, PageHeader, Pill, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { EvalBar, MoveList } from '../components/GameBits';
 import { EngineNotice } from '../components/EngineNotice';
@@ -57,14 +59,13 @@ function savePrefs(p: Prefs) {
   }
 }
 
-function pickEngineMove(lines: PvLine[], bestmove: string, randomness = 0): string {
-  if (!randomness || lines.length < 2) return bestmove;
-  if (Math.random() > randomness) return bestmove;
-  const cp = (s: Score) => (s.mate !== undefined ? (s.mate > 0 ? 5000 : -5000) : s.cp ?? 0);
-  const best = cp(lines[0].score);
+function pickEngineMove(lines: PvLine[], best: string, randomness = 0): string {
+  if (!randomness || lines.length < 2) return best;
+  if (Math.random() > randomness) return best;
+  const top = scoreToCp(lines[0].score);
   // Weaker levels pick among plausible moves, occasionally a clear error.
-  const pool = lines.filter((l) => cp(l.score) > best - 400 * randomness - 150);
-  return pool[Math.floor(Math.random() * pool.length)]?.pv[0] ?? bestmove;
+  const pool = lines.filter((l) => scoreToCp(l.score) > top - 400 * randomness - 150);
+  return pool[Math.floor(Math.random() * pool.length)]?.pv[0] ?? best;
 }
 
 type Phase = 'setup' | 'playing' | 'over';
@@ -85,21 +86,20 @@ export function PlayPage() {
   const [best, setBest] = useState<string | null>(null);
   const [arrows, setArrows] = useState<Arrow[]>([]);
   const [note, setNote] = useState<CoachNote | null>(null);
-  const [pending, setPending] = useState<{ before: number } | null>(null);
+  /** The coach flagged the player's last move and is waiting: take back or play on. */
+  const [pending, setPending] = useState(false);
   const [result, setResult] = useState<{ result: GameRecord['result']; reason: string; id: string } | null>(null);
   const [orientation, setOrientation] = useState<'white' | 'black'>('white');
-  const gen = useRef(0);
   const engineStatus = useEngineStatus();
   const level = LEVELS[prefs.level - 1];
 
-  useEffect(() => {
-    engine.init().catch(() => undefined);
-    return () => engine.cancelAll();
-  }, []);
+  // Leaving the page cancels any search; its continuation sees null and stops.
+  useEffect(() => () => engine.cancelAll(), []);
 
   const fenAt = (ms: Move[]) => (ms.length ? ms[ms.length - 1].after : START_FEN);
   const fen = fenAt(moves);
-  const turn = fen.split(' ')[1] as 'w' | 'b';
+  const turn = turnOf(fen);
+  const canMove = phase === 'playing' && !thinking && !pending && turn === color;
 
   const update = (p: Partial<Prefs>) => {
     const next = { ...prefs, ...p };
@@ -109,7 +109,7 @@ export function PlayPage() {
 
   const finish = (ms: Move[], res: GameRecord['result'], reason: string, playerColor: 'w' | 'b') => {
     const id = 'g' + Date.now().toString(36);
-    const won = (res === '1-0' && playerColor === 'w') || (res === '0-1' && playerColor === 'b');
+    const won = playerWon({ result: res, playerColor });
     updateProfile((d) => {
       d.games.unshift({ id, t: Date.now(), startFen: START_FEN, moves: ms.map(uciOf), playerColor, level: prefs.level, result: res, reason });
       if (d.games.length > 30) d.games.length = 30;
@@ -123,51 +123,40 @@ export function PlayPage() {
   const checkEnd = (ms: Move[], playerColor: 'w' | 'b'): boolean => {
     const c = new Chess(fenAt(ms));
     if (!c.isGameOver()) return false;
-    if (c.isCheckmate()) {
-      const winner = c.turn() === 'w' ? '0-1' : '1-0';
-      finish(ms, winner, 'Checkmate', playerColor);
-    } else {
-      const why = c.isStalemate() ? 'Stalemate' : c.isInsufficientMaterial() ? 'Insufficient material' : c.isThreefoldRepetition() ? 'Threefold repetition' : 'Fifty-move rule';
-      finish(ms, '1/2-1/2', why, playerColor);
-    }
+    if (c.isCheckmate()) finish(ms, c.turn() === 'w' ? '0-1' : '1-0', 'Checkmate', playerColor);
+    else finish(ms, '1/2-1/2', drawReason(c), playerColor);
     return true;
   };
 
+  // Every search below resolves null when cancelled (take-back, rematch, resign, leaving),
+  // so a stale continuation simply stops.
+
   /** Analyse the position for the player: eval bar + hint move. */
-  const analyseForPlayer = async (f: string, g: number) => {
+  const analyseForPlayer = async (f: string) => {
     const r = await engine.search(f, { depth: 11 });
-    if (g !== gen.current) return;
-    const s = r.lines[0]?.score;
-    if (s) setEvalW(whitePov(s, f.split(' ')[1] as 'w' | 'b'));
-    setBest(r.bestmove && r.bestmove !== '(none)' ? r.bestmove : null);
+    if (!r) return;
+    if (r.whiteScore) setEvalW(r.whiteScore);
+    setBest(r.best);
   };
 
-  const engineMove = async (ms: Move[], playerColor: 'w' | 'b', g: number) => {
+  const engineMove = async (ms: Move[], playerColor: 'w' | 'b') => {
     const f = fenAt(ms);
     setThinking(true);
     const o = level.opts;
     const r = await engine.search(f, { skill: o.skill, elo: o.elo, depth: o.depth, movetime: o.movetime, multipv: o.multipv });
-    if (g !== gen.current) return;
-    const uci = pickEngineMove(r.lines, r.bestmove, o.randomness);
-    const c = new Chess(f);
-    let mv: Move;
-    try {
-      mv = c.move(parseUci(uci));
-    } catch {
-      setThinking(false);
-      return;
-    }
-    const next = [...ms, mv];
-    setMoves(next);
-    playMoveSound(mv.san);
+    if (!r) return;
+    const played = r.best ? playUci(f, pickEngineMove(r.lines, r.best, o.randomness)) : null;
     setThinking(false);
+    if (!played) return;
+    const next = [...ms, played.move];
+    setMoves(next);
+    playMoveSound(played.move.san);
     if (checkEnd(next, playerColor)) return;
-    void analyseForPlayer(c.fen(), g);
+    void analyseForPlayer(played.fen);
   };
 
   const start = () => {
     const c: 'w' | 'b' = prefs.color === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : prefs.color;
-    gen.current++;
     engine.cancelAll();
     engine.newGame();
     setColor(c);
@@ -177,23 +166,15 @@ export function PlayPage() {
     setBest(null);
     setArrows([]);
     setNote(null);
-    setPending(null);
+    setPending(false);
     setResult(null);
     setPhase('playing');
-    if (c === 'b') void engineMove([], c, gen.current);
-    else void analyseForPlayer(START_FEN, gen.current);
+    if (c === 'b') void engineMove([], c);
+    else void analyseForPlayer(START_FEN);
   };
 
-  const onMove = async (m: BoardMove) => {
-    if (phase !== 'playing' || thinking || pending || turn !== color) return;
-    const c = new Chess(fen);
-    let mv: Move;
-    try {
-      mv = c.move({ from: m.from, to: m.to, promotion: m.promotion });
-    } catch {
-      return;
-    }
-    const g = gen.current;
+  const onMove = async (mv: Move) => {
+    if (!canMove) return;
     const next = [...moves, mv];
     setMoves(next);
     setArrows([]);
@@ -203,58 +184,51 @@ export function PlayPage() {
 
     if (prefs.coach && evalW) {
       setThinking(true);
-      const r = await engine.search(c.fen(), { depth: 11 });
-      if (g !== gen.current) return;
+      const r = await engine.search(mv.after, { depth: 11 });
+      if (!r) return;
       setThinking(false);
-      const sAfter = r.lines[0]?.score;
-      if (sAfter) {
-        const afterW = whitePov(sAfter, c.turn());
-        const pov = (s: Score) => (color === 'w' ? winPercent(s) : 100 - winPercent(s));
-        const drop = pov(evalW) - pov(afterW);
-        setEvalW(afterW);
-        if (drop >= 14 && pov(evalW) > 12) {
-          const refute = r.bestmove && r.bestmove !== '(none)' ? parseUci(r.bestmove) : null;
-          const line = pvToSan(c.fen(), r.lines[0]?.pv ?? [], 4);
-          if (refute) setArrows([{ from: refute.from, to: refute.to, color: 'red' }]);
+      if (r.whiteScore) {
+        const before = winFor(evalW, color);
+        const drop = before - winFor(r.whiteScore, color);
+        setEvalW(r.whiteScore);
+        if (drop >= 14 && before > 12) {
+          const line = pvToSan(mv.after, r.lines[0]?.pv ?? [], 4);
+          if (r.best) {
+            const refute = parseUci(r.best);
+            setArrows([{ from: refute.from, to: refute.to, color: 'red' }]);
+          }
           setNote({
             kind: 'warn',
             title: drop >= 25 ? `${mv.san} looks like a blunder` : `${mv.san} is a mistake`,
             body: line.length ? `After ${line.join(' ')} your position gets much worse. Take it back and look again?` : 'Your position gets much worse. Take it back and look again?',
           });
-          setPending({ before: moves.length });
+          setPending(true);
           return;
         }
       }
     }
-    void engineMove(next, color, g);
+    void engineMove(next, color);
   };
 
   const continueAfterWarning = () => {
-    setPending(null);
+    setPending(false);
     setNote(null);
     setArrows([]);
-    void engineMove(moves, color, gen.current);
+    void engineMove(moves, color);
   };
 
+  /** Undo the player's last move and anything played after it. */
   const takeBack = () => {
-    gen.current++;
     engine.cancelAll();
     setThinking(false);
-    let n = moves.length;
-    if (pending) n = pending.before;
-    else {
-      // Undo the engine reply and the player's move.
-      while (n > 0 && moves[n - 1].color !== color) n--;
-      if (n > 0) n--;
-    }
-    const next = moves.slice(0, n);
+    const next = moves.slice(0, takeBackTo(moves, color));
     setMoves(next);
-    setPending(null);
+    setPending(false);
     setNote(null);
     setArrows([]);
     const f = fenAt(next);
-    if (f.split(' ')[1] !== color) void engineMove(next, color, gen.current);
-    else void analyseForPlayer(f, gen.current);
+    if (turnOf(f) !== color) void engineMove(next, color);
+    else void analyseForPlayer(f);
   };
 
   const hint = () => {
@@ -265,35 +239,27 @@ export function PlayPage() {
   };
 
   const threat = async () => {
-    const c = new Chess(fen);
-    if (c.inCheck()) {
+    if (new Chess(fen).inCheck()) {
       setNote({ kind: 'threat', title: 'You are in check', body: 'Deal with the check first: move the king, block, or capture the checking piece.' });
       return;
     }
-    const parts = fen.split(' ');
-    parts[1] = parts[1] === 'w' ? 'b' : 'w';
-    parts[3] = '-';
-    const flipped = parts.join(' ');
-    const g = gen.current;
+    const flipped = nullMoveFen(fen);
     const r = await engine.search(flipped, { depth: 10 });
-    if (g !== gen.current || !r.bestmove || r.bestmove === '(none)') return;
-    const s = r.lines[0]?.score;
-    const u = parseUci(r.bestmove);
-    const san = pvToSan(flipped, [r.bestmove])[0];
+    if (!r?.best) return;
+    const u = parseUci(r.best);
+    const san = pvToSan(flipped, [r.best])[0];
     // Compare the opponent's score with a free move against their score now.
     const oppNow = evalW?.cp !== undefined ? (color === 'w' ? -evalW.cp : evalW.cp) : 0;
-    const gain = s?.mate !== undefined ? (s.mate > 0 ? 10000 : -10000) : (s?.cp ?? 0) - oppNow;
-    const serious = gain >= 150;
+    const gain = scoreToCp(r.lines[0]?.score ?? { cp: 0 }) - oppNow;
     setArrows([{ from: u.from, to: u.to, color: 'red' }]);
     setNote(
-      serious
-        ? { kind: 'threat', title: `Threat: ${san}`, body: `If it were ${colorName(color === 'w' ? 'b' : 'w')}'s move, ${san} would be strong. Make sure your move deals with it.` }
+      gain >= 150
+        ? { kind: 'threat', title: `Threat: ${san}`, body: `If it were ${colorName(other(color))}'s move, ${san} would be strong. Make sure your move deals with it.` }
         : { kind: 'info', title: 'No serious threat', body: `The opponent's most active idea is ${san}, but it is not dangerous right now. Use the move to improve your worst piece.` },
     );
   };
 
   const resign = () => {
-    gen.current++;
     engine.cancelAll();
     finish(moves, color === 'w' ? '0-1' : '1-0', 'Resignation', color);
   };
@@ -349,12 +315,12 @@ export function PlayPage() {
 
   const sans = moves.map((m) => m.san);
   const last = moves[moves.length - 1];
-  const playerWon = result && ((result.result === '1-0' && color === 'w') || (result.result === '0-1' && color === 'b'));
+  const won = !!result && playerWon({ result: result.result, playerColor: color });
   const boardEl = (
     <Board
       fen={fen}
       orientation={orientation}
-      interactive={phase === 'playing' && !thinking && !pending && turn === color}
+      interactive={canMove}
       playerColor={color}
       onMove={onMove}
       lastMove={last ? [last.from, last.to] : null}
@@ -362,11 +328,11 @@ export function PlayPage() {
     />
   );
   return (
-    <div className="trainer" style={{ '--board-offset': '150px' } as React.CSSProperties}>
-      <div className="trainer-board">
+    <div className="trainer">
+      <BoardColumn>
         <div className="board-caption">
           <span className="player-tag">
-            <span className={`side-dot ${color === 'w' ? 'b' : 'w'}`} />
+            <span className={`side-dot ${other(color)}`} />
             {level.name} <span className="faint num">~{level.elo}</span>
           </span>
           {thinking && <span className="faint">Thinking…</span>}
@@ -384,23 +350,20 @@ export function PlayPage() {
             <span className={`side-dot ${color}`} /> You
           </span>
           <span style={{ flex: 1 }} />
-          <MoveInput id="play-move" fen={fen} enabled={phase === 'playing' && !thinking && !pending && turn === color} onMove={onMove} />
+          <MoveInput id="play-move" fen={fen} enabled={canMove} onMove={onMove} />
           <button className="icon-btn" aria-label="Flip board" onClick={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))}>
             <Icon name="flip" size={18} />
           </button>
         </div>
-      </div>
+      </BoardColumn>
       <aside className="panel">
         {phase === 'over' && result ? (
-          <div className={`feedback ${playerWon ? 'feedback-good' : result.result === '1/2-1/2' ? 'feedback-info' : 'feedback-bad'}`}>
-            <Icon name={playerWon ? 'trophy' : 'flag'} />
-            <div>
-              <strong>{playerWon ? 'You won' : result.result === '1/2-1/2' ? 'Draw' : 'You lost'}</strong>
-              <span className="feedback-body">
-                {result.reason} · {result.result}
-              </span>
-            </div>
-          </div>
+          <Feedback
+            tone={won ? 'good' : result.result === '1/2-1/2' ? 'info' : 'bad'}
+            icon={won ? 'trophy' : 'flag'}
+            title={won ? 'You won' : result.result === '1/2-1/2' ? 'Draw' : 'You lost'}
+            body={`${result.reason} · ${result.result}`}
+          />
         ) : (
           <div className="to-move">
             <span className={`side-dot ${turn}`} />
@@ -408,13 +371,12 @@ export function PlayPage() {
           </div>
         )}
         {note && (
-          <div className={`feedback ${note.kind === 'warn' ? 'feedback-warn' : note.kind === 'threat' ? 'feedback-bad' : 'feedback-info'}`}>
-            <Icon name={note.kind === 'warn' ? 'flag' : note.kind === 'threat' ? 'target' : 'bulb'} />
-            <div>
-              <strong>{note.title}</strong>
-              {note.body && <span className="feedback-body">{note.body}</span>}
-            </div>
-          </div>
+          <Feedback
+            tone={note.kind === 'warn' ? 'warn' : note.kind === 'threat' ? 'bad' : 'info'}
+            icon={note.kind === 'warn' ? 'flag' : note.kind === 'threat' ? 'target' : 'bulb'}
+            title={note.title}
+            body={note.body}
+          />
         )}
         {pending && (
           <div className="btn-row">
@@ -429,14 +391,14 @@ export function PlayPage() {
         <MoveList sans={sans} current={sans.length} />
         {phase === 'playing' ? (
           <div className="btn-row">
-            <Button icon="bulb" onClick={hint} disabled={!best || thinking || !!pending || turn !== color}>
+            <Button icon="bulb" onClick={hint} disabled={!best || !canMove}>
               Hint
             </Button>
-            <Button icon="target" onClick={threat} disabled={thinking || !!pending || turn !== color}>
+            <Button icon="target" onClick={threat} disabled={!canMove}>
               Threat?
             </Button>
             {prefs.coach && (
-              <Button variant="ghost" icon="undo" onClick={takeBack} disabled={moves.length === 0 || !!pending}>
+              <Button variant="ghost" icon="undo" onClick={takeBack} disabled={moves.length === 0 || pending}>
                 Take back
               </Button>
             )}
