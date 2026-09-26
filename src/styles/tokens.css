@@ -1,0 +1,152 @@
+/* Design tokens. Light palette on :root, dark palette via prefers-color-scheme or data-theme. */
+:root {
+  color-scheme: light;
+  --bg: #eceff3;
+  --bg-grain: #e4e8ee;
+  --surface: #ffffff;
+  --surface-2: #f4f6f9;
+  --surface-3: #e9edf2;
+  --ink: #141d27;
+  --ink-2: #4b5967;
+  --ink-3: #7b8896;
+  --line: #d7dde5;
+  --line-strong: #bcc5d0;
+  --accent: #a8741b;
+  --accent-strong: #8d5f12;
+  --accent-soft: #f6ead3;
+  --accent-ink: #1d1407;
+  --on-accent: #fffaf0;
+  --good: #23855c;
+  --good-soft: #dcf1e6;
+  --bad: #c0392f;
+  --bad-soft: #f8dfdc;
+  --warn: #b7791f;
+  --warn-soft: #f7ecd6;
+  --info: #2f6db3;
+  --info-soft: #dce8f6;
+  --shadow-1: 0 1px 2px rgb(20 29 39 / 0.06), 0 2px 8px rgb(20 29 39 / 0.05);
+  --shadow-2: 0 2px 6px rgb(20 29 39 / 0.08), 0 12px 32px rgb(20 29 39 / 0.1);
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 16px;
+  --font-display: 'Bricolage Grotesque', 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  /* Board themes (overridden per theme class on the board) */
+  --sq-light: #dfe5ea;
+  --sq-dark: #7f98ab;
+  --coord-on-light: #6a8397;
+  --coord-on-dark: #eef2f5;
+  --hl-last: rgb(247 206 96 / 0.55);
+  --hl-last-dark: rgb(226 176 72 / 0.74);
+  --hl-select: rgb(247 206 96 / 0.8);
+  --hl-select-dark: rgb(226 176 72 / 0.9);
+  --dest-dot: rgb(20 29 39 / 0.28);
+  --arrow-green: #2f9e6b;
+  --arrow-red: #d2463b;
+  --arrow-blue: #3a7cc9;
+  --arrow-yellow: #e0a526;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #0c1117;
+    --bg-grain: #0f151c;
+    --surface: #131a22;
+    --surface-2: #19222c;
+    --surface-3: #212c38;
+    --ink: #e6ebf0;
+    --ink-2: #a3b0bd;
+    --ink-3: #6f7e8d;
+    --line: #243040;
+    --line-strong: #33424f;
+    --accent: #e2b25a;
+    --accent-strong: #f0c677;
+    --accent-soft: #2c2413;
+    --accent-ink: #1d1407;
+    --on-accent: #1d1407;
+    --good: #4cc18c;
+    --good-soft: #13291f;
+    --bad: #f0675c;
+    --bad-soft: #321816;
+    --warn: #e8a83d;
+    --warn-soft: #30230f;
+    --info: #6aa5ea;
+    --info-soft: #14243a;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3), 0 2px 8px rgb(0 0 0 / 0.25);
+    --shadow-2: 0 2px 6px rgb(0 0 0 / 0.35), 0 16px 40px rgb(0 0 0 / 0.4);
+    --dest-dot: rgb(10 14 20 / 0.35);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0c1117;
+  --bg-grain: #0f151c;
+  --surface: #131a22;
+  --surface-2: #19222c;
+  --surface-3: #212c38;
+  --ink: #e6ebf0;
+  --ink-2: #a3b0bd;
+  --ink-3: #6f7e8d;
+  --line: #243040;
+  --line-strong: #33424f;
+  --accent: #e2b25a;
+  --accent-strong: #f0c677;
+  --accent-soft: #2c2413;
+  --accent-ink: #1d1407;
+  --on-accent: #1d1407;
+  --good: #4cc18c;
+  --good-soft: #13291f;
+  --bad: #f0675c;
+  --bad-soft: #321816;
+  --warn: #e8a83d;
+  --warn-soft: #30230f;
+  --info: #6aa5ea;
+  --info-soft: #14243a;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3), 0 2px 8px rgb(0 0 0 / 0.25);
+  --shadow-2: 0 2px 6px rgb(0 0 0 / 0.35), 0 16px 40px rgb(0 0 0 / 0.4);
+  --dest-dot: rgb(10 14 20 / 0.35);
+}
+
+/* Board themes */
+.board-slate {
+  --sq-light: #dfe5ea;
+  --sq-dark: #7f98ab;
+  --coord-on-light: #6a8397;
+  --coord-on-dark: #eef2f5;
+}
+.board-walnut {
+  --hl-last: rgb(205 210 106 / 0.6);
+  --hl-last-dark: rgb(205 210 106 / 0.6);
+  --hl-select: rgb(20 85 30 / 0.5);
+  --hl-select-dark: rgb(20 85 30 / 0.5);
+  --sq-light: #f0d9b5;
+  --sq-dark: #b58863;
+  --coord-on-light: #a07550;
+  --coord-on-dark: #f6e6cc;
+}
+.board-tourney {
+  --hl-last: rgb(255 255 51 / 0.45);
+  --hl-last-dark: rgb(255 255 51 / 0.45);
+  --hl-select: rgb(255 255 51 / 0.7);
+  --hl-select-dark: rgb(255 255 51 / 0.7);
+  --sq-light: #ebecd0;
+  --sq-dark: #739552;
+  --coord-on-light: #6c8a4e;
+  --coord-on-dark: #f2f3dd;
+}
+.board-ink {
+  --sq-light: #c9cfd8;
+  --sq-dark: #4d5b72;
+  --coord-on-light: #4d5b72;
+  --coord-on-dark: #d8dde5;
+}
+.board-rose {
+  --sq-light: #efe3dc;
+  --sq-dark: #b9867c;
+  --coord-on-light: #a1716a;
+  --coord-on-dark: #f7ece7;
+}

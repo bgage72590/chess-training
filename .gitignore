@@ -1,0 +1,8 @@
+node_modules
+dist
+dist-single
+public/engine
+*.log
+.DS_Store
+scripts/puzzles/out
+test-results
