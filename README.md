@@ -13,10 +13,12 @@ It trains the four things that separate strong players from casual ones:
 
 ## What's inside
 
+**By the numbers:** 44 lessons (394 steps, including 147 find-the-move exercises and 59 quizzes), 12 opening chapters with 46 annotated lines, 24 endgame drills, and an engine-verified puzzle set, all validated with Stockfish.
+
 - **Today**: a daily plan (warm-up, 10 puzzles, next lesson, opening review, a game or drill), XP goal ring, streak and level.
 - **Learn**: seven units in coaching order: Foundations, Checkmate Patterns, Tactical Motifs, Opening Principles, How to Think, Endgame Technique, Strategy & Planning. Lessons mix explanation, guided demos, quizzes and "find the move" exercises.
 - **Puzzles**: engine-verified puzzles with a unique solution, tagged by theme (fork, pin, skewer, discovered attack, mate in N, sacrifice…). Rated mode, theme filters, Rush (3 minutes, 3 strikes) and a Review queue.
-- **Openings**: Italian, Ruy Lopez, Queen's Gambit, London, Alapin and Advance lines for White; 1…e5, Caro-Kann, Sicilian, QGD and King's Indian for Black.
+- **Openings**: Italian, Ruy Lopez, Alapin vs the Sicilian, French and Caro-Kann Advance, Queen's Gambit and London for White; 1…e5, Caro-Kann, Najdorf, QGD and King's Indian for Black.
 - **Endgames**: drills played out against Stockfish with win / promote / hold-the-draw goals, hints and take-backs.
 - **Play the Coach**: ten levels from ~400 to full Stockfish. Coach mode warns about mistakes before the engine replies, shows threats and suggests moves.
 - **Game Reviews**: every game analysed move by move: accuracy, inaccuracies/mistakes/blunders, an evaluation graph, and "retry this move" on your own errors.
