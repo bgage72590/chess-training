@@ -4,6 +4,7 @@ import { Board } from '../chess/Board';
 import { Button, PageHeader, Segmented } from '../components/ui';
 import { toast } from '../lib/toast';
 import { useSyncState } from '../store/cloud';
+import { InstallCard } from '../components/InstallCard';
 
 const THEMES: { id: BoardTheme; name: string }[] = [
   { id: 'slate', name: 'Slate' },
@@ -111,6 +112,7 @@ export function SettingsPage() {
             />
           </div>
         </section>
+        <InstallCard />
         <section className="card settings-section">
           <h2>Your data</h2>
           <p className="muted">

@@ -25,6 +25,23 @@ It trains the four things that separate strong players from casual ones:
 - **Board Vision**: coordinate sprints, knight routes and a find-every-check drill.
 - **Progress**: rating chart, training heatmap, per-theme strengths, achievements. Export/import progress from Settings.
 
+## Install it as an app
+
+Tempo is an installable web app: once installed it has its own icon, opens in its own window
+and works offline, full-strength Stockfish included. Open
+**https://bgage72590.github.io/chess-training/** and:
+
+| Device | How |
+|---|---|
+| Chrome or Edge (Windows, Mac, Linux, ChromeOS) | Click **Install Tempo** in Settings, or the install icon at the right of the address bar. Tempo appears in the Start menu / Applications folder / dock. |
+| Safari on Mac | **File → Add to Dock** |
+| iPhone / iPad | Safari's **Share** button → **Add to Home Screen** |
+| Android | Chrome menu → **Install app** / **Add to Home screen** |
+
+Right-click (or long-press) the icon for shortcuts to Puzzles, Play and Learn. Progress is kept
+by each installed copy; use Export / Import in Settings to move it between devices. The app
+updates itself the next time it is opened online.
+
 ## Getting started
 
 ```bash
@@ -46,7 +63,9 @@ Other scripts:
 
 ### Deploying
 
-`.github/workflows/pages.yml` publishes `dist/` to GitHub Pages on every push to `main`. Enable it once under **Settings → Pages → Source: GitHub Actions**. The engine is single-threaded WASM, so no special cross-origin headers are needed.
+`.github/workflows/pages.yml` publishes `dist/` to GitHub Pages on every push to the default branch. Enable it once under **Settings → Pages → Source: GitHub Actions**. The engine is single-threaded WASM, so no special cross-origin headers are needed.
+
+The normal build is the installable app: `public/manifest.webmanifest`, the icons in `public/icons/` (regenerate with `node scripts/icons/render-icons.cjs`), and `sw.js`, a service worker written at build time from `src/pwa/sw.template.js` that precaches every built file for offline use.
 
 ## How the content is made trustworthy
 
@@ -63,7 +82,9 @@ src/
   data/         Generated puzzle set
   pages/        One file per screen
   store/        Profile: XP, streaks, ratings, spaced repetition (localStorage)
-  lib/          Rating (Glicko), spaced repetition, game analysis, achievements
+  lib/          Rating (Glicko), spaced repetition, game analysis, achievements, hooks
+  pwa/          Install prompt, service worker registration and template
+public/         Stockfish (copied at install), app icons, web app manifest
 scripts/        Content validator, puzzle generator/builder, engine copy, single-page build
 tests/          Vitest suites
 ```
@@ -72,5 +93,5 @@ tests/          Vitest suites
 
 - Engine: [Stockfish](https://stockfishchess.org) 19 via [stockfish.js](https://github.com/nmrugg/stockfish.js), GPLv3. The engine files are copied from the `stockfish` npm package at install time; its licence ships alongside as `engine/COPYING-stockfish.txt`.
 - Rules and move generation: [chess.js](https://github.com/jhlywa/chess.js) (BSD-2-Clause).
-- Pieces: "cburnett" set by Colin M.L. Burnett (GPLv2+ / GFDL / BSD), as distributed with lichess chessground.
+- Pieces: "cburnett" set by Colin M.L. Burnett (GPLv2+ / GFDL / BSD), as distributed with lichess chessground. The app icon uses its knight.
 - Fonts: Bricolage Grotesque, Figtree, JetBrains Mono (Google Fonts, OFL).

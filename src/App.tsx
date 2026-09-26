@@ -6,6 +6,7 @@ import { useToasts, toast } from './lib/toast';
 import { ACHIEVEMENTS } from './lib/achievements';
 import { dueLines, dueReviewPuzzles } from './lib/due';
 import { ProgressBar } from './components/ui';
+import { InstallButton } from './components/InstallCard';
 import { HomePage } from './pages/Home';
 import { LearnPage } from './pages/Learn';
 import { LessonPage } from './pages/Lesson';
@@ -236,6 +237,7 @@ export function App() {
           ))}
         </nav>
         <div className="sidebar-foot">
+          <InstallButton />
           <MiniStats streak={streak} rating={p.puzzles.rating} />
           <div>
             <div className="faint" style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: 5 }}>
@@ -252,6 +254,7 @@ export function App() {
           Tempo
         </button>
         <MiniStats streak={streak} rating={p.puzzles.rating}>
+          <InstallButton compact />
           <button className="icon-btn" style={{ width: 32, height: 32 }} aria-label="Settings" onClick={() => navigate('settings')}>
             <Icon name="settings" size={18} />
           </button>

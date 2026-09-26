@@ -1,9 +1,9 @@
 name: Deploy to GitHub Pages
 
-# Enable once in the repository: Settings -> Pages -> Build and deployment -> Source: GitHub Actions.
+# Publishes the installable app to https://<owner>.github.io/<repo>/ on every push to the
+# default branch. Enable once: Settings -> Pages -> Build and deployment -> Source: GitHub Actions.
 on:
   push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -17,6 +17,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

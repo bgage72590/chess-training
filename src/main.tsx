@@ -6,6 +6,9 @@ import './styles/app.css';
 import './styles/pages.css';
 import { App } from './App';
 import { startCloudSync } from './store/cloud';
+import { setupInstall } from './pwa/install';
+
+setupInstall();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
