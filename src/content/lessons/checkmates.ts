@@ -49,10 +49,10 @@ export const checkmates: Unit = {
         {
           kind: 'move',
           title: 'Deflect the defender',
-          text: 'White to move. Black threatens ...Qxd1+. Your queen and rook are lined up on the d-file. Mate in two.',
+          text: 'White to move. Your queen and rook are lined up on the open d-file, and only the c8-rook guards Black\'s back rank. Mate in two.',
           fen: '2r3k1/5ppp/8/8/8/1q6/3Q1PPP/3R2K1 w - - 0 1',
           solution: ['Qd8+', 'Rxd8', 'Rxd8#'],
-          hint: 'The c8-rook is the only guard of the back rank. Give it something to capture.',
+          hint: 'Offer your queen on the back rank with check. Only the c8-rook can take it, and your d1-rook stands behind.',
           success: 'Qd8+! Rxd8 Rxd8#. The queen sacrifice drags the defender onto d8, and the rook behind it finishes the job.',
         },
         {
@@ -62,7 +62,7 @@ export const checkmates: Unit = {
           fen: '4r1k1/5pp1/7p/8/8/8/PP3PPP/3R2K1 w - - 0 1',
           choices: [
             { text: 'h3', correct: true, why: 'The king gets h2 as an escape square, and a pawn on h3 is hard to attack. Black already did the same with ...h6.' },
-            { text: 'Kf1', why: 'The king is still on the back rank, and now it stands on the open e-file facing Black\'s rook.' },
+            { text: 'Kf1', why: 'The king stays on the back rank and steps toward the open e-file, where Black\'s rook is waiting.' },
             { text: 'b3', why: 'A reasonable pawn move elsewhere, but it gives the king nothing.' },
           ],
         },
@@ -404,7 +404,7 @@ export const checkmates: Unit = {
           title: 'Anastasia\'s mate',
           text:
             'In **Anastasia\'s mate** a knight on e7 covers g8 and g6, the king\'s own g7-pawn blocks another square, and a rook or queen mates along the h-file.\n\n' +
-            'The usual way to set it up is brutal: a queen sacrifice on h7 drags the king onto the file.',
+            'The usual way to set it up is forcing: a queen sacrifice on h7 drags the king onto the file.',
           fen: '8/4N1pk/8/7R/8/8/8/6K1 b - - 0 1',
           arrows: [
             { from: 'e7', to: 'g8', color: 'green' },
@@ -474,11 +474,11 @@ export const checkmates: Unit = {
           kind: 'read',
           title: 'Key takeaways',
           text:
-            '- The knight covers the squares a rook cannot, so together they mate in many shapes.\n' +
+            '- The knight covers squares a rook cannot, so together they mate in many shapes.\n' +
             '- Arabian: rook next to the cornered king, protected by the knight.\n' +
-            '- Anastasia\'s: knight on e7, king on h7 behind its g-pawn, rook or queen on the h-file.\n' +
+            '- Anastasia\'s: knight on e7, king on h7 behind its g-pawn, heavy piece on the h-file.\n' +
             '- Hook: pawn guards knight, knight guards rook, and the king\'s own pawn blocks the last square.\n' +
-            '- A queen sacrifice on h7 is often the fastest way into these patterns.',
+            '- A queen sacrifice on h7 often sets these patterns up.',
         },
       ],
     },
@@ -494,7 +494,7 @@ export const checkmates: Unit = {
           kind: 'read',
           title: 'Boden\'s mate',
           text:
-            'In **Boden\'s mate** two bishops strike along crossing diagonals. This is the final position of Schulder-Boden, London 1853: the a3-bishop checks, the f5-bishop covers b1 and c2, and White\'s own rook and knight block d1 and d2.\n\n' +
+            'In **Boden\'s mate** two bishops strike along crossing diagonals. The pattern is named after Samuel Boden, who beat Schulder in London, 1853, with the finish ...Qxc3+! bxc3 Ba3#. Here the a3-bishop checks, the f5-bishop covers b1 and c2, and White\'s own rook and knight block d1 and d2.\n\n' +
             'Its usual victim is a king castled queenside whose pawn cover has been torn open.',
           fen: '2k1r2r/ppp3pp/2n5/3B1b2/5P2/b1P1BQ2/P2N1P1P/2KR3R w - - 1 16',
           arrows: [
@@ -528,7 +528,7 @@ export const checkmates: Unit = {
         {
           kind: 'move',
           title: 'Battery mate',
-          text: 'White to move. Black is a pawn up and attacking your bishop. Use the battery.',
+          text: 'White to move. Black is ahead in material and attacking your bishop. Use the battery.',
           fen: '5rk1/p4ppp/8/8/8/3Q4/1qB2PPP/6K1 w - - 0 1',
           solution: ['Qxh7#'],
           hint: 'Queen in front, bishop behind, both aiming at h7.',
@@ -591,11 +591,11 @@ export const checkmates: Unit = {
           kind: 'read',
           title: 'Key takeaways',
           text:
-            '- Boden\'s mate: two bishops on crossing diagonals against a king boxed in by its own pieces.\n' +
-            '- Queen and bishop on the b1-h7 diagonal form a battery: Qxh7 is mate when nothing guards h7.\n' +
+            '- Boden\'s mate: two bishops on crossing diagonals against a boxed-in king.\n' +
+            '- Queen in front, bishop behind on the b1-h7 diagonal: Qxh7 is mate if nothing guards h7.\n' +
             '- The Greek gift Bxh7+ needs a knight for g5 and a queen for the h-file.\n' +
-            '- A pawn on g6 supports a queen mate on h7: Damiano\'s mate.\n' +
-            '- A knight on f6 is the key defender of h7. Remove it and look for mate.',
+            '- Damiano\'s mate: queen on h7 supported by a pawn on g6.\n' +
+            '- A knight on f6 is h7\'s key defender. Remove it and look for mate.',
         },
       ],
     },
@@ -669,7 +669,7 @@ export const checkmates: Unit = {
           fen: 'r1bqkbnr/pppp1p1p/2n3p1/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR b KQkq - 1 4',
           solution: ['Nf6'],
           hint: 'Put a piece between the queen and f7 on the f-file.',
-          success: '...Nf6 blocks the f-file and develops. White\'s queen has moved twice and achieved nothing, while Black develops with gain of time.',
+          success: '...Nf6 blocks the f-file and brings out a piece. White\'s queen has moved twice for nothing, while Black develops with gain of time.',
         },
         {
           kind: 'quiz',
@@ -694,11 +694,11 @@ export const checkmates: Unit = {
           kind: 'read',
           title: 'Key takeaways',
           text:
-            '- f7 and f2 are guarded only by the king at the start. Watch them.\n' +
+            '- At the start, only the king guards f7 (and f2). Watch those squares.\n' +
             '- Against an early Qh5 or Qf3, defend first (...Nc6, ...g6, ...Nf6) and gain time by attacking the queen.\n' +
-            '- Never answer a threat on f7 with a move that ignores it, however active it looks.\n' +
+            '- Never answer a threat on f7 with a move that ignores it.\n' +
             '- An early queen raid wastes time once you develop with tempo.\n' +
-            '- Keep your f- and g-pawns at home in the opening unless you have a good reason.',
+            '- Keep your f- and g-pawns at home in the opening.',
         },
       ],
     },

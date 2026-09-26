@@ -12,6 +12,7 @@ import { sound } from '../chess/sound';
 import { GOAL_LABEL } from './Endgames';
 import type { Arrow } from '../content/types';
 import { EngineNotice } from '../components/EngineNotice';
+import { MoveInput } from '../components/MoveInput';
 
 type Status = 'playing' | 'thinking' | 'success' | 'failed';
 
@@ -182,6 +183,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
           </span>
         </div>
         <Board fen={fen} orientation={learner === 'w' ? 'white' : 'black'} interactive={status === 'playing' && engineStatus !== 'failed'} playerColor={learner} onMove={onMove} lastMove={last ? [last.from, last.to] : null} arrows={arrows} />
+        <MoveInput id="drill-move" fen={fen} enabled={status === 'playing' && engineStatus !== 'failed'} onMove={onMove} />
       </div>
       <aside className="panel">
         <div className="panel-section">

@@ -9,6 +9,7 @@ import { navigate } from '../router';
 import { getProfile, logActivity, updateProfile } from '../store/profile';
 import { sound } from '../chess/sound';
 import type { Arrow } from '../content/types';
+import { MoveInput } from '../components/MoveInput';
 
 function findLesson(id: string): { unit: Unit; lesson: Lesson; index: number } | null {
   for (const unit of units) {
@@ -133,6 +134,7 @@ function MoveStepView({ step, onDone }: { step: MoveStep; onDone: (r: StepResult
           marks={idx === 0 && state !== 'done' ? step.marks : undefined}
         />
       }
+      below={<MoveInput id="lesson-move" fen={fen} enabled={state === 'solving'} onMove={onMove} />}
       caption={`${colorName(learner)} to play`}
     >
       {step.title && <h2>{step.title}</h2>}
@@ -324,12 +326,13 @@ function ReadStepView({ step }: { step: Extract<LessonStep, { kind: 'read' }> })
   );
 }
 
-function StepLayout({ board, caption, children }: { board: React.ReactNode; caption?: string; children: React.ReactNode }) {
+function StepLayout({ board, caption, children, below }: { board: React.ReactNode; caption?: string; children: React.ReactNode; below?: React.ReactNode }) {
   return (
-    <div className="trainer">
+    <div className="trainer" style={{ '--board-offset': '270px' } as React.CSSProperties}>
       <div className="trainer-board">
         {caption && <div className="board-caption">{caption}</div>}
         {board}
+        {below}
       </div>
       <aside className="panel lesson-panel">{children}</aside>
     </div>
@@ -346,7 +349,7 @@ export function LessonPage({ id }: { id: string }) {
   const enterRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) enterRef.current?.();
+      if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement) && !(e.target instanceof HTMLInputElement)) enterRef.current?.();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

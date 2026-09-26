@@ -10,6 +10,7 @@ import { Icon } from '../components/Icon';
 import { EvalBar, MoveList } from '../components/GameBits';
 import { EngineNotice } from '../components/EngineNotice';
 import { sound } from '../chess/sound';
+import { MoveInput } from '../components/MoveInput';
 import type { Arrow } from '../content/types';
 
 export interface Level {
@@ -382,6 +383,8 @@ export function PlayPage() {
           <span className="player-tag">
             <span className={`side-dot ${color}`} /> You
           </span>
+          <span style={{ flex: 1 }} />
+          <MoveInput id="play-move" fen={fen} enabled={phase === 'playing' && !thinking && !pending && turn === color} onMove={onMove} />
           <button className="icon-btn" aria-label="Flip board" onClick={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))}>
             <Icon name="flip" size={18} />
           </button>

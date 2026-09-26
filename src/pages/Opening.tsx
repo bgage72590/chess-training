@@ -9,6 +9,7 @@ import { uciOf } from '../chess/utils';
 import { Button, Pill, RichText } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { sound } from '../chess/sound';
+import { MoveInput } from '../components/MoveInput';
 import type { Arrow } from '../content/types';
 
 type Mode = 'learn' | 'drill';
@@ -128,6 +129,7 @@ function Trainer({ opening, line, mode, onFinish }: { opening: Opening; line: Op
           arrows={arrows}
           tones={tones}
         />
+        <MoveInput id="opening-move" fen={fen} enabled={learnersMove} onMove={onMove} />
       </div>
       <aside className="panel">
         <div className="panel-section">

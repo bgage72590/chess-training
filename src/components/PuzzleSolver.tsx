@@ -6,6 +6,7 @@ import type { Puzzle } from '../data/puzzles';
 import type { Arrow } from '../content/types';
 import { sound } from '../chess/sound';
 import { Icon } from './Icon';
+import { MoveInput } from './MoveInput';
 
 export type PuzzleStatus = 'intro' | 'solving' | 'solved' | 'failed' | 'viewing';
 
@@ -251,6 +252,7 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
           tones={tones}
           arrows={arrows}
         />
+        <MoveInput id="puzzle-move" fen={fen} enabled={status === 'solving'} onMove={onMove} />
       </div>
       {children?.(api)}
     </div>

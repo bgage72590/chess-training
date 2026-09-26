@@ -59,21 +59,17 @@ function CoordsDrill({ mode }: { mode: 'find' | 'name' }) {
 
   useEffect(() => {
     if (phase !== 'run') return;
-    const t = window.setInterval(() => {
-      setLeft((l) => {
-        if (l <= 1) {
-          window.clearInterval(t);
-          setPhase('done');
-          setNewBest(saveBest(key, scoreRef.current));
-          sound('complete');
-          return 0;
-        }
-        return l - 1;
-      });
-    }, 1000);
+    const t = window.setInterval(() => setLeft((l) => Math.max(0, l - 1)), 1000);
     return () => window.clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
+
+  useEffect(() => {
+    if (phase !== 'run' || left > 0) return;
+    setPhase('done');
+    setNewBest(saveBest(key, scoreRef.current));
+    sound('complete');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [left, phase]);
 
   const answer = (sq: string) => {
     if (phase !== 'run') return;

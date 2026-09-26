@@ -797,7 +797,7 @@ input[type='number'] {
   flex-direction: column;
   gap: 10px;
   width: 100%;
-  max-width: min(100%, calc(100vh - var(--board-offset, 200px)), 760px);
+  max-width: min(100%, calc(100vh - var(--board-offset, 230px)), 760px);
   min-width: 0;
 }
 .board-with-eval {
@@ -1120,5 +1120,41 @@ input[type='number'] {
 @keyframes fade {
   from {
     opacity: 0;
+  }
+}
+
+/* Keyboard move entry */
+.move-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.move-input input {
+  width: min(260px, 100%);
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  padding: 6px 10px;
+  background: var(--surface);
+}
+.move-input.error input {
+  border-color: var(--bad);
+  animation: shake 240ms ease;
+}
+.move-input-msg {
+  font-size: 0.8rem;
+  color: var(--bad);
+  font-weight: 600;
+}
+@keyframes shake {
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+@media (pointer: coarse) {
+  .move-input {
+    display: none;
   }
 }

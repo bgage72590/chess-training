@@ -253,6 +253,9 @@ function RushSession() {
   const [key, setKey] = useState(0);
   const used = useRef(new Set<string>());
   const scoreRef = useRef(0);
+  const strikesRef = useRef(0);
+  const endedRef = useRef(false);
+  const prevBest = useRef(0);
 
   const nextPuzzle = (solved: number) => {
     const target = 500 + solved * 55;
@@ -265,6 +268,9 @@ function RushSession() {
   const start = () => {
     used.current = new Set();
     scoreRef.current = 0;
+    strikesRef.current = 0;
+    endedRef.current = false;
+    prevBest.current = getProfile().puzzles.rushBest;
     setScore(0);
     setStrikes(0);
     setLeft(RUSH_SECONDS);
@@ -273,31 +279,31 @@ function RushSession() {
   };
 
   const end = () => {
+    if (endedRef.current) return;
+    endedRef.current = true;
     setPhase('over');
     const s = scoreRef.current;
+    const tried = s + strikesRef.current;
     sound('complete');
     updateProfile((d) => {
       d.puzzles.rushBest = Math.max(d.puzzles.rushBest, s);
-      logActivity(d, 5 + s * 3, 'puzzles', 0);
+      logActivity(d, 5 + s * 3, 'puzzles', tried);
     });
   };
 
+  // The clock only counts down; running out is handled by the effect below.
   useEffect(() => {
     if (phase !== 'running') return;
-    const t = window.setInterval(() => {
-      setLeft((l) => {
-        if (l <= 1) {
-          window.clearInterval(t);
-          end();
-          return 0;
-        }
-        if (l <= 11) sound('tick');
-        return l - 1;
-      });
-    }, 1000);
+    const t = window.setInterval(() => setLeft((l) => Math.max(0, l - 1)), 1000);
     return () => window.clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
+
+  useEffect(() => {
+    if (phase !== 'running') return;
+    if (left === 0) end();
+    else if (left <= 10) sound('tick');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [left, phase]);
 
   if (phase !== 'running' || !puzzle) {
     return (
@@ -307,7 +313,7 @@ function RushSession() {
           <h2>{phase === 'over' ? `You solved ${score}` : 'Three minutes. Three strikes.'}</h2>
           <p className="muted">
             {phase === 'over'
-              ? score >= profile.puzzles.rushBest && score > 0
+              ? score > prevBest.current
                 ? 'A new personal best. Speed comes from patterns you recognise instantly.'
                 : `Your best is ${profile.puzzles.rushBest}. Speed comes from patterns you recognise instantly.`
               : 'Puzzles start easy and get harder with every solve. A wrong move costs a strike. Pattern speed is what wins games in time trouble.'}
@@ -338,12 +344,10 @@ function RushSession() {
           setScore(scoreRef.current);
           window.setTimeout(() => nextPuzzle(scoreRef.current), 350);
         } else {
-          setStrikes((s) => {
-            const n = s + 1;
-            if (n >= 3) window.setTimeout(end, 900);
-            else window.setTimeout(() => nextPuzzle(scoreRef.current), 1100);
-            return n;
-          });
+          strikesRef.current += 1;
+          setStrikes(strikesRef.current);
+          if (strikesRef.current >= 3) window.setTimeout(end, 900);
+          else window.setTimeout(() => nextPuzzle(scoreRef.current), 1100);
         }
       }}
     >

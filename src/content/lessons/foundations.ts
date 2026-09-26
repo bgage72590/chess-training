@@ -162,7 +162,7 @@ export const foundations: Unit = {
             '- Knight 3, bishop 3\n' +
             '- Rook 5\n' +
             '- Queen 9\n\n' +
-            'The king has no value because it can never be traded. The numbers are a guide, not a law: an active knight can outplay a buried rook. But when in doubt, the side with more points usually wins.',
+            'The diagram lines them up from pawn to queen. The king has no value because it can never be traded. The numbers are a guide, not a law: an active knight can outplay a buried rook. But when in doubt, the side with more points usually wins.',
           fen: '4k3/8/8/2PNBRQ1/8/8/8/4K3 w - - 0 1',
         },
         {
