@@ -86,7 +86,8 @@ function main() {
     if (!bands.has(b)) bands.set(b, []);
     bands.get(b)!.push(p);
   }
-  const bandCap = Math.max(60, Math.ceil(MAX / Math.max(1, bands.size)) * 1.6);
+  // When everything fits, keep everything: the picker already serves puzzles near the learner's rating.
+  const bandCap = all.length <= MAX ? Infinity : Math.max(60, Math.ceil(MAX / Math.max(1, bands.size)) * 1.6);
   const picked: typeof all = [];
   for (const [, list] of [...bands.entries()].sort((a, b) => a[0] - b[0])) {
     // Prefer thematic variety inside a band.

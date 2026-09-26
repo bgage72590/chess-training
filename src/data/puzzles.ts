@@ -39,6 +39,7 @@ export const THEMES: Record<string, { name: string; text: string }> = {
   underPromotion: { name: 'Underpromotion', text: 'Promote to a knight, rook or bishop.' },
   quietMove: { name: 'Quiet move', text: 'The winning move is not a check or capture.' },
   enPassant: { name: 'En passant', text: 'The special pawn capture.' },
+  castling: { name: 'Castling', text: 'The winning move is castling.' },
   opening: { name: 'Opening', text: 'Tactics in the first moves.' },
   middlegame: { name: 'Middlegame', text: 'Tactics with many pieces on the board.' },
   endgame: { name: 'Endgame', text: 'Tactics with few pieces left.' },
