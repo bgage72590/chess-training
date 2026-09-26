@@ -93,7 +93,7 @@ export const openingPlay: Unit = {
             },
             {
               text: '3.Ng5',
-              why: 'It moves the same piece twice and threatens nothing, because f7 is defended by the king. It simply loses time.',
+              why: 'It moves the same piece twice, threatens nothing (f7 is defended by the king) and even hangs the knight to 3...Qxg5.',
             },
           ],
         },
@@ -220,7 +220,7 @@ export const openingPlay: Unit = {
         {
           kind: 'read',
           title: 'Copying and wasting moves',
-          text: 'In the Petroff, after 1.e4 e5 2.Nf3 Nf6 3.Nxe5, copying White with 3...Nxe4? is a mistake (3...d6 first is correct).\n\nWhite answers 4.Qe2! The knight on e4 is attacked and sits on the open e-file in front of Black\'s king. The only good reply is 4...Qe7. Moving the knight a third time with 4...Nf6?? loses at once.',
+          text: 'In the Petroff, after 1.e4 e5 2.Nf3 Nf6 3.Nxe5, copying White with 3...Nxe4? is a mistake (3...d6 first is correct).\n\nWhite answers 4.Qe2! The knight on e4 is attacked and sits on the open e-file in front of Black\'s king. The best reply is 4...Qe7. Moving the knight a third time with 4...Nf6?? loses at once.',
           fen: 'rnbqkb1r/pppp1ppp/8/4N3/4n3/8/PPPP1PPP/RNBQKB1R w KQkq - 0 4',
           lastMove: ['f6', 'e4'],
           arrows: [{ from: 'd1', to: 'e2', color: 'green' }],

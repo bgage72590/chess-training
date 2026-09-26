@@ -647,7 +647,7 @@ export const checkmates: Unit = {
         {
           kind: 'move',
           title: 'Defend e5 first',
-          text: 'Black to move. White\'s queen attacks your e5-pawn. Defend it with a developing move.',
+          text: 'Black to move. White\'s queen attacks your e5-pawn. Defend it by developing a knight.',
           fen: 'rnbqkbnr/pppp1ppp/8/4p2Q/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 1 2',
           solution: ['Nc6'],
           hint: 'Bring a knight to a square that guards e5.',
@@ -665,7 +665,7 @@ export const checkmates: Unit = {
         {
           kind: 'move',
           title: 'The threat returns',
-          text: 'Black to move. White\'s queen has come back to f3, hitting f7 once more. Stop the mate while developing.',
+          text: 'Black to move. White\'s queen has come back to f3, hitting f7 once more. Stop the mate by developing a knight: knights come out before the queen.',
           fen: 'r1bqkbnr/pppp1p1p/2n3p1/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR b KQkq - 1 4',
           solution: ['Nf6'],
           hint: 'Put a piece between the queen and f7 on the f-file.',

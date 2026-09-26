@@ -296,11 +296,11 @@ export const endgameTechnique: Unit = {
         {
           kind: 'move',
           title: 'Use the outside passer',
-          text: 'Pawns are even again. Black\'s king is on f6 and White\'s king watches the d5-pawn. Find the winning move.',
-          fen: '8/5ppp/5k2/3p4/P7/8/3K1PPP/8 w - - 0 1',
+          text: 'Pawns are even: White has a passed a-pawn far from the action, Black has three pawns against two on the kingside. Find the move that wins at once.',
+          fen: '8/5ppp/5k2/8/P7/8/3K2PP/8 w - - 0 1',
           solution: ['a5'],
           hint: 'Check the square of the a-pawn after it advances.',
-          success: '1.a5! Black\'s king is outside the square, and White\'s king easily stops the d-pawn. The farther a passed pawn is from the enemy king, the stronger it is.',
+          success: '1.a5! Black\'s king cannot enter the square a5-d5-d8-a8, so the pawn promotes. King moves keep an edge but let Black\'s king come back. The farther a passed pawn is from the enemy king, the stronger it is.',
         },
         {
           kind: 'read',
@@ -338,6 +338,45 @@ export const endgameTechnique: Unit = {
             '4.c7.',
             '4...Ke7.',
             '5.c8=Q. Black\'s king was simply too far away.',
+          ],
+        },
+        {
+          kind: 'move',
+          title: 'Your turn, on the kingside',
+          text: 'Black to move. The same three-against-three pattern, on the other wing and with the other colour. Break through.',
+          fen: '1k6/8/8/8/5ppp/8/5PPP/1K6 b - - 0 1',
+          solution: ['g3'],
+          hint: 'Again, sacrifice the middle pawn first.',
+          success: '1...g3! If 2.hxg3 f3!, and if 2.fxg3 h3!: in both cases a black pawn runs through, and White\'s king is far too slow. Careful: after 2.fxg3, the tempting 2...hxg3? lets White\'s g2-pawn block the last pawn.',
+        },
+        {
+          kind: 'read',
+          title: 'Zugzwang and triangulation',
+          text: 'A **mutual zugzwang**: whoever moves loses ground. With Black to move, the king must leave c7 and White\'s king breaks in to win e6. With White to move, Black holds by mirroring every step of White\'s king.\n\nIf the defending king had only two squares to shuttle between, White could **triangulate**: walk around three squares while Black goes back and forth, and reach this position with Black to move. Here Black\'s king has room, so it mirrors and draws.',
+          fen: '8/2k5/4p3/2KpP3/3P4/8/8/8 w - - 0 1',
+          marks: [
+            { square: 'c5', color: 'green' },
+            { square: 'c7', color: 'red' },
+          ],
+        },
+        {
+          kind: 'quiz',
+          title: 'What triangulation does',
+          text: 'What is the purpose of triangulation?',
+          choices: [
+            {
+              text: 'To reach the same position with the opponent to move.',
+              correct: true,
+              why: 'Three king moves around a triangle against the opponent\'s two back-and-forth moves hand over the move in a mutual zugzwang.',
+            },
+            {
+              text: 'To attack three enemy pawns at once.',
+              why: 'Triangulation is about tempo, not targets. The king returns to where it started.',
+            },
+            {
+              text: 'To avoid stalemate.',
+              why: 'It is a way to win a zugzwang battle, not a stalemate trick.',
+            },
           ],
         },
         {
@@ -453,7 +492,7 @@ export const endgameTechnique: Unit = {
         {
           kind: 'move',
           title: 'Take up the Philidor',
-          text: 'Black to move. White threatens Kf6 with mating ideas on the back rank. Choose the drawing setup.',
+          text: 'Black to move. White threatens Kf6 with mating ideas on the back rank. Set up the Philidor defence: where does your rook belong?',
           fen: '1r2k3/7R/8/4PK2/8/8/8/8 b - - 0 1',
           solution: ['Rb6'],
           hint: 'Put your rook on the rank in front of White\'s king.',
