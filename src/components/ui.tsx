@@ -190,16 +190,25 @@ export function Countdown({ endsAt, warnAt, tick = false, onExpire, format = (s)
   const left = Math.max(0, Math.ceil((endsAt - now) / 1000));
   const expire = useRef(onExpire);
   const prev = useRef<number | null>(null);
+  const fired = useRef(false);
   useEffect(() => {
     expire.current = onExpire;
   });
+  // Tick until the deadline, then stop; a new later deadline starts it again.
+  const done = left === 0;
   useEffect(() => {
+    if (done) return;
     const t = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(t);
-  }, []);
+  }, [done]);
   useEffect(() => {
-    if (left === 0) expire.current();
-    else if (tick && prev.current !== null && left < prev.current && left <= warnAt) sound('tick');
+    if (left > 0) {
+      fired.current = false;
+      if (tick && prev.current !== null && left < prev.current && left <= warnAt) sound('tick');
+    } else if (!fired.current) {
+      fired.current = true;
+      expire.current();
+    }
     prev.current = left;
   }, [left, warnAt, tick]);
   return <div className={`stat-value num ${left <= warnAt ? 'danger' : ''}`}>{format(left)}</div>;

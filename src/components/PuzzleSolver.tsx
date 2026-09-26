@@ -57,6 +57,8 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
   const [mistakes, setMistakes] = useState(0);
   const reported = useRef(false);
   const { later, clear } = useTimeouts();
+  // False while the opponent's reply is pending, even though the status is still 'solving'.
+  const myTurn = status === 'solving' && turnOf(fen) === solverColor;
 
   const report = (o: PuzzleOutcome) => {
     if (reported.current) return;
@@ -100,7 +102,7 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
   };
 
   const onMove = (m: Move) => {
-    if (status !== 'solving') return;
+    if (!myTurn) return;
     const expected = moves[idx];
     const mate = m.san.endsWith('#');
     setArrows([]);
@@ -153,7 +155,7 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
   };
 
   const hint = () => {
-    if (status !== 'solving') return;
+    if (!myTurn) return;
     const ex = parseUci(moves[idx]);
     report({ clean: false });
     if (hintLevel === 0) {
@@ -166,6 +168,9 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
   };
 
   const showSolution = () => {
+    // Only from a settled position: not while a wrong move is on the board being taken back.
+    if (status !== 'solving') return;
+    clear(); // a pending opponent reply is replayed by the solution itself
     report({ clean: false });
     setStatus('viewing');
     setArrows([]);
@@ -225,7 +230,7 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
           tones={tones}
           arrows={arrows}
         />
-        <MoveInput id="puzzle-move" fen={fen} enabled={status === 'solving'} onMove={onMove} />
+        <MoveInput id="puzzle-move" fen={fen} color={solverColor} enabled={status === 'solving'} onMove={onMove} />
       </BoardColumn>
       {children?.(api)}
     </div>

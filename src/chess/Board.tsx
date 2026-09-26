@@ -56,7 +56,8 @@ export function Board({
   const [selected, setSelected] = useState<string | null>(null);
   // Drag state lives in a ref: pointer moves update the dragged piece's transform directly
   // instead of re-rendering the whole board. `dragging` only flips once the drag starts.
-  const drag = useRef<{ from: string; x: number; y: number; rect: DOMRect; moved: boolean; wasSelected: boolean } | null>(null);
+  // Positions are relative to the board, re-measured on every move so scrolling mid-drag is safe.
+  const drag = useRef<{ from: string; startX: number; startY: number; x: number; y: number; size: number; moved: boolean; wasSelected: boolean } | null>(null);
   const dragEl = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [promo, setPromo] = useState<{ from: string; to: string } | null>(null);
@@ -159,8 +160,10 @@ export function Board({
       return;
     }
     if (dests.has(sq)) {
-      const rect = ref.current!.getBoundingClientRect();
-      drag.current = { from: sq, x: e.clientX - rect.left, y: e.clientY - rect.top, rect, moved: false, wasSelected: selected === sq };
+      const r = ref.current!.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      drag.current = { from: sq, startX: x, startY: y, x, y, size: r.width, moved: false, wasSelected: selected === sq };
       setSelected(sq);
       ref.current!.setPointerCapture?.(e.pointerId);
     } else {
@@ -168,15 +171,17 @@ export function Board({
     }
   };
 
-  const dragTransform = (d: { x: number; y: number; rect: DOMRect }) =>
-    `translate(${d.x - d.rect.width / 16}px, ${d.y - d.rect.height / 16}px) scale(1.08)`;
+  const dragTransform = (d: { x: number; y: number; size: number }) => `translate(${d.x - d.size / 16}px, ${d.y - d.size / 16}px) scale(1.08)`;
 
   const onPointerMove = (e: RPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d) return;
-    const x = e.clientX - d.rect.left;
-    const y = e.clientY - d.rect.top;
-    if (!d.moved && Math.hypot(x - d.x, y - d.y) > d.rect.width / 40) {
+    const r = ref.current!.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    const y = e.clientY - r.top;
+    d.size = r.width;
+    // A drag starts once the pointer is a little way from where it went down.
+    if (!d.moved && Math.hypot(x - d.startX, y - d.startY) > r.width / 40) {
       d.moved = true;
       setDragging(d.from);
     }

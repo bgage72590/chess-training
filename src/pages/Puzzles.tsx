@@ -159,7 +159,7 @@ function PanelBody({ api, puzzle, onNext, nextLabel = 'Next puzzle' }: { api: So
             <Button icon="bulb" onClick={api.hint} disabled={api.status !== 'solving'}>
               {api.hintLevel === 0 ? 'Hint' : 'Show move'}
             </Button>
-            <Button variant="ghost" icon="eye" onClick={api.showSolution} disabled={api.status === 'intro'}>
+            <Button variant="ghost" icon="eye" onClick={api.showSolution} disabled={api.status !== 'solving'}>
               Solution
             </Button>
           </>

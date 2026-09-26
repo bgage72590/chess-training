@@ -156,7 +156,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
           </span>
         </div>
         <Board fen={fen} orientation={learner === 'w' ? 'white' : 'black'} interactive={status === 'playing' && engineStatus !== 'failed'} playerColor={learner} onMove={onMove} lastMove={last ? [last.from, last.to] : null} arrows={arrows} />
-        <MoveInput id="drill-move" fen={fen} enabled={status === 'playing' && engineStatus !== 'failed'} onMove={onMove} />
+        <MoveInput id="drill-move" fen={fen} color={learner} enabled={status === 'playing' && engineStatus !== 'failed'} onMove={onMove} />
       </BoardColumn>
       <aside className="panel">
         <div className="panel-section">

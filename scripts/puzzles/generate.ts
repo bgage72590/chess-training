@@ -34,6 +34,8 @@ fs.mkdirSync(path.dirname(OUT), { recursive: true });
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const rndInt = (a: number, b: number) => Math.floor(rnd(a, b + 1));
+// Not scoreToCp: the players' softmax works on score differences, and a compressed mate scale
+// keeps a mate in 1 and a mate in 3 almost equally attractive, as they are to a human.
 const cp = (s: Score) => (s.mate !== undefined ? (s.mate > 0 ? 3000 - s.mate : -3000 - s.mate) : s.cp ?? 0);
 
 interface Ply {

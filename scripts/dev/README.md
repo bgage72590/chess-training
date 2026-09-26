@@ -7,6 +7,7 @@ npm run build && npx vite preview --port 4173 --strictPort &
 node scripts/dev/e2e-play.cjs /tmp/play.png      # plays two moves vs Stockfish (BLOCK_WASM=1 tests the backup engine)
 node scripts/dev/e2e-puzzle.cjs /tmp/puzzle.png  # solves the rated puzzle shown
 node scripts/dev/e2e-review.cjs /tmp/review.png  # plays, resigns, opens the game review
+node scripts/dev/e2e-rematch.cjs                 # resigns while the engine thinks, then plays a rematch
 node scripts/dev/shots.cjs /tmp/shots home learn puzzles@390@dark   # route[@width][@dark]
 npx tsx scripts/dev/dump-lessons.ts > /tmp/lessons.json
 node scripts/dev/e2e-lessons.cjs /tmp/lessons.json [unitId]   # plays through every lesson

@@ -1,4 +1,4 @@
-import { winPercent, type Score } from '../engine/engine';
+import { winPercent, type Score } from '../engine/score';
 import type { MoveClass } from '../store/profile';
 
 /** Win% for `side` from a White-POV score. */

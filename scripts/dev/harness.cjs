@@ -10,12 +10,15 @@ const { chromium } = (() => {
 
 const BASE = process.env.BASE || 'http://localhost:4173/';
 
+const launch = () => chromium.launch();
+
 /**
- * Launches Chromium and opens a page. Unless the route contains "fresh", a new browser
- * profile starts onboarded with sound off. `init` runs before every page script.
+ * Opens a page in a fresh browser context (in `browser` if given, else a new Chromium).
+ * Unless the route contains "fresh", the profile starts onboarded with sound off. `init`
+ * runs before every page script. `close()` closes what open() created.
  */
-async function open({ width = 1400, height = 900, colorScheme = 'light', init } = {}) {
-  const browser = await chromium.launch();
+async function open({ width = 1400, height = 900, colorScheme = 'light', init, browser: shared } = {}) {
+  const browser = shared ?? (await launch());
   const ctx = await browser.newContext({ viewport: { width, height }, colorScheme, deviceScaleFactor: 1, ignoreHTTPSErrors: true });
   const page = await ctx.newPage();
   const errors = [];
@@ -30,7 +33,8 @@ async function open({ width = 1400, height = 900, colorScheme = 'light', init } 
   });
   if (init) await page.addInitScript(init);
   const goto = (route) => page.goto(BASE + '#/' + route);
-  return { browser, ctx, page, errors, goto };
+  const close = () => (shared ? ctx.close() : browser.close());
+  return { browser, ctx, page, errors, goto, close };
 }
 
 /** Centre of a board square in page coordinates, whatever the board orientation. */
@@ -71,4 +75,4 @@ function run(fn) {
   });
 }
 
-module.exports = { BASE, open, squareCenter, clickMove, dragMove, run };
+module.exports = { BASE, launch, open, squareCenter, clickMove, dragMove, run };

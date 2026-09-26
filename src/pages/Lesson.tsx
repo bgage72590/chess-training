@@ -47,9 +47,11 @@ function MoveStepView({ step, onDone }: { step: MoveStep; onDone: (r: StepResult
   const [showHint, setShowHint] = useState(false);
   const { later } = useTimeouts();
   const learner = turnOf(step.fen);
+  // False while the reply is pending or a wrong move is being taken back.
+  const myTurn = state === 'solving' && turnOf(fen) === learner;
 
   const onMove = (mv: Move) => {
-    if (state !== 'solving') return;
+    if (!myTurn) return;
     const want = sanToUci(fen, step.solution[idx]) ?? '';
     const alts = idx === 0 ? (step.accept ?? []).map((a) => sanToUci(fen, a) ?? '') : [];
     setArrows([]);
@@ -93,6 +95,7 @@ function MoveStepView({ step, onDone }: { step: MoveStep; onDone: (r: StepResult
   };
 
   const reveal = () => {
+    if (!myTurn) return;
     const want = sanToUci(fen, step.solution[idx]);
     if (want) {
       const u = parseUci(want);
@@ -116,7 +119,7 @@ function MoveStepView({ step, onDone }: { step: MoveStep; onDone: (r: StepResult
           marks={idx === 0 && state !== 'done' ? step.marks : undefined}
         />
       }
-      below={<MoveInput id="lesson-move" fen={fen} enabled={state === 'solving'} onMove={onMove} />}
+      below={<MoveInput id="lesson-move" fen={fen} color={learner} enabled={state === 'solving'} onMove={onMove} />}
       caption={`${colorName(learner)} to play`}
     >
       {step.title && <h2>{step.title}</h2>}
@@ -134,7 +137,7 @@ function MoveStepView({ step, onDone }: { step: MoveStep; onDone: (r: StepResult
               </Button>
             )}
             {showHint && (
-              <Button variant="ghost" icon="eye" onClick={reveal}>
+              <Button variant="ghost" icon="eye" onClick={reveal} disabled={state !== 'solving'}>
                 Show the move
               </Button>
             )}

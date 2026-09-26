@@ -4,7 +4,7 @@ import { engine, winPercent, type Score } from '../engine/engine';
 import { logActivity, playerWon, updateProfile, useProfile, type GameRecord } from '../store/profile';
 import { summarize, winFor } from '../lib/analysis';
 import { Board, playMoveSound } from '../chess/Board';
-import { fullMoveOf, moveNumberLabel, parseUci, pvToSan, turnOf, uciOf } from '../chess/utils';
+import { moveNumberLabel, parseUci, pvToSan, turnOf, uciOf } from '../chess/utils';
 import { useKeydown } from '../lib/hooks';
 import { navigate } from '../router';
 import { BoardColumn } from '../components/BoardColumn';
@@ -76,6 +76,9 @@ export function ReviewPage({ id }: { id: string }) {
   /** Retrying a mistake: the ply to replay and the position on the board. */
   const [retry, setRetry] = useState<{ ply: number; fen: string; state: 'try' | 'good' | 'bad'; msg?: string } | null>(null);
 
+  // Leaving the page cancels a retry's evaluation (its search then resolves null).
+  useEffect(() => () => engine.cancelAll(), []);
+
   useKeydown((e) => {
     if (retry) return;
     if (e.key === 'ArrowRight') setPly((x) => Math.min(moves.length, x + 1));
@@ -90,8 +93,9 @@ export function ReviewPage({ id }: { id: string }) {
   /** Position before move i (i = 0 is the start). */
   const fenAt = (i: number) => (i === 0 ? game.startFen : moves[i - 1].after);
   const fen = fenAt(ply);
-  /** Leave any retry and show the position after `n` moves. */
+  /** Leave any retry (dropping its pending evaluation) and show the position after `n` moves. */
   const jump = (n: number) => {
+    if (retry) engine.cancelAll();
     setRetry(null);
     setPly(Math.max(0, Math.min(moves.length, n)));
   };
@@ -283,7 +287,7 @@ export function ReviewPage({ id }: { id: string }) {
                   <button key={i} className="moment" onClick={() => startRetry(i)}>
                     <span className={`glyph glyph-${c}`}>{CLASS_GLYPH[c]}</span>
                     <span className="mono">
-                      {moveNumberLabel(i, fullMoveOf(game.startFen), turnOf(game.startFen))}
+                      {moveNumberLabel(i)}
                       {moves[i].san}
                     </span>
                     <span className="faint">{Math.round(winFor(rv.evals[i], me) - winFor(rv.evals[i + 1], me))}% lost</span>

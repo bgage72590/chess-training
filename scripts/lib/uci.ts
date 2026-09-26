@@ -37,7 +37,11 @@ export class UciEngine {
   private waiters: { pred: (l: string) => boolean; resolve: (l: string) => void; reject: (e: Error) => void }[] = [];
   private onLine: ((l: string) => void) | null = null;
   private chain: Promise<unknown> = Promise.resolve();
-  /** Clear the hash before every search so results do not depend on earlier searches. */
+  /**
+   * Clear the hash before every search so results do not depend on earlier searches. This
+   * costs hash reuse between searches of the same position; the validator accepts that so its
+   * verdicts are the same whichever checks run first.
+   */
   private fresh = false;
 
   private constructor(variant: keyof typeof ENGINES) {

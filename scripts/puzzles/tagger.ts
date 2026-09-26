@@ -82,7 +82,7 @@ export function materialDiff(chess: Chess, color: Color): number {
 }
 
 /** Length theme from the number of solver moves. */
-export function lengthTheme(solverMoves: number): string {
+function lengthTheme(solverMoves: number): string {
   return solverMoves === 1 ? 'oneMove' : solverMoves === 2 ? 'short' : solverMoves === 3 ? 'long' : 'veryLong';
 }
 

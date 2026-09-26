@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Chess, type Move } from 'chess.js';
-import { engine, scoreToCp, useEngineStatus, type PvLine, type Score, type SearchOptions } from '../engine/engine';
+import { engine, scoreToCp, useEngineStatus, whitePov, type PvLine, type Score, type SearchOptions } from '../engine/engine';
 import { Board, playMoveSound } from '../chess/Board';
 import { colorName, drawReason, nullMoveFen, other, parseUci, playUci, pvToSan, START_FEN, takeBackTo, turnOf, uciOf } from '../chess/utils';
 import { logActivity, playerWon, updateProfile, type GameRecord } from '../store/profile';
@@ -83,7 +83,8 @@ export function PlayPage() {
   const [moves, setMoves] = useState<Move[]>([]);
   const [thinking, setThinking] = useState(false);
   const [evalW, setEvalW] = useState<Score | undefined>(undefined);
-  const [best, setBest] = useState<string | null>(null);
+  /** The coach's best move, remembered with the position it was computed for. */
+  const [best, setBest] = useState<{ fen: string; uci: string | null } | null>(null);
   const [arrows, setArrows] = useState<Arrow[]>([]);
   const [note, setNote] = useState<CoachNote | null>(null);
   /** The coach flagged the player's last move and is waiting: take back or play on. */
@@ -100,6 +101,7 @@ export function PlayPage() {
   const fen = fenAt(moves);
   const turn = turnOf(fen);
   const canMove = phase === 'playing' && !thinking && !pending && turn === color;
+  const hintMove = best?.fen === fen ? best.uci : null;
 
   const update = (p: Partial<Prefs>) => {
     const next = { ...prefs, ...p };
@@ -136,7 +138,7 @@ export function PlayPage() {
     const r = await engine.search(f, { depth: 11 });
     if (!r) return;
     if (r.whiteScore) setEvalW(r.whiteScore);
-    setBest(r.best);
+    setBest({ fen: f, uci: r.best });
   };
 
   const engineMove = async (ms: Move[], playerColor: 'w' | 'b') => {
@@ -159,6 +161,7 @@ export function PlayPage() {
     const c: 'w' | 'b' = prefs.color === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : prefs.color;
     engine.cancelAll();
     engine.newGame();
+    setThinking(false);
     setColor(c);
     setOrientation(c === 'w' ? 'white' : 'black');
     setMoves([]);
@@ -232,10 +235,10 @@ export function PlayPage() {
   };
 
   const hint = () => {
-    if (!best) return;
-    const u = parseUci(best);
+    if (!hintMove) return;
+    const u = parseUci(hintMove);
     setArrows([{ from: u.from, to: u.to, color: 'green' }]);
-    setNote({ kind: 'hint', title: 'Coach suggestion', body: `Consider ${pvToSan(fen, [best])[0] ?? best}. Ask yourself what it attacks or improves before playing it.` });
+    setNote({ kind: 'hint', title: 'Coach suggestion', body: `Consider ${pvToSan(fen, [hintMove])[0] ?? hintMove}. Ask yourself what it attacks or improves before playing it.` });
   };
 
   const threat = async () => {
@@ -243,13 +246,18 @@ export function PlayPage() {
       setNote({ kind: 'threat', title: 'You are in check', body: 'Deal with the check first: move the king, block, or capture the checking piece.' });
       return;
     }
+    // The board waits while the coach looks, so the answer always matches the position.
+    setThinking(true);
     const flipped = nullMoveFen(fen);
     const r = await engine.search(flipped, { depth: 10 });
-    if (!r?.best) return;
+    if (!r) return;
+    setThinking(false);
+    if (!r.best) return;
     const u = parseUci(r.best);
     const san = pvToSan(flipped, [r.best])[0];
-    // Compare the opponent's score with a free move against their score now.
-    const oppNow = evalW?.cp !== undefined ? (color === 'w' ? -evalW.cp : evalW.cp) : 0;
+    // Compare the opponent's score after a free move with their score now. When the board
+    // already shows a mate, any mating idea counts as serious, so measure it from level.
+    const oppNow = evalW && evalW.mate === undefined ? scoreToCp(whitePov(evalW, other(color))) : 0;
     const gain = scoreToCp(r.lines[0]?.score ?? { cp: 0 }) - oppNow;
     setArrows([{ from: u.from, to: u.to, color: 'red' }]);
     setNote(
@@ -261,6 +269,7 @@ export function PlayPage() {
 
   const resign = () => {
     engine.cancelAll();
+    setThinking(false);
     finish(moves, color === 'w' ? '0-1' : '1-0', 'Resignation', color);
   };
 
@@ -350,7 +359,7 @@ export function PlayPage() {
             <span className={`side-dot ${color}`} /> You
           </span>
           <span style={{ flex: 1 }} />
-          <MoveInput id="play-move" fen={fen} enabled={canMove} onMove={onMove} />
+          <MoveInput id="play-move" fen={fen} color={color} enabled={canMove} onMove={onMove} />
           <button className="icon-btn" aria-label="Flip board" onClick={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))}>
             <Icon name="flip" size={18} />
           </button>
@@ -391,7 +400,7 @@ export function PlayPage() {
         <MoveList sans={sans} current={sans.length} />
         {phase === 'playing' ? (
           <div className="btn-row">
-            <Button icon="bulb" onClick={hint} disabled={!best || !canMove}>
+            <Button icon="bulb" onClick={hint} disabled={!hintMove || !canMove}>
               Hint
             </Button>
             <Button icon="target" onClick={threat} disabled={!canMove}>

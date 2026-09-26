@@ -84,11 +84,14 @@ export async function startCloudSync() {
       const { games, ...rest } = p;
       // Games (with their reviews) are the bulky part: only rewrite them when they changed.
       const gamesJson = JSON.stringify(games);
-      await Promise.all([
+      // Wait for both writes, even if one fails, so the next write never overlaps them.
+      const [profileWrite, gamesWrite] = await Promise.allSettled([
         profileRef.set({ v: 1, updatedAt: p.updatedAt, json: JSON.stringify(rest) }),
         gamesJson !== lastGamesJson && gamesRef.set({ v: 1, updatedAt: p.updatedAt, json: gamesJson }),
       ]);
-      lastGamesJson = gamesJson;
+      if (gamesWrite.status === 'fulfilled') lastGamesJson = gamesJson;
+      if (profileWrite.status === 'rejected') throw profileWrite.reason;
+      if (gamesWrite.status === 'rejected') throw gamesWrite.reason;
       setState('synced');
     } catch (e) {
       const code = (e as { code?: string }).code;

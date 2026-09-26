@@ -117,7 +117,7 @@ function Trainer({ opening, line, mode, onFinish }: { opening: Opening; line: Op
           arrows={arrows}
           tones={tones}
         />
-        <MoveInput id="opening-move" fen={fen} enabled={learnersMove} onMove={onMove} />
+        <MoveInput id="opening-move" fen={fen} color={learnerTurn} enabled={learnersMove} onMove={onMove} />
       </BoardColumn>
       <aside className="panel">
         <div className="panel-section">

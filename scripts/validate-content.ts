@@ -12,7 +12,7 @@ import { Chess, validateFen, type Move } from 'chess.js';
 import { units, openings, endgameDrills } from '../src/content/index.ts';
 import type { Arrow, Mark, MoveStep, LessonStep } from '../src/content/types.ts';
 import { UciEngine, scoreToCp, winPercent, type Score, type SearchOptions, type SearchResult } from './lib/uci.ts';
-import { acceptsMove, isSquare, nullMoveFen, playUci, sanToUci, uciOf } from '../src/chess/utils.ts';
+import { isSquare, nullMoveFen, playUci, sanToUci, uciOf } from '../src/chess/utils.ts';
 
 const args = process.argv.slice(2);
 const flag = (f: string) => args.includes(f);
@@ -35,9 +35,15 @@ const warn = (where: string, msg: string) => {
   console.log(`  WARN   ${where}: ${msg}`);
 };
 
+/** Centipawns with any mate counted as ±10 pawns, so a slower mate is not reported as a loss. */
+const openingCp = (s: Score) => (s.mate !== undefined ? (s.mate > 0 ? 1000 : -1000) : s.cp ?? 0);
 const fmt = (s: Score) => (s.mate !== undefined ? `#${s.mate}` : `${((s.cp ?? 0) / 100).toFixed(2)}`);
 
 let engine: UciEngine | null = null;
+let starting: Promise<UciEngine> | null = null;
+/** The one engine process, started on first use (concurrent callers share the start). */
+const eng = () => (starting ??= UciEngine.create({ hashMb: 128, fresh: true }).then((e) => (engine = e)));
+
 const cache = new Map<string, Promise<SearchResult>>();
 /**
  * Engine analysis, memoised per position and options. The engine clears its hash before
@@ -47,10 +53,7 @@ function analyze(fen: string, o: SearchOptions): Promise<SearchResult> {
   const key = fen + JSON.stringify(o);
   let r = cache.get(key);
   if (!r) {
-    r = (async () => {
-      engine ??= await UciEngine.create({ hashMb: 128, fresh: true });
-      return engine.analyze(fen, o);
-    })();
+    r = eng().then((e) => e.analyze(fen, o));
     cache.set(key, r);
   }
   return r;
@@ -134,8 +137,10 @@ async function checkMoveStep(where: string, step: MoveStep) {
         const accepted = [uciOf(mv), ...(i === 0 ? (step.accept ?? []).map((a) => sanToUci(fen, a) ?? '') : [])];
         for (const l of r.lines) {
           const altMove = playUci(fen, l.pv[0])?.move;
-          // Moves the lesson page would accept too are not ambiguities.
-          if (altMove && acceptsMove(altMove, accepted)) continue;
+          if (accepted.includes(l.pv[0])) continue;
+          // The lesson page accepts any mate, so another mate is only fine when the solution
+          // mates too; a mate the solution misses is worth a warning.
+          if (isMate && altMove?.san.endsWith('#')) continue;
           const close =
             (played.mate !== undefined && played.mate > 0 && l.score.mate !== undefined && l.score.mate > 0 && l.score.mate <= played.mate) ||
             winPercent(l.score) >= winPercent(played) - 4;
@@ -242,8 +247,8 @@ async function main() {
           const best = r.lines[0];
           if (!best || best.pv[0] === uciOf(mv)) continue;
           const played = await scoreOfMove(fen, uciOf(mv), r.lines);
-          const bestCp = best.score.mate !== undefined ? 1000 : best.score.cp ?? 0;
-          const playedCp = played.mate !== undefined ? (played.mate > 0 ? 1000 : -1000) : played.cp ?? 0;
+          const bestCp = openingCp(best.score);
+          const playedCp = openingCp(played);
           if (bestCp - playedCp > 90) {
             warn(where, `ply ${ply} ${san} loses ${((bestCp - playedCp) / 100).toFixed(2)} vs engine ${best.pv[0]} (${fmt(best.score)})`);
           }
