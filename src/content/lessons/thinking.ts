@@ -167,9 +167,9 @@ export const thinking: Unit = {
           title: 'A new line for the queen',
           text: 'White to move. Black\'s last move was ...Qd8-d7. It looks harmless. Punish it.',
           fen: 'r1b1kb1r/pp1q1ppp/n3pn2/2pp4/3P4/2N1PN2/PPP1BPPP/R1BQ1RK1 w - - 0 1',
-          solution: ['Bb5'],
+          solution: ['Bb5', 'Qxb5', 'Nxb5'],
           hint: 'Look at the diagonal from b5 to e8. What stands on it now?',
-          success: 'Bb5 pins the queen to the king and wins it for a bishop, since the c3-knight guards b5. Black\'s blunder check should have asked: which lines does my queen stand on now?',
+          success: 'Bb5 pins the queen to the king, and the c3-knight guards b5: after ...Qxb5 Nxb5 White has won the queen for a bishop. Black\'s blunder check should have asked: which lines does my queen stand on now?',
         },
         {
           kind: 'move',

@@ -125,9 +125,9 @@ export const tactics: Unit = {
           kind: 'read',
           title: 'Stuck in front of the king',
           text:
-            'A **pin** attacks a piece that shields a more valuable one behind it on the same line. Only bishops, rooks and queens can pin.\n\n' +
-            'Here the c6-knight is pinned to the king: moving it would be illegal. That is an **absolute pin**. If the piece behind is a queen or rook, the pin is **relative**: the pinned piece may move, but it costs material.\n\n' +
-            'The trigger: an enemy king, queen or rook on an open line with a single piece in front of it.',
+            'A **pin** attacks a piece that shields a more valuable one behind it. Only bishops, rooks and queens can pin.\n\n' +
+            'Here the c6-knight is pinned to the king, so moving it is illegal: an **absolute pin**. If the piece behind is a queen or rook, the pin is **relative**: the piece may move, but it costs material.\n\n' +
+            'The trigger: an enemy king, queen or rook on an open line with one piece in front of it.',
           fen: 'r1bqkbnr/ppp2ppp/2np4/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4',
           arrows: [{ from: 'b5', to: 'e8', color: 'red' }],
           marks: [{ square: 'c6', color: 'yellow' }],
@@ -210,7 +210,7 @@ export const tactics: Unit = {
           kind: 'read',
           title: 'Key takeaways',
           text:
-            '- A pin freezes a piece in front of a bigger one. Absolute pins (to the king) cannot be broken by moving the piece.\n' +
+            '- A pin freezes a piece in front of a more valuable one.\n' +
             '- Attack a pinned piece with a pawn or pile up more attackers than it has defenders.\n' +
             '- A pinned piece is a fake defender: take what it seems to protect.\n' +
             '- Relative pins are not walls. Check whether breaking one wins something bigger.\n' +
