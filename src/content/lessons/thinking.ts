@@ -283,6 +283,15 @@ export const thinking: Unit = {
           success: 'Qxg7#. The knight left f6, opening the diagonal and abandoning g7. Running away with the queen would have missed mate.',
         },
         {
+          kind: 'move',
+          title: 'A faster threat',
+          text: 'White to move. Black threatens ...Qxg2 mate and attacks your queen with the rook. Before you defend, scan your own checks.',
+          fen: '6k1/pb3ppp/1p6/8/4q3/8/PPr2PPP/2QR3K w - - 0 1',
+          solution: ['Rd8+', 'Qe8', 'Rxe8#'],
+          hint: 'Black\'s king has no luft either. Which check can only be blocked once?',
+          success: 'Rd8+! Qe8 Rxe8#. Here every defensive move loses; the only answer to Black\'s threat was a faster one of your own.',
+        },
+        {
           kind: 'quiz',
           title: 'The quiet threat',
           text: 'Black has just played ...Qe5. What does it threaten?',
@@ -367,6 +376,15 @@ export const thinking: Unit = {
           solution: ['Ne7+', 'Kh8', 'Qxh7+', 'Kxh7', 'Rh3#'],
           hint: 'Checks first. Once your knight covers g8 and g6, the king on h7 has nowhere to go.',
           success: 'Ne7+ Kh8 Qxh7+! Kxh7 Rh3#. Every move was a check, so the calculation was short and certain. This mating pattern is called Anastasia\'s mate.',
+        },
+        {
+          kind: 'move',
+          title: 'Count the tempi',
+          text: 'White to move. Your king looks hopelessly far from Black\'s h-pawn, and your c-pawn can be caught. Calculate the king\'s route and save the game.',
+          fen: '7K/8/k1P5/7p/8/8/8/8 w - - 0 1',
+          solution: ['Kg7', 'h4', 'Kf6'],
+          hint: 'A king walking diagonally can head towards two goals at once: the h-pawn and your own c-pawn.',
+          success: 'Kg7! h4 Kf6! Now ...h3 is met by Ke7 and c7, queening together, while ...Kb6 allows Ke5 and the king catches the h-pawn. This is Réti\'s famous study.',
         },
         {
           kind: 'quiz',
