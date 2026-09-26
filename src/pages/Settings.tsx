@@ -3,6 +3,7 @@ import { defaultProfile, replaceProfile, updateProfile, useProfile, type BoardTh
 import { Board } from '../chess/Board';
 import { Button, PageHeader, Segmented } from '../components/ui';
 import { toast } from '../lib/toast';
+import { useSyncState } from '../store/cloud';
 
 const THEMES: { id: BoardTheme; name: string }[] = [
   { id: 'slate', name: 'Slate' },
@@ -18,6 +19,7 @@ export function SettingsPage() {
   const p = useProfile();
   const s = p.settings;
   const [confirmReset, setConfirmReset] = useState(false);
+  const sync = useSyncState();
   const [importText, setImportText] = useState('');
   const set = (patch: Partial<typeof s>) => updateProfile((d) => Object.assign(d.settings, patch));
 
@@ -111,7 +113,15 @@ export function SettingsPage() {
         </section>
         <section className="card settings-section">
           <h2>Your data</h2>
-          <p className="muted">Progress is stored in this browser only. Export it to move to another device.</p>
+          <p className="muted">
+            {sync === 'synced' || sync === 'saving'
+              ? 'Progress is saved to your claude.ai account and kept in this browser.'
+              : sync === 'connecting'
+                ? 'Connecting to your account storage…'
+                : sync === 'error'
+                  ? 'Your account storage could not be reached, so progress is kept in this browser for now.'
+                  : 'Progress is stored in this browser only. Export it to move to another device.'}
+          </p>
           <div className="btn-row">
             <Button icon="download" onClick={exportData}>
               Export progress

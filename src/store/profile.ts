@@ -96,6 +96,8 @@ export interface Profile {
   achievements: Record<string, number>;
   onboarded: boolean;
   lastVisit: string;
+  /** Last local change (ms). Used to merge with the cloud copy. */
+  updatedAt: number;
 }
 
 const KEY = 'tempo.profile.v1';
@@ -117,6 +119,7 @@ export function defaultProfile(): Profile {
     achievements: {},
     onboarded: false,
     lastVisit: dayKey(),
+    updatedAt: 0,
   };
 }
 
@@ -164,13 +167,14 @@ export function getSettings(): Settings {
 export function updateProfile(fn: (draft: Profile) => void) {
   const next = structuredClone(state);
   fn(next);
+  next.updatedAt = Date.now();
   state = next;
   persist();
   listeners.forEach((l) => l());
 }
 
-export function replaceProfile(p: Profile) {
-  state = p;
+export function replaceProfile(p: Profile, opts: { keepTimestamp?: boolean } = {}) {
+  state = opts.keepTimestamp ? p : { ...p, updatedAt: Date.now() };
   persist();
   listeners.forEach((l) => l());
 }
@@ -179,6 +183,9 @@ function subscribe(l: () => void) {
   listeners.add(l);
   return () => listeners.delete(l);
 }
+
+/** Listen for any profile change (used by cloud sync). */
+export const subscribeProfile = subscribe;
 
 export function useProfile(): Profile {
   return useSyncExternalStore(subscribe, getProfile, getProfile);

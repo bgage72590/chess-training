@@ -5,9 +5,12 @@ import './styles/pieces.css';
 import './styles/app.css';
 import './styles/pages.css';
 import { App } from './App';
+import { startCloudSync } from './store/cloud';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
   </StrictMode>,
 );
+
+void startCloudSync();
