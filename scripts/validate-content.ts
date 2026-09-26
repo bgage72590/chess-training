@@ -93,6 +93,7 @@ async function scoreOfMove(fen: string, uci: string, known: { pv: string[]; scor
 async function checkMoveStep(where: string, step: MoveStep) {
   const chess = checkFen(where, step.fen);
   if (!chess) return;
+  if (useEngine) (await eng()).newGame();
   if (!step.solution.length) return err(where, 'empty solution');
   if (step.solution.length % 2 === 0) err(where, 'solution must start and end with the learner move (odd length)');
   if (step.accept?.length && step.solution.length !== 1) err(where, '`accept` is only allowed for one-move solutions');
@@ -260,6 +261,8 @@ async function main() {
       if (chess.isGameOver()) err(where, 'position is already game over');
       if (d.tips.length < 2) warn(where, 'add at least two tips');
       if (!useEngine) continue;
+      // Clear the hash so each drill is judged independently of earlier positions.
+      (await eng()).newGame();
       const r = await (await eng()).analyze(d.fen, { depth: Math.max(depth, 20) });
       const s = r.lines[0]?.score ?? { cp: 0 };
       const cp = s.mate !== undefined ? (s.mate > 0 ? 10000 : -10000) : s.cp ?? 0;
