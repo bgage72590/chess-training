@@ -1,10 +1,11 @@
-// Read-aloud for Kids mode: wraps window.speechSynthesis (feature-detected). Prefers on-device
-// English voices, unlocks on the first tap (iOS), queues lines, and reports the spoken word for
+// Read-aloud for Kids mode: wraps window.speechSynthesis (feature-detected). Picks the most natural
+// English voice on the device (voices.ts), unlocks on the first tap (iOS), queues lines, and reports the spoken word for
 // karaoke highlighting (with a timed fallback when the engine sends no boundary events).
 import { useSyncExternalStore } from 'react';
 import { pronounce } from '../lib/pronounce';
 import { BAND_TUNING } from '../curriculum/tuning';
 import { getKid, updateKid, type KidProfile } from '../store/kidsStore';
+import { rankVoices } from './voices';
 
 interface SpeakOpts {
   rate?: number;
@@ -47,18 +48,16 @@ function clearTimers() {
   timers = [];
 }
 
+/** Online voices that failed here (e.g. offline): skipped from then on. */
+const failed = new Set<string>();
+const online = () => (typeof navigator === 'undefined' ? true : navigator.onLine !== false);
+
 function pickVoice() {
   const s = synth();
   if (!s) return;
   const all = s.getVoices();
-  const en = all.filter((v) => /^en\b|^en[-_]/i.test(v.lang));
-  voice =
-    all.find((v) => v.voiceURI === voiceURI) ??
-    en.find((v) => v.localService && /^en[-_]US/i.test(v.lang)) ??
-    en.find((v) => v.localService && /^en[-_]GB/i.test(v.lang)) ??
-    en.find((v) => v.localService) ??
-    en[0] ??
-    null;
+  const chosen = all.find((v) => v.voiceURI === voiceURI && !failed.has(v.voiceURI));
+  voice = chosen ?? rankVoices(all, online(), failed)[0] ?? null;
 }
 
 if (typeof window !== 'undefined') {
@@ -66,6 +65,8 @@ if (typeof window !== 'undefined') {
   if (s) {
     try {
       s.addEventListener?.('voiceschanged', pickVoice);
+      window.addEventListener('online', pickVoice);
+      window.addEventListener('offline', pickVoice);
       pickVoice();
     } catch {
       /* ignore */
@@ -75,9 +76,12 @@ if (typeof window !== 'undefined') {
 
 const words = (t: string) => t.split(/\s+/).filter(Boolean);
 
+let runGen = 0;
+
 function run(lines: string[], opts: SpeakOpts, token: number) {
   const s = synth();
   if (!s) return;
+  const gen = ++runGen; // a retry with another voice retires this run's handlers
   const rate = opts.rate ?? 1;
   let offset = 0;
   lines.forEach((caption, li) => {
@@ -93,7 +97,7 @@ function run(lines: string[], opts: SpeakOpts, token: number) {
     u.pitch = opts.pitch ?? 1;
     let gotBoundary = false;
     u.onstart = () => {
-      if (token !== state.token) return;
+      if (token !== state.token || gen !== runGen) return;
       set({ speaking: true, word: base });
       // Graceful fallback: no word events within 700 ms -> timed highlighting.
       timers.push(
@@ -105,13 +109,32 @@ function run(lines: string[], opts: SpeakOpts, token: number) {
       );
     };
     u.onboundary = (e) => {
-      if (token !== state.token || e.name === 'sentence') return;
+      if (token !== state.token || gen !== runGen || e.name === 'sentence') return;
       gotBoundary = true;
       const before = words(spoken.slice(0, e.charIndex)).length;
       set({ word: base + Math.min(capWords - 1, Math.round((before * capWords) / spokenWords)) });
     };
-    u.onend = u.onerror = () => {
-      if (token !== state.token) return;
+    u.onerror = (e) => {
+      if (token !== state.token || gen !== runGen) return;
+      // An online voice that cannot be reached: switch to the best on-device voice and say it again.
+      if (voice && !voice.localService && e.error !== 'interrupted' && e.error !== 'canceled' && !failed.has(voice.voiceURI)) {
+        failed.add(voice.voiceURI);
+        pickVoice();
+        try {
+          s.cancel();
+        } catch {
+          /* ignore */
+        }
+        run(lines.slice(li), opts, token);
+        return;
+      }
+      if (li === lines.length - 1) {
+        clearTimers();
+        set({ speaking: false, word: -1 });
+      }
+    };
+    u.onend = () => {
+      if (token !== state.token || gen !== runGen) return;
       if (li === lines.length - 1) {
         clearTimers();
         set({ speaking: false, word: -1 });
@@ -180,12 +203,18 @@ export const speech = {
     voiceURI = uri;
     pickVoice();
   },
+  /** English voices for the grown-ups' picker, most natural first (novelty voices left out). */
   voices(): SpeechSynthesisVoice[] {
     try {
-      return (synth()?.getVoices() ?? []).filter((v) => /^en/i.test(v.lang));
+      return rankVoices(synth()?.getVoices() ?? []);
     } catch {
       return [];
     }
+  },
+  /** The voice in use (the automatic choice, or the grown-ups' pick). */
+  current(): SpeechSynthesisVoice | null {
+    if (!voice) pickVoice();
+    return voice;
   },
   get state() {
     return state;
@@ -223,7 +252,7 @@ export function sayAs(kid: KidProfile | null | undefined, lines: string[], opts:
   const rate = kid?.settings.rate ?? t.speechRate;
   const voice = kid?.settings.voice ?? 'auto';
   if (!opts.force && kid) {
-    if (voice === 'off') return undefined;
+    if (voice === 'off' || getKid(kid.id)?.settings.muted) return undefined;
     if (voice === 'first') {
       const id = lineId(clean.join(' '));
       if (getKid(kid.id)?.firsts.includes(id)) return undefined;

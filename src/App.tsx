@@ -23,6 +23,7 @@ import { ProgressPage } from './pages/Progress';
 import { SettingsPage } from './pages/Settings';
 import { TrainPage } from './pages/Train';
 import { SyncJoinPage } from './sync/SyncJoinPage';
+import { SoundToggle, useSoundShortcut } from './components/SoundToggle';
 import { isKidsLocked } from './kids/lock';
 const KidsApp = lazy(() => import('./kids/KidsApp').then((m) => ({ default: m.KidsApp })));
 
@@ -217,6 +218,7 @@ export function App() {
   useThemeAttribute();
   useAchievementWatcher();
   useLevelWatcher();
+  useSoundShortcut();
   const locked = isKidsLocked();
   useEffect(() => {
     if (locked && section !== 'kids') navigate('kids', { replace: true });
@@ -261,6 +263,7 @@ export function App() {
         </nav>
         <div className="sidebar-foot">
           <InstallButton />
+          <SoundToggle />
           <MiniStats streak={streak} rating={p.puzzles.rating} />
           <div>
             <div className="faint" style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: 5 }}>
@@ -278,6 +281,7 @@ export function App() {
         </button>
         <MiniStats streak={streak} rating={p.puzzles.rating}>
           <InstallButton compact />
+          <SoundToggle compact />
           <button className="icon-btn" aria-label="Settings" onClick={() => navigate('settings')}>
             <Icon name="settings" size={18} />
           </button>

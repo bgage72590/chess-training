@@ -1412,3 +1412,53 @@ button.feedback:hover {
     border-color: Highlight;
   }
 }
+
+/* Mute button: sidebar row and phone header icon. */
+.sound-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+.sound-toggle-row:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.sound-toggle-row kbd {
+  margin-left: auto;
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font: 600 0.7rem/1.4 var(--font-mono, ui-monospace, monospace);
+  opacity: 0.7;
+}
+.sound-toggle.off {
+  opacity: 0.75;
+}
+.sound-toggle.off .icon {
+  color: var(--bad, #b5483b);
+}
+.volume-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.volume-row input[type='range'] {
+  flex: 1;
+  max-width: 260px;
+  accent-color: var(--accent, #9a6b2f);
+}
+.volume-row .volume-value {
+  min-width: 3.2em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

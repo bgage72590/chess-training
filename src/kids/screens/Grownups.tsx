@@ -15,6 +15,7 @@ import { hashPin, newSalt, pinSupported, clearGatePass } from '../ui/ParentGate'
 import { PawnBuddy } from '../ui/PawnBuddy';
 import { KidsIcon } from '../ui/KidsIcon';
 import { speech } from '../player/speech';
+import { voiceNote, voiceScore } from '../player/voices';
 import { toast } from '../../lib/toast';
 import { go } from '../routes';
 
@@ -190,18 +191,28 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
                 speech.setVoice(v);
               }}
             >
-              <option value="">Automatic (on-device English)</option>
-              {voices.map((v) => (
-                <option key={v.voiceURI} value={v.voiceURI}>
-                  {v.name} {v.localService ? '' : '(online)'}
-                </option>
-              ))}
+              <option value="">Automatic: most natural voice{!device.voiceURI && speech.current() ? ` (${speech.current()!.name})` : ''}</option>
+              {voices.map((v) => {
+                const note = voiceNote(v);
+                return (
+                  <option key={v.voiceURI} value={v.voiceURI}>
+                    {v.name}
+                    {note ? ` (${note})` : ''}
+                  </option>
+                );
+              })}
             </select>
-            <button type="button" className="k-gu-btn" onClick={() => speech.speak(["Hi! I'm Pip. Let's play chess!"], { rate: st.rate ?? 1 })}>
+            <button type="button" className="k-gu-btn" onClick={() => speech.speak(["Hi! I'm Pip. Let's play chess together!"], { rate: st.rate ?? 1 })}>
               Preview
             </button>
           </div>
         </div>
+      )}
+      {speech.supported() && voices.length > 0 && !voices.some((v) => voiceScore(v) >= 80) && (
+        <p className="k-gu-note">
+          This device has no natural-sounding voice yet. For a much better one: on a Mac, iPhone or iPad, go to Settings, Accessibility, Spoken Content (Read &amp; Speak on a Mac), Voices, English, and download a Premium or Enhanced voice such as Ava or Zoe. On
+          Windows, open Tempo in Microsoft Edge (its Natural voices are built in). On Android, install Google Speech Services voices.
+        </p>
       )}
       <div className="k-gu-row">
         <span className="k-gu-label">Speech speed</span>

@@ -79,7 +79,7 @@ export function KidsApp({ route }: { route: string }) {
     if (kid && BOUNDARY_SCREENS.includes(r.screen) && sessionOver(kid)) markBreak(kid.id);
   }, [kid, r.screen]);
   useEffect(() => () => speech.cancel(), []);
-  useEffect(() => kidsSound.setEnabled(kid ? kid.settings.sound : true), [kid]);
+  useEffect(() => kidsSound.setEnabled(kid ? kid.settings.sound && !kid.settings.muted : true), [kid]);
   useEffect(() => speech.setVoice(s.device.voiceURI), [s.device.voiceURI]);
   useEffect(() => {
     const prev = document.title;

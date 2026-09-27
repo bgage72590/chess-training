@@ -4074,3 +4074,15 @@
 .k-splash-rest {
   cursor: default;
 }
+
+/* Map speaker button: quiet mode (no sounds, no automatic reading aloud). */
+.k-mute.on {
+  background: var(--k-cream-edge);
+  color: var(--k-ink-2, var(--k-ink));
+}
+@media (max-width: 420px) {
+  .k-mapbar .k-mute {
+    width: 48px;
+    height: 48px;
+  }
+}

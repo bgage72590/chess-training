@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { defaultProfile, normalizeProfile, replaceProfile, updateProfile, useProfile, type Profile } from '../store/profile';
 import { Board } from '../chess/Board';
+import { sound } from '../chess/sound';
 import { BOARD_THEMES, swatchBackground } from '../chess/themes';
 import { Button, PageHeader, Segmented } from '../components/ui';
 import { toast } from '../lib/toast';
@@ -97,7 +98,23 @@ export function SettingsPage() {
           </div>
           <label className="switch">
             <input id="set-sound" type="checkbox" checked={s.sound} onChange={(e) => set({ sound: e.target.checked })} />
-            Move sounds
+            Sound effects <span className="faint">(press M anywhere to mute)</span>
+          </label>
+          <label className="volume-row">
+            <span className="stat-label">Volume</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={Math.round((s.volume ?? 0.8) * 100)}
+              disabled={!s.sound}
+              aria-label="Sound volume"
+              onChange={(e) => set({ volume: Number(e.target.value) / 100 })}
+              onPointerUp={() => sound('move')}
+              onKeyUp={() => sound('move')}
+            />
+            <span className="num volume-value">{Math.round((s.volume ?? 0.8) * 100)}%</span>
           </label>
           <div className="play-option">
             <span className="stat-label">Daily goal</span>

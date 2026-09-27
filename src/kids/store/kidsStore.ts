@@ -107,6 +107,8 @@ export interface KidSettings {
   voice: 'auto' | 'first' | 'off';
   rate: number | null;
   sound: boolean;
+  /** Quiet mode from the map's speaker button: no sounds and no automatic reading aloud. */
+  muted: boolean;
   bedtime: 'off' | 'on' | 'system';
   reducedMotion: 'system' | 'on';
   sessionMin: 0 | 10 | 15 | 20 | 30 | 45;
@@ -131,6 +133,7 @@ export function defaultSettings(band: AgeBand): KidSettings {
     voice: t.voice,
     rate: null,
     sound: true,
+    muted: false,
     bedtime: 'system',
     reducedMotion: 'system',
     sessionMin: t.sessionMinDefault,
@@ -255,6 +258,7 @@ function normalizeKid(x: unknown): KidProfile | null {
     voice: oneOf(s.voice, ['auto', 'first', 'off'] as const, ds.voice),
     rate: typeof s.rate === 'number' ? num(s.rate, 1, 0.7, 1.2) : null,
     sound: typeof s.sound === 'boolean' ? s.sound : ds.sound,
+    muted: s.muted === true,
     bedtime: oneOf(s.bedtime, ['off', 'on', 'system'] as const, ds.bedtime),
     reducedMotion: oneOf(s.reducedMotion, ['system', 'on'] as const, ds.reducedMotion),
     sessionMin: oneOf(s.sessionMin, [0, 10, 15, 20, 30, 45] as const, ds.sessionMin),

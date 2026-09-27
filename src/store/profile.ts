@@ -13,6 +13,8 @@ export interface Settings {
   boardTheme: BoardTheme;
   pieceSet: PieceSet;
   sound: boolean;
+  /** Sound effects volume, 0 to 1. */
+  volume: number;
   coordinates: boolean;
   autoQueen: boolean;
   theme: 'system' | 'light' | 'dark';
@@ -121,7 +123,7 @@ export function defaultProfile(): Profile {
     xp: 0,
     days: {},
     streak: { current: 0, best: 0, last: '' },
-    settings: { boardTheme: 'walnut', pieceSet: 'staunton3d', sound: true, coordinates: true, autoQueen: false, theme: 'system', dailyGoal: 60 },
+    settings: { boardTheme: 'walnut', pieceSet: 'staunton3d', sound: true, volume: 0.8, coordinates: true, autoQueen: false, theme: 'system', dailyGoal: 60 },
     puzzles: { rating: 1000, rd: RD_START, history: [], attempts: 0, solved: 0, themes: {}, seen: {}, review: {}, rushBest: 0, bestStreak: 0 },
     lessons: {},
     lines: {},

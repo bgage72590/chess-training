@@ -1,7 +1,8 @@
 // The map: an island of 8 ranks (Rank 1 at the bottom). The Pawn Buddy stands on the current
 // node; a big sticky PLAY runs the warm-up (if due) and then the next node.
 import { useLayoutEffect, useRef, useState } from 'react';
-import type { KidProfile } from '../store/kidsStore';
+import { updateKid, type KidProfile } from '../store/kidsStore';
+import { speech } from '../player/speech';
 import { REGISTRY } from '../packs';
 import { WORLDS, nodesOf, type NodeDef, type WorldDef } from '../curriculum/worlds';
 import { activeNodes, bossPassed, earnedStars, canGraduate, crownOf, currentWorld, frontierNode, nextNode, nodeUnlocked, totalStars, visibleTo, warmupPlan, worldPassed, worldUnlocked } from '../store/progress';
@@ -88,6 +89,20 @@ export function MapBar({ kid, stars, playgroundOpen, back }: { kid: KidProfile; 
         <KidsIcon name="star" size={26} fill /> {stars}
       </span>
       <span className="k-mapbar-gap" />
+      <button
+        type="button"
+        className={`k-round k-round-plain k-mute${kid.settings.muted ? ' on' : ''}`}
+        aria-label={kid.settings.muted ? 'Turn sound on' : 'Turn sound off'}
+        aria-pressed={kid.settings.muted}
+        title={kid.settings.muted ? 'Sound is off' : 'Sound is on'}
+        onClick={() => {
+          const muted = !kid.settings.muted;
+          if (muted) speech.cancel();
+          updateKid(kid.id, (d) => void (d.settings.muted = muted));
+        }}
+      >
+        <KidsIcon name={kid.settings.muted ? 'mute' : 'speaker'} size={28} />
+      </button>
       <button type="button" className="k-pillbtn sea" aria-label="Sticker book" onClick={() => go.stickers()}>
         <KidsIcon name="book" size={26} />
         <span className="k-pill-label">Stickers</span>

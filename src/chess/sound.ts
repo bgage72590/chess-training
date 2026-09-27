@@ -15,6 +15,17 @@ function audio(): AudioContext | null {
   }
 }
 
+// Every sound goes through one gain node set to the volume in Settings.
+let master: GainNode | null = null;
+function out(a: AudioContext): GainNode {
+  if (master?.context !== a) {
+    master = a.createGain();
+    master.connect(a.destination);
+  }
+  master.gain.value = Math.max(0, Math.min(1, getSettings().volume ?? 0.8));
+  return master;
+}
+
 // A 50 ms decaying noise burst, built once per audio context and reused by every knock.
 let noiseBuf: AudioBuffer | null = null;
 function noise(a: AudioContext): AudioBuffer {
@@ -37,7 +48,7 @@ function knock(a: AudioContext, t: number, freq: number, gain: number, decay = 0
   const g = a.createGain();
   g.gain.setValueAtTime(gain, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
-  src.connect(bp).connect(g).connect(a.destination);
+  src.connect(bp).connect(g).connect(out(a));
   src.start(t);
 
   const osc = a.createOscillator();
@@ -47,7 +58,7 @@ function knock(a: AudioContext, t: number, freq: number, gain: number, decay = 0
   const og = a.createGain();
   og.gain.setValueAtTime(gain * 0.5, t);
   og.gain.exponentialRampToValueAtTime(0.0001, t + decay);
-  osc.connect(og).connect(a.destination);
+  osc.connect(og).connect(out(a));
   osc.start(t);
   osc.stop(t + decay + 0.02);
 }
@@ -60,13 +71,14 @@ function tone(a: AudioContext, t: number, freq: number, dur: number, gain = 0.08
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(gain, t + 0.015);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  osc.connect(g).connect(a.destination);
+  osc.connect(g).connect(out(a));
   osc.start(t);
   osc.stop(t + dur + 0.02);
 }
 
 export function sound(name: SoundName) {
-  if (!getSettings().sound) return;
+  const st = getSettings();
+  if (!st.sound || st.volume === 0) return;
   const a = audio();
   if (!a) return;
   const t = a.currentTime + 0.005;
