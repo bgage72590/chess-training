@@ -4,6 +4,9 @@ open-weight neural voice, Apache-2.0) and writes public/voice/manifest.json.
   npx tsx scripts/voice/collect.ts > /tmp/lines.json
   python3 scripts/voice/render.py /tmp/lines.json --model DIR   # DIR has kokoro-v1.0.int8.onnx, voices-v1.0.bin
 
+To record in several places at once, give each a share of the lines and --part NAME: it records
+only those, writes manifest.NAME.json and removes nothing. The next full run folds the parts in.
+
 Needs: pip install kokoro-onnx lameenc. Model files: github.com/thewh1teagle/kokoro-onnx/releases
 (model-files-v1.0). Only lines without a clip are rendered; clips for lines that are gone are removed.
 """
@@ -51,6 +54,7 @@ def main():
     ap.add_argument('lines')
     ap.add_argument('--model', required=True)
     ap.add_argument('--jobs', type=int, default=os.cpu_count() or 2)
+    ap.add_argument('--part', help='record only these lines into manifest.PART.json')
     a = ap.parse_args()
     os.makedirs(OUT, exist_ok=True)
     lines = json.load(open(a.lines))
@@ -59,7 +63,19 @@ def main():
     clips = {k: v for k, v in old.get('clips', {}).items() if os.path.exists(os.path.join(OUT, k + '.mp3'))}
     if old.get('voice') not in (None, VOICE):
         clips = {}
+    # Parts recorded elsewhere (--part): fold them in.
+    for f in sorted(os.listdir(OUT)):
+        if f.startswith('manifest.') and f.endswith('.json') and not a.part:
+            clips.update(json.load(open(os.path.join(OUT, f))).get('clips', {}))
+            os.remove(os.path.join(OUT, f))
+    # Clips recorded by an interrupted run: constant 48 kbit/s, so the size gives the length.
+    for f in os.listdir(OUT):
+        k = f[:-4]
+        if f.endswith('.mp3') and k not in clips and os.path.getsize(os.path.join(OUT, f)) > 1000:
+            clips[k] = round(os.path.getsize(os.path.join(OUT, f)) * 8 / 48)
     todo = [l for l in lines if l['key'] not in clips]
+    if a.part:
+        clips = {}
     print(f'{len(lines)} lines, {len(todo)} to record with {a.jobs} workers', flush=True)
     done = 0
     with Pool(a.jobs, initializer=init, initargs=(a.model,)) as pool:
@@ -68,6 +84,11 @@ def main():
             done += 1
             if done % 25 == 0:
                 print(f'  {done}/{len(todo)}', flush=True)
+    if a.part:
+        with open(os.path.join(OUT, f'manifest.{a.part}.json'), 'w') as f:
+            json.dump({'v': 1, 'voice': VOICE, 'clips': dict(sorted(clips.items()))}, f, separators=(',', ':'))
+        print(f'part {a.part}: {len(clips)} clips', flush=True)
+        return
     keep = {l['key'] for l in lines}
     for k in list(clips):
         if k not in keep:
