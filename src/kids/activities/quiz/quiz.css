@@ -1,0 +1,127 @@
+/* What's Happening? Quiz (Pack C). Answer art, sun/moon badges, the balance scale. */
+.k-quiz {
+  position: relative;
+}
+.k-quiz-ans {
+  display: inline-flex;
+  align-items: center;
+}
+.k-quiz-ans:empty {
+  display: none;
+}
+.k-quiz-face {
+  width: 34px;
+  height: 34px;
+  flex: none;
+}
+.k-quiz-dots {
+  display: inline-grid;
+  grid-template-columns: repeat(4, 7px);
+  gap: 3px;
+}
+.k-quiz-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.55;
+}
+/* Four answers do not fit in one row on a phone: 2 x 2 instead. */
+@media (max-width: 520px) {
+  .k-tray.cols-4:has(.k-quiz-ans) {
+    --cols: 2;
+  }
+  .k-tray:has(.k-quiz-ans) .k-btn-label {
+    font-size: min(var(--k-btn-label), 20px);
+  }
+}
+.k-quiz-sky {
+  position: absolute;
+  top: 3%;
+  left: 3%;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  width: 42%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid var(--k-ink);
+  pointer-events: none;
+}
+.k-quiz-sky .k-icon {
+  width: 80%;
+  height: 80%;
+}
+.k-quiz-sky.sun {
+  background: var(--k-sun);
+  color: var(--k-ink);
+}
+.k-quiz-sky.moon {
+  background: var(--k-sea-edge);
+  color: #fffaf0;
+}
+.k-quiz-scale {
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  z-index: 20;
+  width: min(80%, 300px);
+  translate: -50% 0;
+  padding: 8px 12px 10px;
+  border-radius: var(--k-r);
+  background: var(--k-card);
+  border: 2px solid var(--k-edge);
+  box-shadow: var(--k-lift);
+  animation: k-quiz-pop 300ms var(--k-ease-spring);
+}
+.k-quiz-scale svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.k-quiz-beam {
+  transform-box: view-box;
+  transform-origin: 110px 30px;
+  transition: transform 700ms var(--k-ease-spring);
+}
+.k-quiz-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--k-font-num);
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--k-ink);
+}
+.k-quiz-banner {
+  position: absolute;
+  top: 2%;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 20;
+  padding: 4px 14px;
+  border-radius: var(--k-r-pill);
+  background: var(--k-sun);
+  border: 2px solid var(--k-sun-edge);
+  font-family: var(--k-font-display);
+  font-weight: 600;
+  font-size: 18px;
+  color: #1f2a44;
+  white-space: nowrap;
+  pointer-events: none;
+}
+@keyframes k-quiz-pop {
+  from {
+    scale: 0.7;
+    opacity: 0;
+  }
+  to {
+    scale: 1;
+    opacity: 1;
+  }
+}
+.kids-app[data-motion='reduced'] .k-quiz-scale {
+  animation: none;
+}
+.kids-app[data-motion='reduced'] .k-quiz-beam {
+  transition: none;
+}
