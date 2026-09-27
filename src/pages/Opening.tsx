@@ -13,6 +13,7 @@ import { Icon } from '../components/Icon';
 import { sound } from '../chess/sound';
 import { MoveInput } from '../components/MoveInput';
 import type { Arrow } from '../content/types';
+import { SoundToggle } from '../components/SoundToggle';
 
 type Mode = 'learn' | 'drill';
 
@@ -59,7 +60,7 @@ function Trainer({ opening, line, mode, onFinish }: { opening: Opening; line: Op
       playMoveSound(plies[ply].move.san);
       setPly((n) => n + 1);
       setTones({});
-    }, ply === 0 ? 500 : 650);
+    }, ply === 0 ? 700 : 850 + Math.random() * 350);
     return () => window.clearTimeout(t);
   }, [ply, done, learnersMove, plies]);
 
@@ -106,6 +107,7 @@ function Trainer({ opening, line, mode, onFinish }: { opening: Opening; line: Op
           <span className="faint num">
             {Math.min(ply, plies.length)}/{plies.length}
           </span>
+          <SoundToggle compact />
         </div>
         <Board
           fen={fen}

@@ -317,7 +317,7 @@ export function Board({
   return (
     <div
       ref={ref}
-      className={`board board-${boardTheme ?? settings.boardTheme} pieces-${pieceSet ?? settings.pieceSet}${canMove ? ' can-move' : ''}`}
+      className={`board board-${boardTheme ?? settings.boardTheme} pieces-${pieceSet ?? settings.pieceSet}${canMove ? ' can-move' : ''}${playerColor ? ` opp-${playerColor === 'w' ? 'b' : 'w'}` : ''}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

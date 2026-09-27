@@ -14,6 +14,8 @@ import { GOAL_LABEL } from './Endgames';
 import type { Arrow } from '../content/types';
 import { EngineNotice } from '../components/EngineNotice';
 import { MoveInput } from '../components/MoveInput';
+import { thinkTimeMs, waitUntil } from '../lib/thinkTime';
+import { SoundToggle } from '../components/SoundToggle';
 
 type Status = 'playing' | 'thinking' | 'success' | 'failed';
 
@@ -71,6 +73,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
     }
 
     setStatus('thinking');
+    const startedAt = performance.now();
     let res;
     try {
       res = await engine.search(afterLearner, { depth: 18, movetime: 900 });
@@ -97,6 +100,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
     }
 
     const reply = res.best && playUci(afterLearner, res.best);
+    if (reply) await waitUntil(startedAt, thinkTimeMs({ fen: afterLearner, moveNumber: used, afterCapture: !!mv.captured }));
     if (!reply) {
       setStatus('playing');
       return;
@@ -154,6 +158,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
           <span className="faint">
             {status === 'thinking' ? 'Engine thinking…' : `Move ${learnerMoves}${drill.goal === 'draw' ? ` of ${drill.maxMoves}` : ` / ${drill.maxMoves}`}`}
           </span>
+          <SoundToggle compact />
         </div>
         <Board fen={fen} orientation={learner === 'w' ? 'white' : 'black'} interactive={status === 'playing' && engineStatus !== 'failed'} playerColor={learner} onMove={onMove} lastMove={last ? [last.from, last.to] : null} arrows={arrows} />
         <MoveInput id="drill-move" fen={fen} color={learner} enabled={status === 'playing' && engineStatus !== 'failed'} onMove={onMove} />

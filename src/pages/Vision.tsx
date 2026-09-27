@@ -11,6 +11,7 @@ import { Button, Countdown, Feedback, PageHeader, Pill, Segmented } from '../com
 import { Icon } from '../components/Icon';
 import { sound } from '../chess/sound';
 import type { Arrow, Mark } from '../content/types';
+import { SoundToggle } from '../components/SoundToggle';
 
 const ALL_SQUARES = Array.from({ length: 64 }, (_, i) => FILES[i % 8] + (Math.floor(i / 8) + 1));
 const EMPTY_FEN = '8/8/8/8/8/8/8/8 w - - 0 1';
@@ -259,6 +260,7 @@ function KnightDrill() {
               Moves: <span className="num">{used}</span> · Best possible: <span className="num">{optimal}</span>
             </span>
           )}
+          <SoundToggle compact />
         </div>
         <Board fen={fenWithKnight(pos)} onSquareClick={click} marks={phase === 'run' ? marks : []} arrows={phase === 'run' ? arrows : []} drawable={false} />
       </BoardColumn>
@@ -341,6 +343,7 @@ function ChecksDrill() {
           <span className="faint num">
             {found.length}/{all.length} checks
           </span>
+          <SoundToggle compact />
         </div>
         <Board fen={fen} orientation={turn === 'w' ? 'white' : 'black'} interactive={!done} playerColor={turn} onMove={onMove} tones={tones} arrows={[...foundArrows, ...arrows]} />
       </BoardColumn>

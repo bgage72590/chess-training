@@ -12,6 +12,7 @@ import { getProfile, logActivity, updateProfile } from '../store/profile';
 import { sound } from '../chess/sound';
 import type { Arrow } from '../content/types';
 import { MoveInput } from '../components/MoveInput';
+import { SoundToggle } from '../components/SoundToggle';
 
 function findLesson(id: string): { unit: Unit; lesson: Lesson; index: number } | null {
   for (const unit of units) {
@@ -278,7 +279,10 @@ function StepLayout({ board, caption, children, below }: { board: React.ReactNod
   return (
     <div className="trainer">
       <BoardColumn>
-        {caption && <div className="board-caption">{caption}</div>}
+        <div className="board-caption">
+          {caption ?? <span />}
+          <SoundToggle compact />
+        </div>
         {board}
         {below}
       </BoardColumn>

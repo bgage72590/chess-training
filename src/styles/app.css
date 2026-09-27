@@ -1462,3 +1462,11 @@ button.feedback:hover {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+/* The mute button at the end of a trainer's caption row. */
+.board-caption .sound-toggle {
+  width: 30px;
+  height: 30px;
+  margin-left: 2px;
+  flex: none;
+}

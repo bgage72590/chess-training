@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Chess, type Move } from 'chess.js';
 import { engine, scoreToCp, useEngineStatus, whitePov, type PvLine, type Score, type SearchOptions } from '../engine/engine';
 import { Board, playMoveSound } from '../chess/Board';
 import { colorName, drawReason, nullMoveFen, other, parseUci, playUci, pvToSan, START_FEN, takeBackTo, turnOf, uciOf } from '../chess/utils';
 import { logActivity, playerWon, updateProfile, type GameRecord } from '../store/profile';
 import { winFor } from '../lib/analysis';
+import { thinkTimeMs, waitUntil } from '../lib/thinkTime';
 import { navigate } from '../router';
 import { BoardColumn } from '../components/BoardColumn';
 import { Button, Feedback, PageHeader, Pill, Segmented } from '../components/ui';
@@ -14,6 +15,7 @@ import { EngineNotice } from '../components/EngineNotice';
 import { sound } from '../chess/sound';
 import { MoveInput } from '../components/MoveInput';
 import type { Arrow } from '../content/types';
+import { SoundToggle } from '../components/SoundToggle';
 
 export interface Level {
   n: number;
@@ -82,6 +84,7 @@ export function PlayPage() {
   const [color, setColor] = useState<'w' | 'b'>('w');
   const [moves, setMoves] = useState<Move[]>([]);
   const [thinking, setThinking] = useState(false);
+  const gameRef = useRef(0);
   const [evalW, setEvalW] = useState<Score | undefined>(undefined);
   /** The coach's best move, remembered with the position it was computed for. */
   const [best, setBest] = useState<{ fen: string; uci: string | null } | null>(null);
@@ -95,7 +98,13 @@ export function PlayPage() {
   const level = LEVELS[prefs.level - 1];
 
   // Leaving the page cancels any search; its continuation sees null and stops.
-  useEffect(() => () => engine.cancelAll(), []);
+  useEffect(
+    () => () => {
+      engine.cancelAll();
+      gameRef.current++;
+    },
+    [],
+  );
 
   const fenAt = (ms: Move[]) => (ms.length ? ms[ms.length - 1].after : START_FEN);
   const fen = fenAt(moves);
@@ -143,10 +152,15 @@ export function PlayPage() {
 
   const engineMove = async (ms: Move[], playerColor: 'w' | 'b') => {
     const f = fenAt(ms);
+    const game = gameRef.current;
+    const startedAt = performance.now();
     setThinking(true);
     const o = level.opts;
     const r = await engine.search(f, { skill: o.skill, elo: o.elo, depth: o.depth, movetime: o.movetime, multipv: o.multipv });
     if (!r) return;
+    // Take a human amount of time over the move, not the instant the engine answers.
+    await waitUntil(startedAt, thinkTimeMs({ fen: f, moveNumber: Math.floor(ms.length / 2), afterCapture: !!ms[ms.length - 1]?.captured }));
+    if (game !== gameRef.current) return; // a new game started (or this one ended) meanwhile
     const played = r.best ? playUci(f, pickEngineMove(r.lines, r.best, o.randomness)) : null;
     setThinking(false);
     if (!played) return;
@@ -160,6 +174,7 @@ export function PlayPage() {
   const start = () => {
     const c: 'w' | 'b' = prefs.color === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : prefs.color;
     engine.cancelAll();
+    gameRef.current++; // drops a coach move still being "thought" about
     engine.newGame();
     setThinking(false);
     setColor(c);
@@ -223,6 +238,7 @@ export function PlayPage() {
   /** Undo the player's last move and anything played after it. */
   const takeBack = () => {
     engine.cancelAll();
+    gameRef.current++; // drops a coach move still being "thought" about
     setThinking(false);
     const next = moves.slice(0, takeBackTo(moves, color));
     setMoves(next);
@@ -269,6 +285,7 @@ export function PlayPage() {
 
   const resign = () => {
     engine.cancelAll();
+    gameRef.current++; // drops a coach move still being "thought" about
     setThinking(false);
     finish(moves, color === 'w' ? '0-1' : '1-0', 'Resignation', color);
   };
@@ -345,6 +362,7 @@ export function PlayPage() {
             {level.name} <span className="faint num">~{level.elo}</span>
           </span>
           {thinking && <span className="faint">Thinking…</span>}
+          <SoundToggle compact />
         </div>
         {prefs.evalBar ? (
           <div className="board-with-eval">

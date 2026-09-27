@@ -9,6 +9,7 @@ import { useTimeouts } from '../lib/hooks';
 import { BoardColumn } from './BoardColumn';
 import { MoveInput } from './MoveInput';
 import { Feedback } from './ui';
+import { SoundToggle } from './SoundToggle';
 
 export type PuzzleStatus = 'intro' | 'solving' | 'solved' | 'failed' | 'viewing';
 
@@ -219,6 +220,7 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
           <span className="faint">
             Puzzle <span className="num">{puzzle.id.replace(/^p0*/, '#')}</span>
           </span>
+          <SoundToggle compact />
         </div>
         <Board
           fen={fen}
