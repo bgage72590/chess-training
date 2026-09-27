@@ -35,7 +35,7 @@
   --warn-soft: #f6e6c9;
   --info: #3b6588;
   --info-soft: #dfe7ee;
-  --mistake: #b4561c;
+  --mistake: #9e4a16;
   /* piece materials (shared with the 3D set) */
   --ivory: #f4ecdd;
   --ivory-shade: #d9ccb4;
@@ -230,7 +230,10 @@
 }
 
 @media (prefers-contrast: more) {
+  /* The selectors match the dark palettes' specificity (0,2,0); coming last, these win in both themes. */
   :root,
+  :root:not([data-theme='light']),
+  :root[data-theme='dark'],
   .sidebar,
   .topbar {
     --grain: none;
@@ -240,7 +243,9 @@
     --line: var(--line-strong);
     --board-glow: transparent;
   }
-  :root {
+  :root,
+  :root:not([data-theme='light']),
+  :root[data-theme='dark'] {
     --ink-3: var(--ink-2);
   }
 }

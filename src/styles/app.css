@@ -175,8 +175,8 @@ button {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 24px 14px 18px;
+  gap: 14px;
+  padding: 22px 14px 16px;
   background: var(--leather-grain), linear-gradient(180deg, var(--leather-2), var(--leather) 40%);
   border-right: 0;
   box-shadow: inset -1px 0 0 rgb(0 0 0 / 0.35), 1px 0 0 rgb(255 255 255 / 0.03);
@@ -239,7 +239,7 @@ button {
   gap: 2px;
 }
 .nav-group-label {
-  padding: 14px 12px 5px;
+  padding: 10px 12px 4px;
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -265,6 +265,21 @@ button {
 }
 .nav-item .icon {
   color: var(--ink-3);
+}
+@media (pointer: coarse) {
+  .nav-item {
+    min-height: 40px;
+  }
+}
+@media (min-width: 901px) and (max-height: 760px) and (pointer: fine) {
+  /* Short laptop screens: keep the streak and XP foot above the fold. */
+  .nav-item {
+    min-height: 34px;
+    padding-block: 6px;
+  }
+  .nav-group-label {
+    padding-top: 8px;
+  }
 }
 .nav-item:hover {
   background: rgb(255 240 220 / 0.05);
@@ -343,6 +358,14 @@ button {
   gap: 24px;
   /* Opacity only: .page is an ancestor of sticky elements and of the board column. */
   animation: page-in 180ms var(--ease);
+}
+@media (min-width: 901px) {
+  /* Desktop trainer pages without a lesson-nav: BoardColumn already leaves a 16px gap under the
+     board, so the 64px bottom padding only produced a 48px page scroll. Pages with a .lesson-nav
+     keep 64px, in sync with its 0 -32px -64px margins (layout contract). */
+  .page:has(> .trainer):not(:has(.lesson-nav)) {
+    padding-bottom: 16px;
+  }
 }
 .topbar,
 .tabbar {
@@ -899,10 +922,17 @@ button.card:hover,
 .trainer-board::before {
   content: '';
   position: absolute;
-  inset: -6% -8%;
+  /* No bottom bleed: an overhang below the column would add page scroll under the fitted board. */
+  inset: -8% -8% 0;
   z-index: -1;
   pointer-events: none;
   background: radial-gradient(closest-side, var(--board-glow), transparent);
+}
+@media (max-width: 900px) {
+  /* The board fills the column here: keep the glow inside it so .main never scrolls sideways. */
+  .trainer-board::before {
+    inset: -8% 0 0;
+  }
 }
 .board-with-eval {
   display: grid;
@@ -1096,6 +1126,9 @@ button.feedback:hover {
   box-shadow: var(--sunk);
 }
 .moves .n {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   padding: 4px 10px 4px 8px;
   font-family: var(--font-display);
   font-style: italic;
@@ -1103,6 +1136,7 @@ button.feedback:hover {
   color: var(--ink-3);
   background: transparent;
   border-right: 1px solid var(--line);
+  border-bottom: 1px solid color-mix(in oklab, var(--line) 50%, transparent);
 }
 .moves button {
   display: flex;
@@ -1149,6 +1183,9 @@ button.feedback:hover {
   overflow: hidden;
   background: linear-gradient(90deg, #120e0b, var(--ebony-hi));
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.3), var(--shadow-1);
+  /* A hairline edge so the ebony half still reads against the dark desk. */
+  outline: 1px solid color-mix(in oklab, var(--line-strong) 80%, transparent);
+  outline-offset: 0;
 }
 .evalbar-white {
   position: absolute;
@@ -1177,7 +1214,8 @@ button.feedback:hover {
   left: 0;
   right: 0;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 8px;
+  letter-spacing: -0.06em;
   font-weight: 600;
   text-align: center;
   z-index: 2;
@@ -1245,7 +1283,10 @@ button.feedback:hover {
   gap: 10px;
 }
 .move-input input {
-  width: min(260px, 100%);
+  /* A definite width that fits the whole hint, 'Type a move: e4, Nf3, O-O' (a percentage width
+     let the caption row shrink it and clip the hint). */
+  width: calc(26ch + 24px);
+  max-width: 100%;
   height: 34px;
   font-family: var(--font-mono);
   font-size: 0.86rem;
@@ -1309,5 +1350,27 @@ button.feedback:hover {
   }
   .side-dot {
     forced-color-adjust: none;
+  }
+  /* The leather is a background image, which forced colours keep: drop it for the system canvas. */
+  .sidebar,
+  .topbar,
+  .main {
+    background: Canvas;
+  }
+  .nav-item .icon,
+  .sidebar .icon {
+    color: CanvasText;
+  }
+  /* Selected states that were conveyed only by fill or shadow. */
+  .segmented button.on,
+  .swatch.on,
+  .level-card.on,
+  .theme-chip.on {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  .switch input:checked {
+    background: Highlight;
+    border-color: Highlight;
   }
 }
