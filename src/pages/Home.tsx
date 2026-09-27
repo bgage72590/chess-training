@@ -148,6 +148,8 @@ export function HomePage() {
   const weak = weakThemes(p);
   const history = p.puzzles.history.slice(-60).map((h) => h.r);
   const nextUp = plan.find((x) => !x.done);
+  const greet = greeting();
+  const lastSpace = greet.lastIndexOf(' ');
 
   if (!p.onboarded) return <Onboarding />;
 
@@ -156,7 +158,10 @@ export function HomePage() {
       <section className="today-hero">
         <div className="today-hero-text">
           <div className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</div>
-          <h1>{greeting()}.</h1>
+          <h1>
+            {greet.slice(0, lastSpace + 1)}
+            <em>{greet.slice(lastSpace + 1)}</em>.
+          </h1>
           <p className="lede">
             {planDone === plan.length
               ? 'Today’s plan is complete. Extra puzzles or a game will only make it stronger.'
@@ -173,14 +178,10 @@ export function HomePage() {
           )}
         </div>
         <div className="today-stats">
-          <Ring value={today.xp} max={goal} size={112} stroke={10} tone={today.xp >= goal ? 'good' : 'accent'}>
+          <Ring value={today.xp} max={goal} size={112} stroke={8} tone={today.xp >= goal ? 'good' : 'accent'}>
             <div>
-              <div className="stat-value num" style={{ fontSize: '1.5rem' }}>
-                {today.xp}
-              </div>
-              <div className="faint" style={{ fontSize: '0.72rem', fontWeight: 600 }}>
-                / {goal} XP
-              </div>
+              <div className="stat-value num ring-value">{today.xp}</div>
+              <div className="stat-label">/ {goal} XP</div>
             </div>
           </Ring>
           <div className="today-mini">
@@ -208,7 +209,7 @@ export function HomePage() {
           </div>
           <ol className="plan">
             {plan.map((item, i) => (
-              <li key={item.id} className={`plan-item ${item.done ? 'done' : ''}`}>
+              <li key={item.id} className={`plan-item${item.done ? ' done' : ''}${item === nextUp ? ' next' : ''}`}>
                 <span className="plan-step num" aria-hidden="true">
                   {item.done ? <Icon name="check" size={16} /> : i + 1}
                 </span>
@@ -297,6 +298,18 @@ export function HomePage() {
                 After a few puzzles per theme, your weakest patterns appear here with a one-click drill.
               </p>
             )}
+          </div>
+          <div className="card kids-card">
+            <button className="link-row" onClick={() => navigate('kids')}>
+              <span>
+                <span className="faint" style={{ fontSize: '0.8rem' }}>
+                  Teaching a kid?
+                </span>
+                <strong>Open Kids mode</strong>
+                <span className="muted kids-card-sub">A playful chess world for young learners</span>
+              </span>
+              <Icon name="right" />
+            </button>
           </div>
         </aside>
       </div>

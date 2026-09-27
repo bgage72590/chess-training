@@ -58,6 +58,7 @@ function useNav(): { groups: { label?: string; items: NavItem[] }[]; tabs: NavIt
       items: [
         { route: 'play', label: 'Play the Coach', icon: 'play' },
         { route: 'games', label: 'Game Reviews', icon: 'swords', match: ['review'] },
+        { route: 'kids', label: 'Kids mode', icon: 'star' },
       ],
     },
     {
@@ -241,7 +242,7 @@ export function App() {
             <div key={i} className="nav">
               {g.label && <div className="nav-group-label">{g.label}</div>}
               {g.items.map((it: NavItem) => (
-                <button key={it.route} className={`nav-item ${isActive(it, section) ? 'active' : ''}`} onClick={() => navigate(it.route)} aria-current={isActive(it, section) ? 'page' : undefined}>
+                <button key={it.route} data-route={it.route} className={`nav-item ${isActive(it, section) ? 'active' : ''}`} onClick={() => navigate(it.route)} aria-current={isActive(it, section) ? 'page' : undefined}>
                   <Icon name={it.icon} />
                   {it.label}
                   {!!it.badge && <span className="badge">{it.badge}</span>}
@@ -269,7 +270,7 @@ export function App() {
         </button>
         <MiniStats streak={streak} rating={p.puzzles.rating}>
           <InstallButton compact />
-          <button className="icon-btn" style={{ width: 32, height: 32 }} aria-label="Settings" onClick={() => navigate('settings')}>
+          <button className="icon-btn" aria-label="Settings" onClick={() => navigate('settings')}>
             <Icon name="settings" size={18} />
           </button>
         </MiniStats>

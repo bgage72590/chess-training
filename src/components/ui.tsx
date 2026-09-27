@@ -38,7 +38,7 @@ export function Ring({ value, max = 1, size = 88, stroke = 8, children, tone = '
   return (
     <div className="ring" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--surface-3)" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--ring-track, var(--surface-3))" strokeWidth={stroke} />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -49,7 +49,7 @@ export function Ring({ value, max = 1, size = 88, stroke = 8, children, tone = '
           strokeLinecap="round"
           strokeDasharray={`${c * pct} ${c}`}
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          style={{ transition: 'stroke-dasharray 600ms ease' }}
+          style={{ transition: 'stroke-dasharray 600ms cubic-bezier(0.2,0.7,0.2,1)' }}
         />
       </svg>
       <div className="ring-center">{children}</div>

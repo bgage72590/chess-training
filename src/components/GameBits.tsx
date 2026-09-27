@@ -2,23 +2,48 @@ import { useEffect, useRef } from 'react';
 import { formatScore, winPercent, type Score } from '../engine/engine';
 import type { MoveClass } from '../store/profile';
 
+/**
+ * The eval bar's short label: the label's end of the bar already says who is ahead, so it shows
+ * the size of the advantage without a sign, in at most three characters (lichess convention):
+ * tenths below 10 ("0.3", "4.5"), whole pawns from 10 ("12"), and "M3" for a mate.
+ */
+function evalBarLabel(score: Score | undefined): string {
+  if (!score) return '0.0';
+  if (score.mate !== undefined) return score.mate === 0 ? '#' : `M${Math.abs(score.mate)}`;
+  const v = Math.abs((score.cp ?? 0) / 100);
+  return Math.round(v * 10) >= 100 ? String(Math.min(99, Math.round(v))) : v.toFixed(1);
+}
+
 /** Vertical evaluation bar. `score` is from White's point of view. */
 export function EvalBar({ score, orientation = 'white' }: { score?: Score; orientation?: 'white' | 'black' }) {
   const white = winPercent(score);
   const label = formatScore(score);
+  const short = evalBarLabel(score);
   const whiteAhead = white >= 50;
   return (
-    <div className={`evalbar ${orientation === 'black' ? 'flipped' : ''}`} aria-label={`Evaluation ${label}`}>
+    <div
+      className={`evalbar ${orientation === 'black' ? 'flipped' : ''}`}
+      role="img"
+      aria-label={`Evaluation ${label}`}
+    >
       <div className="evalbar-white" style={{ height: `${white}%` }} />
       <div
-        className="evalbar-label"
+        className={`evalbar-label${!short.includes('.') && short.length > 2 ? ' tight' : ''}`}
         style={
           (orientation === 'white') === whiteAhead
-            ? { bottom: 4, color: '#2a2e33' }
-            : { top: 4, color: '#f1f1ec' }
+            ? { bottom: 4, color: 'var(--ebony)' }
+            : { top: 4, color: 'var(--ivory)' }
         }
       >
-        {label.replace('+', '')}
+        {short.includes('.') ? (
+          <>
+            {short.split('.')[0]}
+            <span className="evalbar-dot">.</span>
+            {short.split('.')[1]}
+          </>
+        ) : (
+          short
+        )}
       </div>
     </div>
   );
@@ -104,12 +129,12 @@ export function EvalGraph({ evals, current, onSelect, classes }: { evals: Score[
   };
   return (
     <svg className="evalgraph" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" onPointerDown={handle} role="img" aria-label="Evaluation over the game">
-      <rect x="0" y="0" width={W} height={H} fill="#2a2e33" />
-      <path d={area} fill="#f1f1ec" />
-      <line x1="0" x2={W} y1={H / 2} y2={H / 2} stroke="#8a8f96" strokeWidth="1" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
+      <rect x="0" y="0" width={W} height={H} fill="var(--ebony)" />
+      <path d={area} fill="var(--ivory)" />
+      <line x1="0" x2={W} y1={H / 2} y2={H / 2} stroke="rgb(128 118 104)" strokeWidth="1" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
       {classes?.map((c, i) =>
         c === 'blunder' || c === 'mistake' ? (
-          <circle key={i} cx={x(i + 1)} cy={y(evals[i + 1])} r="4" fill={c === 'blunder' ? 'var(--bad)' : '#e07b2a'} vectorEffect="non-scaling-stroke" />
+          <circle key={i} cx={x(i + 1)} cy={y(evals[i + 1])} r="4" fill={c === 'blunder' ? 'var(--bad)' : 'var(--mistake)'} vectorEffect="non-scaling-stroke" />
         ) : null,
       )}
       <line x1={x(current)} x2={x(current)} y1="0" y2={H} stroke="var(--accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
