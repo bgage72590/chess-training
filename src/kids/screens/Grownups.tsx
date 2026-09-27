@@ -202,7 +202,7 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
                 );
               })}
             </select>
-            <button type="button" className="k-gu-btn" onClick={() => speech.speak(["Hi! I'm Pip. Let's play chess together!"], { rate: st.rate ?? 1 })}>
+            <button type="button" className="k-gu-btn" onClick={() => speech.speak(["Hi! I'm Pip. Let's play chess together!"], { rate: st.rate ?? 1, clipRate: st.rate ?? undefined })}>
               Preview
             </button>
           </div>

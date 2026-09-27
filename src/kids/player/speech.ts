@@ -8,8 +8,12 @@ import { rankVoices } from './voices';
 import { clipKey, spokenText } from '../lib/clipKey';
 
 interface SpeakOpts {
+  /** Device-voice speed (the band's pace unless a grown-up set one). */
   rate?: number;
   pitch?: number;
+  /** Speed for recorded clips: only a grown-up's explicit choice. Clips are recorded at a
+   *  kid-friendly pace, and speeding or slowing them in the browser makes them sound robotic. */
+  clipRate?: number;
 }
 
 interface SpeechState {
@@ -82,6 +86,8 @@ const words = (t: string) => t.split(/\s+/).filter(Boolean);
 interface VoiceManifest {
   v: 1;
   voice: string;
+  /** How the clips were recorded; part of each clip's URL so a new recording is never mixed with cached old clips. */
+  version?: string;
   clips: Record<string, number>; // clip key -> duration (ms)
 }
 let manifest: VoiceManifest | null = null;
@@ -89,6 +95,7 @@ let manifestLoad: Promise<void> | null = null;
 let audioEl: HTMLAudioElement | null = null;
 const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
 const voiceUrl = (file: string) => new URL(`voice/${file}`, document.baseURI).href;
+const clipUrl = (key: string) => voiceUrl(`${key}.mp3${manifest?.version ? `?v=${encodeURIComponent(manifest.version)}` : ''}`);
 
 function loadManifest(): Promise<void> {
   if (manifestLoad) return manifestLoad;
@@ -117,7 +124,7 @@ function prefetchClips() {
   let i = 0;
   const step = () => {
     if (i >= keys.length || !navigator.onLine) return;
-    fetch(voiceUrl(`${keys[i++]}.mp3`))
+    fetch(clipUrl(keys[i++]))
       .then((r) => r.arrayBuffer())
       .catch(() => undefined)
       .finally(() => setTimeout(step, 60));
@@ -141,7 +148,7 @@ function timedWords(p: LinePlan, ms: number, live: () => boolean) {
   for (let i = 1; i < p.capWords; i++) timers.push(setTimeout(() => live() && set({ word: p.base + i }), i * per));
 }
 
-function playClip(p: LinePlan, key: string, ms: number, rate: number, live: () => boolean, done: () => void, fallback: () => void) {
+function playClip(p: LinePlan, key: string, ms: number, rate: number | undefined, live: () => boolean, done: () => void, fallback: () => void) {
   const el = (audioEl ??= new Audio());
   let settled = false;
   const fail = () => {
@@ -155,8 +162,8 @@ function playClip(p: LinePlan, key: string, ms: number, rate: number, live: () =
     done();
   };
   el.onerror = fail;
-  el.src = voiceUrl(`${key}.mp3`);
-  el.playbackRate = Math.min(1.2, Math.max(0.7, rate));
+  el.src = clipUrl(key);
+  el.playbackRate = rate ? Math.min(1.2, Math.max(0.7, rate)) : 1;
   el.play()
     .then(() => {
       if (!live()) return el.pause();
@@ -217,7 +224,6 @@ function speakTts(p: LinePlan, opts: SpeakOpts, live: () => boolean, done: () =>
 function run(lines: string[], opts: SpeakOpts, token: number) {
   const gen = ++runGen;
   const live = () => token === state.token && gen === runGen;
-  const rate = opts.rate ?? 1;
   let offset = 0;
   const plan: LinePlan[] = lines.map((caption) => {
     const p = { spoken: spokenText(caption), capWords: words(caption).length, base: offset };
@@ -231,7 +237,7 @@ function run(lines: string[], opts: SpeakOpts, token: number) {
     const p = plan[i];
     const key = recordedOn() ? clipKey(p.spoken) : '';
     const ms = key ? manifest!.clips[key] : undefined;
-    if (key && ms !== undefined) playClip(p, key, ms, rate, live, () => next(i + 1), () => speakTts(p, opts, live, () => next(i + 1)));
+    if (key && ms !== undefined) playClip(p, key, ms, opts.clipRate, live, () => next(i + 1), () => speakTts(p, opts, live, () => next(i + 1)));
     else speakTts(p, opts, live, () => next(i + 1));
   };
   // The clip list loads with Kids mode; give it a moment on the very first line.
@@ -368,5 +374,5 @@ export function sayAs(kid: KidProfile | null | undefined, lines: string[], opts:
       updateKid(kid.id, (d) => void d.firsts.push(id));
     }
   }
-  return speech.speak(clean, { rate, pitch: t.pitch });
+  return speech.speak(clean, { rate, pitch: t.pitch, clipRate: kid?.settings.rate ?? undefined });
 }

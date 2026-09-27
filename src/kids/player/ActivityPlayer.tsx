@@ -133,10 +133,11 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       const voice = kid.settings.voice;
       const id = lineId(caption);
       const k = getKid(kid.id);
-      const speakIt = force || voice === 'auto' || (voice === 'first' && !k?.firsts.includes(id));
+      // Quiet mode (the map's speaker button) stops automatic reading; a tap on the speaker still reads.
+      const speakIt = force || (!k?.settings.muted && (voice === 'auto' || (voice === 'first' && !k?.firsts.includes(id))));
       let token: number | undefined;
       if (speakIt) {
-        token = speech.speak(lines, { rate, pitch: tuning.pitch });
+        token = speech.speak(lines, { rate, pitch: tuning.pitch, clipRate: kid.settings.rate ?? undefined });
         if (voice === 'first' && !force && !k?.firsts.includes(id)) updateKid(kid.id, (d) => void d.firsts.push(id));
       } else speech.cancel();
       setCoach({ text: caption, token });

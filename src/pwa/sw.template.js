@@ -4,7 +4,7 @@ const VERSION = '__VERSION__';
 const FILES = __FILES__;
 const CACHE = `tempo-${VERSION}`;
 const FONTS = 'tempo-fonts';
-const VOICE = 'tempo-voice-af_heart';
+const VOICE = 'tempo-voice';
 const scoped = (path) => new URL(path, self.registration.scope).href;
 
 self.addEventListener('install', (event) => {
@@ -47,17 +47,23 @@ self.addEventListener('fetch', (event) => {
   }
   if (url.origin !== self.location.origin) return;
 
-  // Pip's voice: clips are named by their text, so a cached clip never goes stale; the clip
-  // list is fetched fresh when online.
+  // Pip's voice: clips are named by their text and the recording version, so a cached clip never
+  // goes stale. The clip list is fetched fresh when online; a new recording clears the old clips.
   if (req.method === 'GET' && url.pathname.includes('/voice/')) {
     if (url.pathname.endsWith('/manifest.json')) {
-      event.respondWith(
-        fetch(req)
-          .then((res) => {
-            if (res.ok) void caches.open(VOICE).then((c) => c.put(req, res.clone()));
-            return res;
+      const fresh = fetch(req);
+      event.respondWith(fresh.then((res) => res.clone()).catch(() => caches.open(VOICE).then((c) => c.match(req)).then((hit) => hit ?? Response.error())));
+      event.waitUntil(
+        fresh
+          .then(async (res) => {
+            if (!res.ok) return;
+            const next = await res.clone().json();
+            const cache = await caches.open(VOICE);
+            const prev = await cache.match(req).then((hit) => (hit ? hit.json() : null));
+            if (prev && prev.version !== next.version) await caches.delete(VOICE);
+            await (await caches.open(VOICE)).put(req, res);
           })
-          .catch(() => caches.open(VOICE).then((c) => c.match(req)).then((hit) => hit ?? Response.error())),
+          .catch(() => undefined),
       );
     } else {
       event.respondWith(

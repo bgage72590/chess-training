@@ -25,7 +25,7 @@ export function WorldScreen({ kid, worldId }: { kid: KidProfile; worldId: WorldI
   const nextW = WORLDS[world.rank];
   const current = nextNode(kid, REGISTRY);
   const [token, setToken] = useState<number | undefined>();
-  const say = () => setToken(speech.speak([world.intro], { rate: kid.settings.rate ?? tuning.speechRate, pitch: tuning.pitch }));
+  const say = () => setToken(speech.speak([world.intro], { rate: kid.settings.rate ?? tuning.speechRate, pitch: tuning.pitch, clipRate: kid.settings.rate ?? undefined }));
 
   // Pip's world intro is spoken on the first visit.
   useEffect(() => {
