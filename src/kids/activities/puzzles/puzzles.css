@@ -1,0 +1,4 @@
+/* Puzzle Path: the board is sized by the player (kids.css); this only anchors overlays. */
+.k-puzzles {
+  position: relative;
+}
