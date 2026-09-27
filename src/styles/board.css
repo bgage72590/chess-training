@@ -1,18 +1,28 @@
-/* The chess board: squares, highlights, pieces, arrows and board themes.
-   Piece images live in pieces.css. */
+/* The chess board: squares, frame, highlights, pieces, arrows and board themes.
+   Piece images live in pieces.css; the theme list for Settings is src/chess/themes.ts.
+   Textured themes (walnut, marble) draw one generated 8x8 image behind transparent squares
+   (scripts/boards/generate.mjs); --sq-light/--sq-dark stay defined for fallbacks. */
 :root {
   /* Board defaults (overridden per theme class on the board) */
-  --sq-light: #dfe5ea;
-  --sq-dark: #7f98ab;
-  --coord-on-light: #6a8397;
-  --coord-on-dark: #eef2f5;
-  --hl-last: rgb(247 206 96 / 0.55);
-  --hl-select: rgb(247 206 96 / 0.8);
-  --dest-dot: rgb(20 29 39 / 0.28);
-  --arrow-green: #2f9e6b;
-  --arrow-red: #d2463b;
-  --arrow-blue: #3a7cc9;
-  --arrow-yellow: #e0a526;
+  --sq-light: #e2e8ec;
+  --sq-dark: #86a0b3;
+  --coord-on-light: #62798c;
+  --coord-on-dark: #f1f4f7;
+  --coord-shadow-light: 0 1px 0 rgb(255 255 255 / 0.45);
+  --coord-shadow-dark: 0 1px 1px rgb(0 0 0 / 0.22);
+  --hl-last: rgb(247 206 96 / 0.5);
+  --hl-select: rgb(247 206 96 / 0.78);
+  --dest-dot: rgb(20 29 39 / 0.3);
+  --dest-hover: rgb(20 29 39 / 0.14);
+  /* Frame: a thin bevelled band drawn with box-shadows outside the board's box. */
+  --frame: #465b6d;
+  --frame-hi: #6a8193;
+  --frame-lo: #2d3c49;
+  --frame-seam: rgb(10 16 22 / 0.42);
+  --arrow-green: #2c9a62;
+  --arrow-red: #d4443a;
+  --arrow-blue: #2f7cd3;
+  --arrow-yellow: #e4a21f;
 }
 
 /* ---------- Board ---------- */
@@ -23,10 +33,31 @@
   max-width: 100%;
   user-select: none;
   touch-action: none;
-  border-radius: 4px;
+  border-radius: 5px;
   overflow: hidden;
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.12), var(--shadow-2);
+  /* Frame and depth, all outside the box (so pointer mapping and layout are unaffected),
+     at most 5px wide: seam line, band, lit top edge, shaded bottom edge, then shadows. */
+  box-shadow:
+    0 0 0 1px var(--frame-seam),
+    0 0 0 4px var(--frame),
+    0 -1px 0 4px var(--frame-hi),
+    0 1px 0 4px var(--frame-lo),
+    0 0 0 5px color-mix(in srgb, var(--frame) 70%, var(--frame-lo)),
+    0 3px 6px 3px rgb(0 0 0 / 0.14),
+    0 16px 34px -6px rgb(0 0 0 / 0.3);
   container-type: inline-size;
+}
+/* A soft inner bevel over the squares, under coordinates and pieces. */
+.board::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.22),
+    inset 0 0 0 1px rgb(0 0 0 / 0.1);
 }
 .squares {
   position: absolute;
@@ -44,6 +75,8 @@
 .sq.dark {
   background: var(--sq-dark);
 }
+
+/* ---------- Highlights ---------- */
 .sq.last::before,
 .sq.selected::before,
 .sq[class*='tone-']::before {
@@ -54,70 +87,117 @@
 .sq.last::before {
   background: var(--hl-last);
 }
-.sq.selected::before {
-  background: var(--hl-select);
-}
 .sq.dark.last::before {
   background: var(--hl-last-dark, var(--hl-last));
+}
+.sq.selected::before {
+  background: var(--hl-select);
+  box-shadow: inset 0 0 0 max(2px, 0.4cqw) var(--hl-select-ring, rgb(255 255 255 / 0.35));
 }
 .sq.dark.selected::before {
   background: var(--hl-select-dark, var(--hl-select));
 }
+/* Check: a red glow around the king, pulsing twice when it appears. */
 .sq.check::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle, rgb(230 40 30 / 0.95) 0%, rgb(230 40 30 / 0.55) 35%, rgb(230 40 30 / 0) 72%);
+  background: radial-gradient(
+    circle closest-side,
+    rgb(255 80 60) 0%,
+    rgb(240 44 32 / 0.85) 42%,
+    rgb(214 24 24 / 0.45) 74%,
+    rgb(200 0 0 / 0) 100%
+  );
+  box-shadow: inset 0 0 max(6px, 1.4cqw) rgb(220 30 30 / 0.55);
+  animation: check-pulse 900ms ease-in-out 2;
+}
+@keyframes check-pulse {
+  50% {
+    opacity: 0.55;
+  }
 }
 .sq.tone-good::before {
-  background: rgb(60 180 120 / 0.55);
+  background: rgb(52 176 110 / 0.5);
+  box-shadow: inset 0 0 0 max(2px, 0.45cqw) rgb(40 150 90 / 0.75);
 }
 .sq.tone-bad::before {
-  background: rgb(220 70 60 / 0.55);
+  background: rgb(222 64 52 / 0.5);
+  box-shadow: inset 0 0 0 max(2px, 0.45cqw) rgb(196 44 36 / 0.75);
 }
 .sq.tone-hint::before {
-  background: rgb(70 140 220 / 0.45);
+  background: rgb(64 138 224 / 0.4);
+  box-shadow: inset 0 0 0 max(2px, 0.45cqw) rgb(50 118 206 / 0.8);
 }
 .sq.tone-focus::before {
-  box-shadow: inset 0 0 0 4px var(--arrow-yellow);
+  box-shadow: inset 0 0 0 max(3px, 0.6cqw) var(--arrow-yellow);
 }
+
+/* ---------- Move targets ---------- */
 .dest {
+  --dot: var(--dest-dot);
   position: absolute;
-  inset: 36%;
-  border-radius: 50%;
-  background: var(--dest-dot);
+  inset: 0;
   z-index: 3;
   pointer-events: none;
+  background: radial-gradient(circle closest-side, var(--dot) 0 30%, transparent calc(30% + 1px));
+}
+.sq.dark > .dest {
+  --dot: var(--dest-dot-dark, var(--dest-dot));
 }
 .dest.capture {
-  inset: 3%;
-  background: none;
-  border: 5px solid var(--dest-dot);
-  border-radius: 50%;
+  background: radial-gradient(circle closest-side, transparent 0 78%, var(--dot) calc(78% + 1px) 97%, transparent calc(97% + 1px));
 }
+@media (hover: hover) {
+  .sq:hover > .dest {
+    background-color: var(--dest-hover);
+  }
+}
+/* The square under a dragged piece (moved by Board's pointer handlers, not by React). */
+.drag-hover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12.5%;
+  height: 12.5%;
+  z-index: 3;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 max(2px, 0.45cqw) rgb(255 255 255 / 0.55);
+}
+.drag-hover.is-dest {
+  background: var(--dest-hover);
+  box-shadow: inset 0 0 0 max(2px, 0.5cqw) rgb(255 255 255 / 0.8);
+}
+
+/* ---------- Coordinates: small, soft, engraved into the squares ---------- */
 .coord {
   position: absolute;
   font-family: var(--font-body);
   font-weight: 700;
-  font-size: clamp(8px, 2.1cqw, 13px);
+  font-size: clamp(8px, 2.05cqw, 13px);
   line-height: 1;
+  letter-spacing: 0.02em;
   pointer-events: none;
   z-index: 2;
 }
 .coord.rank {
-  top: 3px;
-  left: 3px;
+  top: max(2px, 0.45cqw);
+  left: max(3px, 0.55cqw);
 }
 .coord.file {
-  bottom: 3px;
-  right: 4px;
+  bottom: max(2px, 0.4cqw);
+  right: max(3px, 0.6cqw);
 }
 .sq.light .coord {
   color: var(--coord-on-light);
+  text-shadow: var(--coord-shadow-light);
 }
 .sq.dark .coord {
   color: var(--coord-on-dark);
+  text-shadow: var(--coord-shadow-dark);
 }
+
+/* ---------- Pieces ---------- */
 .piece {
   position: absolute;
   top: 0;
@@ -130,14 +210,27 @@
   transition: transform 190ms cubic-bezier(0.2, 0.75, 0.3, 1);
   will-change: transform;
 }
-.piece.dragging {
+/* The flat set sits on the board with a faint contact shadow. */
+.pieces-cburnett .piece {
+  filter: drop-shadow(0 max(1px, 0.18cqw) max(1px, 0.2cqw) rgb(0 0 0 / 0.28));
+}
+.piece.dragging,
+.pieces-cburnett .piece.dragging {
   transition: none;
   z-index: 20;
-  filter: drop-shadow(0 6px 8px rgb(0 0 0 / 0.35));
+  filter: drop-shadow(0 max(5px, 1.1cqw) max(4px, 0.9cqw) rgb(0 0 0 / 0.34)) drop-shadow(0 1px 2px rgb(0 0 0 / 0.2));
+}
+.piece.ghost,
+.pieces-cburnett .piece.ghost {
+  opacity: 0.28;
+  filter: none;
+  transition: none;
 }
 .board.can-move {
   cursor: pointer;
 }
+
+/* ---------- Arrows and circles ---------- */
 .shapes {
   position: absolute;
   inset: 0;
@@ -145,12 +238,16 @@
   height: 100%;
   z-index: 6;
   pointer-events: none;
+  filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.28));
 }
+
+/* ---------- Promotion ---------- */
 .promo {
   position: absolute;
   inset: 0;
   z-index: 30;
-  background: rgb(10 14 20 / 0.45);
+  background: rgb(10 14 20 / 0.5);
+  backdrop-filter: blur(1.5px);
 }
 .promo-choice {
   position: absolute;
@@ -162,9 +259,12 @@
   background-size: 86% 86%;
   background-position: center;
   background-repeat: no-repeat;
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-2), inset 0 0 0 1px rgb(0 0 0 / 0.08);
   cursor: pointer;
   z-index: 2;
+  transition:
+    border-radius 120ms ease,
+    background-color 120ms ease;
 }
 .promo-choice:hover {
   background-color: var(--accent-soft);
@@ -178,45 +278,115 @@
   cursor: default;
 }
 
-/* Board themes. Dark squares use --hl-*-dark when a theme sets it, else the plain highlight. */
+@media (prefers-reduced-motion: reduce) {
+  .sq.check::after {
+    animation: none;
+  }
+}
+
+/* ---------- Themes ----------
+   Dark squares use --hl-*-dark when a theme sets it, else the plain highlight. */
 .board-slate,
 .board-ink,
 .board-rose {
   /* Gold washes out on these muted dark squares: use a deeper tone there. */
-  --hl-last-dark: rgb(226 176 72 / 0.74);
-  --hl-select-dark: rgb(226 176 72 / 0.9);
+  --hl-last-dark: rgb(226 176 72 / 0.72);
+  --hl-select-dark: rgb(226 176 72 / 0.88);
 }
 .board-slate {
-  --sq-light: #dfe5ea;
-  --sq-dark: #7f98ab;
-  --coord-on-light: #6a8397;
-  --coord-on-dark: #eef2f5;
-}
-.board-walnut {
-  --hl-last: rgb(205 210 106 / 0.6);
-  --hl-select: rgb(20 85 30 / 0.5);
-  --sq-light: #f0d9b5;
-  --sq-dark: #b58863;
-  --coord-on-light: #a07550;
-  --coord-on-dark: #f6e6cc;
+  --sq-light: #e2e8ec;
+  --sq-dark: #86a0b3;
+  --coord-on-light: #62798c;
+  --coord-on-dark: #f1f4f7;
+  --frame: #465b6d;
+  --frame-hi: #6a8193;
+  --frame-lo: #2d3c49;
 }
 .board-tourney {
-  --hl-last: rgb(255 255 51 / 0.45);
-  --hl-select: rgb(255 255 51 / 0.7);
-  --sq-light: #ebecd0;
-  --sq-dark: #739552;
-  --coord-on-light: #6c8a4e;
-  --coord-on-dark: #f2f3dd;
+  --hl-last: rgb(255 246 64 / 0.46);
+  --hl-last-dark: rgb(222 214 60 / 0.62);
+  --hl-select: rgb(255 246 64 / 0.7);
+  --hl-select-dark: rgb(222 214 60 / 0.82);
+  --sq-light: #eeeed2;
+  --sq-dark: #769656;
+  --coord-on-light: #688748;
+  --coord-on-dark: #f3f4df;
+  --dest-dot: rgb(24 44 12 / 0.3);
+  --dest-dot-dark: rgb(16 34 6 / 0.36);
+  --frame: #4b6237;
+  --frame-hi: #6c8753;
+  --frame-lo: #334425;
 }
 .board-ink {
-  --sq-light: #c9cfd8;
-  --sq-dark: #4d5b72;
-  --coord-on-light: #4d5b72;
-  --coord-on-dark: #d8dde5;
+  --sq-light: #d0d6df;
+  --sq-dark: #55637a;
+  --coord-on-light: #55637a;
+  --coord-on-dark: #dde2ea;
+  --dest-dot: rgb(12 18 30 / 0.34);
+  --dest-dot-dark: rgb(8 12 22 / 0.45);
+  --frame: #2b3342;
+  --frame-hi: #4a556a;
+  --frame-lo: #191e28;
 }
 .board-rose {
-  --sq-light: #efe3dc;
-  --sq-dark: #b9867c;
-  --coord-on-light: #a1716a;
-  --coord-on-dark: #f7ece7;
+  --sq-light: #f1e4dc;
+  --sq-dark: #b7847a;
+  --coord-on-light: #9f6f67;
+  --coord-on-dark: #fbf0ea;
+  --dest-dot: rgb(60 22 16 / 0.28);
+  --frame: #74493f;
+  --frame-hi: #9a6b60;
+  --frame-lo: #51302a;
+}
+
+/* Walnut: maple and walnut inlay, satin finish, in a dark walnut frame. */
+.board-walnut {
+  --sq-light: #e6cb9a;
+  --sq-dark: #7d5130;
+  --coord-on-light: rgb(112 72 36 / 0.85);
+  --coord-on-dark: rgb(250 232 206 / 0.88);
+  --coord-shadow-light: 0 1px 0 rgb(255 244 222 / 0.55);
+  --coord-shadow-dark: 0 -1px 0 rgb(0 0 0 / 0.35);
+  --hl-last: rgb(222 206 70 / 0.44);
+  --hl-last-dark: rgb(228 204 72 / 0.5);
+  --hl-select: rgb(158 196 58 / 0.55);
+  --hl-select-dark: rgb(150 190 54 / 0.62);
+  --dest-dot: rgb(44 24 8 / 0.36);
+  --dest-dot-dark: rgb(26 12 2 / 0.5);
+  --dest-hover: rgb(44 24 8 / 0.14);
+  --frame: #4b2d18;
+  --frame-hi: #7a5030;
+  --frame-lo: #2c190c;
+  --frame-seam: rgb(20 10 2 / 0.55);
+}
+.board-walnut .squares {
+  background: var(--sq-dark) url('../assets/boards/walnut.webp') 0 0 / 100% 100% no-repeat;
+}
+
+/* Marble: cream and verde marble tiles, polished, in a dark green stone frame. */
+.board-marble {
+  --sq-light: #ece7de;
+  --sq-dark: #5d7469;
+  --coord-on-light: rgb(76 94 86 / 0.85);
+  --coord-on-dark: rgb(240 244 238 / 0.9);
+  --coord-shadow-light: 0 1px 0 rgb(255 255 255 / 0.7);
+  --coord-shadow-dark: 0 -1px 0 rgb(0 0 0 / 0.3);
+  --hl-last: rgb(236 196 92 / 0.46);
+  --hl-last-dark: rgb(228 186 80 / 0.6);
+  --hl-select: rgb(236 190 72 / 0.66);
+  --hl-select-dark: rgb(230 182 64 / 0.78);
+  --dest-dot: rgb(16 36 28 / 0.36);
+  --dest-dot-dark: rgb(8 22 16 / 0.48);
+  --dest-hover: rgb(16 36 28 / 0.14);
+  --frame: #34443c;
+  --frame-hi: #5b6f65;
+  --frame-lo: #1f2a25;
+  --frame-seam: rgb(8 16 12 / 0.5);
+}
+.board-marble .squares {
+  background: var(--sq-dark) url('../assets/boards/marble.webp') 0 0 / 100% 100% no-repeat;
+}
+.board-walnut .sq,
+.board-marble .sq {
+  background: none;
 }

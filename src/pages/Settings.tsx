@@ -1,18 +1,11 @@
 import { useState } from 'react';
-import { defaultProfile, normalizeProfile, replaceProfile, updateProfile, useProfile, type BoardTheme, type Profile } from '../store/profile';
+import { defaultProfile, normalizeProfile, replaceProfile, updateProfile, useProfile, type Profile } from '../store/profile';
 import { Board } from '../chess/Board';
+import { BOARD_THEMES, swatchBackground } from '../chess/themes';
 import { Button, PageHeader, Segmented } from '../components/ui';
 import { toast } from '../lib/toast';
 import { useSyncState } from '../store/cloud';
 import { InstallCard } from '../components/InstallCard';
-
-const THEMES: { id: BoardTheme; name: string }[] = [
-  { id: 'slate', name: 'Slate' },
-  { id: 'walnut', name: 'Walnut' },
-  { id: 'tourney', name: 'Tournament' },
-  { id: 'ink', name: 'Ink' },
-  { id: 'rose', name: 'Rosewood' },
-];
 
 const SAMPLE = 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4';
 
@@ -54,14 +47,9 @@ export function SettingsPage() {
         <section className="card settings-section">
           <h2>Board</h2>
           <div className="theme-swatches" role="radiogroup" aria-label="Board theme">
-            {THEMES.map((t) => (
+            {BOARD_THEMES.map((t) => (
               <button key={t.id} role="radio" aria-checked={s.boardTheme === t.id} className={`swatch board-${t.id} ${s.boardTheme === t.id ? 'on' : ''}`} onClick={() => set({ boardTheme: t.id })}>
-                <span className="swatch-squares">
-                  <span style={{ background: 'var(--sq-light)' }} />
-                  <span style={{ background: 'var(--sq-dark)' }} />
-                  <span style={{ background: 'var(--sq-dark)' }} />
-                  <span style={{ background: 'var(--sq-light)' }} />
-                </span>
+                <span className="swatch-squares" style={{ background: swatchBackground(t), boxShadow: 'inset 0 0 0 1px rgb(0 0 0 / 0.14), 0 1px 2px rgb(0 0 0 / 0.18)' }} />
                 {t.name}
               </button>
             ))}

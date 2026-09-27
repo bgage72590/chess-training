@@ -5,7 +5,7 @@ import { dayKey, daysBetween } from '../lib/srs';
 import { RD_START } from '../lib/rating';
 import type { SrsCard } from '../lib/srs';
 
-export type BoardTheme = 'slate' | 'walnut' | 'tourney' | 'ink' | 'rose';
+export type BoardTheme = 'slate' | 'walnut' | 'marble' | 'tourney' | 'ink' | 'rose';
 /** Piece artwork: the classic flat set, or rendered 3D Staunton pieces. */
 export type PieceSet = 'cburnett' | 'staunton3d';
 

@@ -82,6 +82,8 @@ export function Board({
   // Positions are relative to the board, re-measured on every move so scrolling mid-drag is safe.
   const drag = useRef<{ from: string; startX: number; startY: number; x: number; y: number; size: number; moved: boolean; wasSelected: boolean } | null>(null);
   const dragEl = useRef<HTMLDivElement>(null);
+  // Highlight of the square under the dragged piece, also moved directly by pointer handlers.
+  const hoverEl = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [promo, setPromo] = useState<{ from: string; to: string } | null>(null);
   const [userShapes, setUserShapes] = useState<{ from: string; to?: string; color: MarkColor }[]>([]);
@@ -201,7 +203,24 @@ export function Board({
     }
   };
 
-  const dragTransform = (d: { x: number; y: number; size: number }) => `translate(${d.x - d.size / 16}px, ${d.y - d.size / 16}px) scale(1.08)`;
+  const dragTransform = (d: { x: number; y: number; size: number }) => `translate(${d.x - d.size / 16}px, ${d.y - d.size / 16}px) scale(1.12)`;
+
+  /** Board cell (column/row from the top-left) under a drag position, and whether it is a target. */
+  const dragCell = (d: { from: string; x: number; y: number; size: number }) => {
+    const col = Math.floor((d.x / d.size) * 8);
+    const row = Math.floor((d.y / d.size) * 8);
+    if (col < 0 || col > 7 || row < 0 || row > 7) return null;
+    const sq = FILES[flip ? 7 - col : col] + (flip ? row + 1 : 8 - row);
+    return { col, row, dest: sq !== d.from && !!dests.get(d.from)?.some((x) => x.to === sq) };
+  };
+
+  const placeHover = (el: HTMLDivElement, d: { from: string; x: number; y: number; size: number }) => {
+    const cell = dragCell(d);
+    el.style.visibility = cell ? '' : 'hidden';
+    if (!cell) return;
+    el.style.transform = `translate(${cell.col * 100}%, ${cell.row * 100}%)`;
+    el.classList.toggle('is-dest', cell.dest);
+  };
 
   const onPointerMove = (e: RPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
@@ -218,6 +237,7 @@ export function Board({
     d.x = x;
     d.y = y;
     if (dragEl.current) dragEl.current.style.transform = dragTransform(d);
+    if (hoverEl.current) placeHover(hoverEl.current, d);
   };
 
   const endDrag = () => {
@@ -304,6 +324,25 @@ export function Board({
       aria-label={`Chess board, ${colorName(turn)} to move`}
     >
       <div className="squares">{squares}</div>
+      {dragging && drag.current && (
+        <div
+          ref={(el) => {
+            hoverEl.current = el;
+            if (el && drag.current) placeHover(el, drag.current);
+          }}
+          className="drag-hover"
+          aria-hidden="true"
+        />
+      )}
+      {dragging &&
+        drag.current &&
+        pieces
+          .filter((p) => p.square === dragging)
+          .map((p) => {
+            // A faint copy stays on the origin square while its piece is lifted.
+            const { x, y } = xy(p.square);
+            return <div key="ghost" className={`piece ghost pc-${p.color}${p.type.toUpperCase()}`} style={{ transform: `translate(${x * 100}%, ${y * 100}%)` }} />;
+          })}
       {pieces.map((p) => {
         const { x, y } = xy(p.square);
         const isDragged = dragging === p.square && drag.current;
