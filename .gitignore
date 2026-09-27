@@ -6,3 +6,6 @@ public/engine
 .DS_Store
 scripts/puzzles/out
 test-results
+
+# Temporary worktrees used by parallel agents
+.claude/worktrees/
