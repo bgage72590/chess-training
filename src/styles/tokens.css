@@ -1,98 +1,246 @@
-/* Design tokens. Light palette on :root, dark palette via prefers-color-scheme or data-theme. */
+/* Design tokens: "Study: walnut, paper and brass".
+   Light palette on :root, dark palette via prefers-color-scheme or data-theme (identical values in both dark blocks). */
 :root {
   color-scheme: light;
-  --bg: #eceff3;
-  --bg-grain: #e4e8ee;
-  --surface: #ffffff;
-  --surface-2: #f4f6f9;
-  --surface-3: #e9edf2;
-  --ink: #141d27;
-  --ink-2: #4b5967;
-  --ink-3: #7b8896;
-  --line: #d7dde5;
-  --line-strong: #bcc5d0;
-  --accent: #a8741b;
-  --accent-strong: #8d5f12;
-  --accent-soft: #f6ead3;
-  --accent-ink: #1d1407;
+  /* desk and paper */
+  --bg: #efe8dc;
+  --bg-deep: #e6ddce;
+  --bg-grain: #e6ddce; /* legacy alias */
+  --surface: #fbf7f0;
+  --surface-2: #f4eee4;
+  --surface-3: #e9e0d1;
+  --surface-sunk: #ebe3d6; /* wells: inputs, tracks, move list */
+  --ink: #241c14;
+  --ink-2: #5a4c3d;
+  --ink-3: #6a5b4b; /* >=4.6:1 on every light surface incl. surface-3 */
+  --line: #e0d5c3;
+  --line-strong: #cbbba3;
+  --field-border: #8f7e66; /* form-control boundary, >=3:1 on sunk */
+  /* brass */
+  --accent: #8c5e1c;
+  --accent-strong: #7a5117;
+  --accent-soft: #f3e3c6;
+  --accent-ink: #20160a;
   --on-accent: #fffaf0;
-  --good: #23855c;
-  --good-soft: #dcf1e6;
-  --bad: #c0392f;
-  --bad-soft: #f8dfdc;
-  --warn: #b7791f;
-  --warn-soft: #f7ecd6;
-  --info: #2f6db3;
-  --info-soft: #dce8f6;
-  --shadow-1: 0 1px 2px rgb(20 29 39 / 0.06), 0 2px 8px rgb(20 29 39 / 0.05);
-  --shadow-2: 0 2px 6px rgb(20 29 39 / 0.08), 0 12px 32px rgb(20 29 39 / 0.1);
-  --radius-s: 6px;
-  --radius-m: 10px;
-  --radius-l: 16px;
-  --font-display: 'Bricolage Grotesque', 'Figtree', ui-sans-serif, system-ui, sans-serif;
-  --font-body: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
-
+  --brass-hi: #d9ab5f;
+  --brass-lo: #7c531a;
+  /* semantic */
+  --good: #35703f;
+  --good-soft: #e0ecd8;
+  --on-good: #ffffff;
+  --bad: #a9432f;
+  --bad-soft: #f6ddd3;
+  --on-bad: #ffffff;
+  --warn: #8a5810;
+  --warn-soft: #f6e6c9;
+  --info: #3b6588;
+  --info-soft: #dfe7ee;
+  --mistake: #b4561c;
+  /* piece materials (shared with the 3D set) */
+  --ivory: #f4ecdd;
+  --ivory-shade: #d9ccb4;
+  --ebony: #1e1813;
+  --ebony-hi: #2a211a;
+  /* leather chrome: sidebar + mobile topbar, dark in BOTH themes */
+  --leather: #2b2019;
+  --leather-2: #36291f;
+  --leather-3: #403126; /* hover/active fills inside leather */
+  --leather-ink: #f2e7d6;
+  --leather-ink-2: #cdbba3;
+  --leather-ink-3: #b09c83;
+  --leather-line: rgb(242 231 214 / 0.1);
+  --leather-line-strong: rgb(242 231 214 / 0.2);
+  --leather-accent: #e2be82; /* focus + active marks on leather */
+  --leather-accent-strong: #f0d3a0;
+  --stitch: rgb(226 190 130 / 0.2);
+  /* depth */
+  --hl-top: inset 0 1px 0 rgb(255 255 255 / 0.65);
+  --shadow-1: 0 1px 1px rgb(58 38 18 / 0.05), 0 2px 6px rgb(58 38 18 / 0.06);
+  --shadow-2: 0 2px 4px rgb(58 38 18 / 0.06), 0 10px 28px rgb(58 38 18 / 0.12);
+  --shadow-3: 0 4px 8px rgb(58 38 18 / 0.08), 0 22px 48px -12px rgb(58 38 18 / 0.28);
+  --shadow-press: inset 0 1px 2px rgb(58 38 18 / 0.18);
+  --sunk: inset 0 1px 2px rgb(58 38 18 / 0.1);
+  --ring-track: #e4dac9;
+  /* board ambience contract (consumed by the board team) */
+  --board-shadow: 0 1px 2px rgb(58 38 18 / 0.18), 0 18px 40px -16px rgb(58 38 18 / 0.42);
+  --board-shadow-mini: 0 0 0 1px rgb(0 0 0 / 0.18), 0 2px 6px rgb(40 25 10 / 0.25);
+  --board-glow: rgb(217 171 95 / 0.16);
+  --lamp: radial-gradient(1200px 600px at 70% -10%, color-mix(in oklab, var(--accent) 7%, transparent), transparent 70%);
+  /* textures */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.29 0 0 0 0 0.2 0 0 0 0 0.11 0 0 0 1.6 -0.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.18'/%3E%3C/svg%3E");
+  --leather-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='l'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='4' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.5 -0.55'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23l)' opacity='0.35'/%3E%3C/svg%3E");
+  /* shape, motion, type */
+  --radius-s: 8px;
+  --radius-m: 12px;
+  --radius-l: 18px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --font-display: 'Newsreader Variable', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --font-body: 'Source Sans 3 Variable', 'Source Sans Pro', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 }
 
+/* Dark: "the study at night". A neutral charcoal desk, warm paper-brown cards, the leather spine darkest. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --bg: #0c1117;
-    --bg-grain: #0f151c;
-    --surface: #131a22;
-    --surface-2: #19222c;
-    --surface-3: #212c38;
-    --ink: #e6ebf0;
-    --ink-2: #a3b0bd;
-    --ink-3: #6f7e8d;
-    --line: #243040;
-    --line-strong: #33424f;
-    --accent: #e2b25a;
-    --accent-strong: #f0c677;
-    --accent-soft: #2c2413;
-    --accent-ink: #1d1407;
-    --on-accent: #1d1407;
-    --good: #4cc18c;
-    --good-soft: #13291f;
-    --bad: #f0675c;
-    --bad-soft: #321816;
-    --warn: #e8a83d;
-    --warn-soft: #30230f;
-    --info: #6aa5ea;
-    --info-soft: #14243a;
-    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3), 0 2px 8px rgb(0 0 0 / 0.25);
-    --shadow-2: 0 2px 6px rgb(0 0 0 / 0.35), 0 16px 40px rgb(0 0 0 / 0.4);
-    --dest-dot: rgb(10 14 20 / 0.35);
+    --bg: #12100e;
+    --bg-deep: #0e0c0a;
+    --bg-grain: #0e0c0a;
+    --surface: #231d18;
+    --surface-2: #2b241e;
+    --surface-3: #362d25;
+    --surface-sunk: #1a1613;
+    --ink: #f1e8db;
+    --ink-2: #c5b7a3;
+    --ink-3: #a69885;
+    --line: #3a3028;
+    --line-strong: #54473a;
+    --field-border: #7a6a58;
+    --accent: #d7a65b;
+    --accent-strong: #ebc27f;
+    --accent-soft: #3d2e1c;
+    --accent-ink: #20160a;
+    --on-accent: #22170a;
+    --brass-hi: #f1cf8e;
+    --brass-lo: #a8762f;
+    --good: #93c48d;
+    --good-soft: #1f2c1f;
+    --on-good: #10180f;
+    --bad: #ec8f78;
+    --bad-soft: #3a211b;
+    --on-bad: #1c0d09;
+    --warn: #e8b061;
+    --warn-soft: #36291a;
+    --info: #9dbcd8;
+    --info-soft: #1c2631;
+    --mistake: #eb9a5c;
+    --leather: #0d0a08;
+    --leather-2: #17120e;
+    --leather-3: #211a14;
+    --leather-ink: #f1e8db;
+    --leather-ink-2: #c5b7a3;
+    --leather-ink-3: #958671;
+    --leather-line: rgb(241 232 219 / 0.08);
+    --leather-line-strong: rgb(241 232 219 / 0.16);
+    --leather-accent: #e2be82;
+    --leather-accent-strong: #f0d3a0;
+    --stitch: rgb(215 166 91 / 0.16);
+    --hl-top: inset 0 1px 0 rgb(255 236 210 / 0.05);
+    --shadow-1: 0 1px 1px rgb(0 0 0 / 0.35), 0 2px 8px rgb(0 0 0 / 0.25);
+    --shadow-2: 0 2px 6px rgb(0 0 0 / 0.4), 0 14px 36px rgb(0 0 0 / 0.45);
+    --shadow-3: 0 4px 10px rgb(0 0 0 / 0.45), 0 28px 64px -16px rgb(0 0 0 / 0.75);
+    --shadow-press: inset 0 1px 3px rgb(0 0 0 / 0.45);
+    --sunk: inset 0 1px 3px rgb(0 0 0 / 0.35);
+    --ring-track: #2f2720;
+    --board-shadow: 0 2px 4px rgb(0 0 0 / 0.5), 0 28px 60px -18px rgb(0 0 0 / 0.85);
+    --board-shadow-mini: 0 0 0 1px rgb(0 0 0 / 0.4), 0 2px 8px rgb(0 0 0 / 0.45);
+    --board-glow: rgb(255 214 150 / 0.075);
+    --lamp: radial-gradient(1200px 600px at 70% -10%, color-mix(in oklab, var(--accent) 6%, transparent), transparent 70%);
+    --dest-dot: rgb(20 14 8 / 0.38);
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.9 0 0 0 0 0.75 0 0 0 1.6 -0.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
   }
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #0c1117;
-  --bg-grain: #0f151c;
-  --surface: #131a22;
-  --surface-2: #19222c;
-  --surface-3: #212c38;
-  --ink: #e6ebf0;
-  --ink-2: #a3b0bd;
-  --ink-3: #6f7e8d;
-  --line: #243040;
-  --line-strong: #33424f;
-  --accent: #e2b25a;
-  --accent-strong: #f0c677;
-  --accent-soft: #2c2413;
-  --accent-ink: #1d1407;
-  --on-accent: #1d1407;
-  --good: #4cc18c;
-  --good-soft: #13291f;
-  --bad: #f0675c;
-  --bad-soft: #321816;
-  --warn: #e8a83d;
-  --warn-soft: #30230f;
-  --info: #6aa5ea;
-  --info-soft: #14243a;
-  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3), 0 2px 8px rgb(0 0 0 / 0.25);
-  --shadow-2: 0 2px 6px rgb(0 0 0 / 0.35), 0 16px 40px rgb(0 0 0 / 0.4);
-  --dest-dot: rgb(10 14 20 / 0.35);
+  --bg: #12100e;
+  --bg-deep: #0e0c0a;
+  --bg-grain: #0e0c0a;
+  --surface: #231d18;
+  --surface-2: #2b241e;
+  --surface-3: #362d25;
+  --surface-sunk: #1a1613;
+  --ink: #f1e8db;
+  --ink-2: #c5b7a3;
+  --ink-3: #a69885;
+  --line: #3a3028;
+  --line-strong: #54473a;
+  --field-border: #7a6a58;
+  --accent: #d7a65b;
+  --accent-strong: #ebc27f;
+  --accent-soft: #3d2e1c;
+  --accent-ink: #20160a;
+  --on-accent: #22170a;
+  --brass-hi: #f1cf8e;
+  --brass-lo: #a8762f;
+  --good: #93c48d;
+  --good-soft: #1f2c1f;
+  --on-good: #10180f;
+  --bad: #ec8f78;
+  --bad-soft: #3a211b;
+  --on-bad: #1c0d09;
+  --warn: #e8b061;
+  --warn-soft: #36291a;
+  --info: #9dbcd8;
+  --info-soft: #1c2631;
+  --mistake: #eb9a5c;
+  --leather: #0d0a08;
+  --leather-2: #17120e;
+  --leather-3: #211a14;
+  --leather-ink: #f1e8db;
+  --leather-ink-2: #c5b7a3;
+  --leather-ink-3: #958671;
+  --leather-line: rgb(241 232 219 / 0.08);
+  --leather-line-strong: rgb(241 232 219 / 0.16);
+  --leather-accent: #e2be82;
+  --leather-accent-strong: #f0d3a0;
+  --stitch: rgb(215 166 91 / 0.16);
+  --hl-top: inset 0 1px 0 rgb(255 236 210 / 0.05);
+  --shadow-1: 0 1px 1px rgb(0 0 0 / 0.35), 0 2px 8px rgb(0 0 0 / 0.25);
+  --shadow-2: 0 2px 6px rgb(0 0 0 / 0.4), 0 14px 36px rgb(0 0 0 / 0.45);
+  --shadow-3: 0 4px 10px rgb(0 0 0 / 0.45), 0 28px 64px -16px rgb(0 0 0 / 0.75);
+  --shadow-press: inset 0 1px 3px rgb(0 0 0 / 0.45);
+  --sunk: inset 0 1px 3px rgb(0 0 0 / 0.35);
+  --ring-track: #2f2720;
+  --board-shadow: 0 2px 4px rgb(0 0 0 / 0.5), 0 28px 60px -18px rgb(0 0 0 / 0.85);
+  --board-shadow-mini: 0 0 0 1px rgb(0 0 0 / 0.4), 0 2px 8px rgb(0 0 0 / 0.45);
+  --board-glow: rgb(255 214 150 / 0.075);
+  --lamp: radial-gradient(1200px 600px at 70% -10%, color-mix(in oklab, var(--accent) 6%, transparent), transparent 70%);
+  --dest-dot: rgb(20 14 8 / 0.38);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.9 0 0 0 0 0.75 0 0 0 1.6 -0.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+}
+
+/* Leather token re-scope: every child of the leather chrome (nav, ghost buttons, badges, bars,
+   faint text, icon buttons and focus rings) inherits the right colours without per-element patches. */
+.sidebar,
+.topbar {
+  --bg: var(--leather);
+  --surface: var(--leather-3);
+  --surface-2: var(--leather-3);
+  --surface-3: color-mix(in oklab, var(--leather-3) 85%, var(--leather-ink));
+  --surface-sunk: rgb(0 0 0 / 0.35);
+  --ink: var(--leather-ink);
+  --ink-2: var(--leather-ink-2);
+  --ink-3: var(--leather-ink-3);
+  --line: var(--leather-line);
+  --line-strong: var(--leather-line-strong);
+  --field-border: var(--leather-line-strong);
+  --accent: var(--leather-accent);
+  --accent-strong: var(--leather-accent-strong);
+  --accent-soft: rgb(226 190 130 / 0.14);
+  --accent-ink: #20160a;
+  --on-accent: #20160a;
+  --brass-hi: #f1cf8e;
+  --brass-lo: #a8762f;
+  --hl-top: inset 0 1px 0 rgb(255 240 220 / 0.05);
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --sunk: inset 0 1px 2px rgb(0 0 0 / 0.45);
+  --ring-track: rgb(0 0 0 / 0.35);
+  color: var(--ink);
+}
+
+@media (prefers-contrast: more) {
+  :root,
+  .sidebar,
+  .topbar {
+    --grain: none;
+    --leather-grain: none;
+    --lamp: none;
+    --stitch: transparent;
+    --line: var(--line-strong);
+    --board-glow: transparent;
+  }
+  :root {
+    --ink-3: var(--ink-2);
+  }
 }

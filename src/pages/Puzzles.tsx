@@ -74,7 +74,9 @@ function RatingBox({ rating, delta }: { rating: number; delta: number | null }) 
     <div className="rating-box">
       <div>
         <div className="stat-label">Puzzle rating</div>
-        <div className="stat-value num">{rating}</div>
+        <div className="stat-value num" key={rating}>
+          {rating}
+        </div>
       </div>
       {delta !== null && delta !== 0 && <span className={`delta ${delta > 0 ? 'up' : 'down'} num`}>{delta > 0 ? `+${delta}` : delta}</span>}
     </div>

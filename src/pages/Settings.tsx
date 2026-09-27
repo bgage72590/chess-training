@@ -5,6 +5,7 @@ import { Button, PageHeader, Segmented } from '../components/ui';
 import { toast } from '../lib/toast';
 import { useSyncState } from '../store/cloud';
 import { InstallCard } from '../components/InstallCard';
+import { navigate } from '../router';
 
 const THEMES: { id: BoardTheme; name: string }[] = [
   { id: 'slate', name: 'Slate' },
@@ -110,6 +111,15 @@ export function SettingsPage() {
                 { value: '200', label: 'Intense · 200 XP' },
               ]}
             />
+          </div>
+          <div className="settings-row">
+            <span>
+              <strong>Kids mode</strong>
+              <span className="muted">A playful chess course for ages 4-12</span>
+            </span>
+            <Button size="s" icon="star" aria-label="Open Kids mode" onClick={() => navigate('kids')}>
+              Open
+            </Button>
           </div>
         </section>
         <InstallCard />

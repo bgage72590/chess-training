@@ -5,11 +5,13 @@
   align-items: center;
   gap: 24px;
   flex-wrap: wrap;
-  padding: 26px 28px;
+  padding: 30px 32px;
   border-radius: var(--radius-l);
   background:
-    linear-gradient(135deg, var(--surface) 0%, var(--surface) 55%, var(--accent-soft) 100%);
+    radial-gradient(520px 260px at 100% 0%, color-mix(in oklab, var(--accent) 16%, transparent), transparent 70%),
+    var(--surface);
   border: 1px solid var(--line);
+  box-shadow: var(--hl-top), var(--shadow-2);
   position: relative;
   overflow: hidden;
 }
@@ -17,14 +19,19 @@
   /* A faint chequer in the corner: the one ornament, taken from the board itself. */
   content: '';
   position: absolute;
-  right: -30px;
-  top: -30px;
-  width: 220px;
-  height: 220px;
-  background: repeating-conic-gradient(var(--accent) 0 25%, transparent 0 50%) 0 0 / 44px 44px;
-  opacity: 0.07;
-  transform: rotate(12deg);
+  right: -10px;
+  top: -10px;
+  width: 260px;
+  height: 260px;
+  background: repeating-conic-gradient(var(--accent) 0 25%, transparent 0 50%) 0 0 / 40px 40px;
+  opacity: 0.09;
+  transform: none;
+  -webkit-mask-image: radial-gradient(circle at 100% 0%, #000 0%, transparent 70%);
+  mask-image: radial-gradient(circle at 100% 0%, #000 0%, transparent 70%);
   pointer-events: none;
+}
+.today-hero h1 {
+  font-size: clamp(2.2rem, 1.4rem + 2.2vw, 3.2rem);
 }
 .today-hero-text {
   display: flex;
@@ -37,9 +44,29 @@
 .today-stats {
   display: flex;
   align-items: center;
+  align-self: stretch;
   gap: 22px;
+  padding-left: 28px;
+  border-left: 1px solid var(--line);
   position: relative;
   z-index: 1;
+}
+.ring-value {
+  font-size: 1.6rem;
+}
+.today-stats .ring .stat-label {
+  font-size: 0.72rem;
+}
+@media (max-width: 700px) {
+  .today-hero {
+    padding: 24px 20px;
+  }
+  .today-stats {
+    width: 100%;
+    padding: 18px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
 }
 .today-mini {
   display: flex;
@@ -53,7 +80,7 @@
   font-size: 1.45rem;
 }
 .flame-icon {
-  color: var(--warn);
+  color: var(--accent);
 }
 .home-grid {
   display: grid;
@@ -71,48 +98,85 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* The plan is one ledger card with hairline rows. */
 .plan {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  box-shadow: var(--hl-top), var(--shadow-1);
+  overflow: hidden;
 }
 .plan-item {
   display: grid;
   grid-template-columns: 28px 40px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
-  padding: 14px 16px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-m);
+  position: relative;
+  padding: 14px 18px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+  transition: background 160ms var(--ease);
+}
+.plan-item:first-child {
+  border-top: 0;
+}
+.plan-item:hover {
+  background: color-mix(in oklab, var(--accent) 4%, transparent);
+}
+.plan-item.next {
+  background: linear-gradient(90deg, color-mix(in oklab, var(--accent) 8%, transparent), transparent 65%);
+}
+.plan-item.next::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
 }
 .plan-step {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  border: 1.5px solid var(--line-strong);
-  font-size: 0.8rem;
-  font-weight: 700;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  box-shadow: var(--hl-top);
+  font: italic 600 0.95rem var(--font-display);
   color: var(--ink-2);
+}
+.plan-item.next .plan-step {
+  border-color: var(--accent);
+  color: var(--accent-strong);
 }
 .plan-item.done .plan-step {
   background: var(--good);
   border-color: var(--good);
-  color: #fff;
+  color: var(--on-good);
 }
 .plan-icon {
   display: grid;
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: var(--radius-s);
-  background: var(--surface-2);
+  border-radius: 10px;
+  background: var(--surface-sunk);
+  box-shadow: var(--sunk);
   color: var(--accent-strong);
+}
+.plan-text strong {
+  font-size: 1.02rem;
 }
 .plan-text {
   display: flex;
@@ -151,8 +215,9 @@
   gap: 12px;
   text-align: left;
   cursor: pointer;
-  border-color: var(--warn);
-  background: var(--warn-soft);
+  background: color-mix(in oklab, var(--warn) 10%, var(--surface));
+  border: 1px solid color-mix(in oklab, var(--warn) 45%, var(--line));
+  border-left: 3px solid var(--warn);
   color: var(--ink);
 }
 .review-callout > .icon:first-child {
@@ -200,12 +265,39 @@
 .link-row:hover strong {
   color: var(--accent-strong);
 }
+.link-row > .icon {
+  flex: none;
+  color: var(--ink-3);
+  transition: transform 160ms var(--ease), color 160ms var(--ease);
+}
+.link-row:hover > .icon {
+  transform: translateX(2px);
+  color: var(--accent-strong);
+}
+/* Kids mode entry for grown-ups (the only .kids-* rule in the grown-up app). */
+.kids-card {
+  background:
+    radial-gradient(120% 120% at 100% 0%, color-mix(in oklab, var(--accent) 10%, transparent), transparent 60%),
+    var(--surface);
+}
+.kids-card .link-row {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.kids-card .link-row > span {
+  gap: 1px;
+}
+.kids-card .kids-card-sub {
+  font-size: 0.86rem;
+}
 .onboard {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   gap: 28px;
   padding: 32px;
   align-items: center;
+  box-shadow: var(--hl-top), var(--shadow-2);
 }
 .onboard-text {
   display: flex;
@@ -225,12 +317,9 @@
   text-align: left;
   border-radius: var(--radius-m);
   border: 1px solid var(--line-strong);
-  background: var(--surface-2);
+  background: var(--surface);
+  box-shadow: var(--hl-top), var(--shadow-1);
   cursor: pointer;
-}
-.onboard-option:hover {
-  border-color: var(--accent);
-  background: var(--accent-soft);
 }
 .onboard-option strong {
   font-family: var(--font-display);
@@ -261,11 +350,9 @@
   align-items: center;
 }
 .unit-index {
-  font-family: var(--font-display);
-  font-size: 2.2rem;
-  font-weight: 800;
+  font: italic 500 2.8rem/1 var(--font-display);
+  font-variant-numeric: lining-nums;
   color: var(--accent);
-  line-height: 1;
 }
 .unit-head-text {
   display: flex;
@@ -299,22 +386,26 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 16px;
+  padding: 18px;
   text-align: left;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-m);
+  box-shadow: var(--hl-top), var(--shadow-1);
   cursor: pointer;
-  transition: border-color 120ms, transform 120ms, box-shadow 120ms;
+  transition:
+    border-color 160ms var(--ease),
+    transform 160ms var(--ease),
+    box-shadow 160ms var(--ease);
 }
 .lesson-card:hover {
   border-color: var(--line-strong);
-  box-shadow: var(--shadow-1);
-  transform: translateY(-1px);
+  box-shadow: var(--hl-top), var(--shadow-2);
+  transform: translateY(-2px);
 }
 .lesson-card.next {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 60%, var(--line));
+  box-shadow: var(--hl-top), var(--shadow-1), 0 0 0 1px color-mix(in oklab, var(--accent) 40%, transparent);
 }
 .lesson-card .muted {
   font-size: 0.88rem;
@@ -327,9 +418,10 @@
   min-height: 22px;
 }
 .lesson-num {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   color: var(--ink-3);
   font-weight: 600;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 .lesson-state {
   display: inline-flex;
@@ -342,7 +434,11 @@
   color: var(--good);
 }
 .lesson-state.accent {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
   color: var(--accent-strong);
+  font-weight: 650;
 }
 .lesson-meta {
   display: flex;
@@ -373,7 +469,7 @@
   gap: 2px;
 }
 .lesson-title {
-  font-size: clamp(1.3rem, 1rem + 1vw, 1.75rem);
+  font-size: clamp(1.4rem, 1.05rem + 1vw, 1.85rem);
 }
 .lesson-progress {
   display: flex;
@@ -392,7 +488,7 @@
   }
 }
 .lesson-panel h2 {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
 }
 .lesson-nav {
   display: flex;
@@ -405,8 +501,9 @@
   z-index: 20;
   margin: 0 -32px -64px;
   padding: 12px 32px;
-  background: color-mix(in oklab, var(--bg) 88%, transparent);
-  backdrop-filter: blur(8px);
+  background: color-mix(in oklab, var(--bg) 86%, transparent);
+  -webkit-backdrop-filter: blur(10px) saturate(1.1);
+  backdrop-filter: blur(10px) saturate(1.1);
   border-top: 1px solid var(--line);
 }
 @media (max-width: 900px) {
@@ -415,18 +512,16 @@
     padding: 10px 16px;
   }
 }
+/* Opacity only: .step-wrap wraps the board column. */
 .step-wrap {
-  animation: pop 240ms ease;
+  animation: fade-in 200ms var(--ease);
 }
 .step-solo {
   max-width: 720px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 26px;
-}
-.step-solo .rich {
-  font-size: 1.04rem;
+  padding: 26px 28px;
 }
 .choices {
   display: flex;
@@ -438,16 +533,20 @@
   grid-template-columns: 28px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
+  min-height: 48px;
   padding: 10px 12px;
   border-radius: var(--radius-s);
   border: 1px solid var(--line-strong);
   background: var(--surface);
+  box-shadow: var(--hl-top), 0 1px 1px rgb(58 38 18 / 0.05);
   text-align: left;
   cursor: pointer;
   font-weight: 550;
+  transition: border-color 140ms var(--ease), background 140ms var(--ease);
 }
 .choice:hover:not(:disabled) {
   border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 5%, var(--surface));
 }
 .choice-letter {
   display: grid;
@@ -455,9 +554,9 @@
   width: 26px;
   height: 26px;
   border-radius: 6px;
-  background: var(--surface-3);
-  font-weight: 700;
-  font-size: 0.82rem;
+  background: var(--surface-sunk);
+  box-shadow: var(--sunk);
+  font: italic 600 0.98rem var(--font-display);
 }
 .choice.right {
   border-color: var(--good);
@@ -465,7 +564,8 @@
 }
 .choice.right .choice-letter {
   background: var(--good);
-  color: #fff;
+  color: var(--on-good);
+  box-shadow: none;
 }
 .choice.wrong {
   border-color: var(--bad);
@@ -473,7 +573,8 @@
 }
 .choice.wrong .choice-letter {
   background: var(--bad);
-  color: #fff;
+  color: var(--on-bad);
+  box-shadow: none;
 }
 .choice.dim {
   opacity: 0.55;
@@ -492,15 +593,18 @@
   display: inline-flex;
   gap: 3px;
   padding: 3px 7px;
-  border-radius: 5px;
+  border-radius: 6px;
   border: 0;
-  background: var(--surface-2);
+  background: var(--surface-sunk);
+  box-shadow: var(--sunk);
   cursor: pointer;
   font: inherit;
+  color: var(--ink);
 }
 .demo-move.cur {
-  background: var(--accent);
-  color: var(--on-accent);
+  background: linear-gradient(180deg, var(--brass-hi), var(--accent));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3);
+  color: var(--accent-ink);
 }
 .demo-move.cur .faint {
   color: inherit;
@@ -513,14 +617,20 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-radius: var(--radius-s);
-  background: var(--surface-2);
+  background: color-mix(in oklab, var(--accent) 6%, var(--surface));
+  border: 1px solid var(--line);
   border-left: 3px solid var(--accent);
+  box-shadow: var(--hl-top);
+}
+.note-card .rich,
+.note-card > p,
+.note-card > span:not(.note-move) {
+  font: 1.04rem/1.55 var(--font-display);
 }
 .note-move {
-  font-weight: 700;
-  font-size: 0.9rem;
+  font: 600 0.92rem var(--font-mono);
   color: var(--accent-strong);
 }
 .lesson-done {
@@ -532,6 +642,7 @@
   padding: 44px 24px;
   max-width: 760px;
   margin: 10px auto;
+  box-shadow: var(--hl-top), var(--shadow-2);
 }
 .lesson-done-badge {
   display: grid;
@@ -539,8 +650,10 @@
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: var(--good);
-  color: #fff;
+  /* A brass coin: rewards only. Keeps pop, it is a leaf. */
+  background: radial-gradient(circle at 35% 30%, var(--brass-hi), var(--accent) 60%, var(--brass-lo));
+  color: var(--accent-ink);
+  box-shadow: inset 0 0 0 3px rgb(255 255 255 / 0.2), var(--shadow-2);
   animation: pop 300ms ease;
 }
 .xp-chip {
@@ -549,8 +662,10 @@
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent);
   font-weight: 700;
   font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Puzzles ---------- */
@@ -560,12 +675,32 @@
   justify-content: space-between;
   gap: 10px;
 }
+.rating-box .stat-value {
+  font-size: 2.1rem;
+  animation: num-roll 260ms var(--ease);
+}
 .delta {
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: 1rem;
   padding: 2px 8px;
   border-radius: 999px;
   animation: pop 240ms ease;
+}
+.delta.up::before {
+  content: '▲';
+  content: '▲' / '';
+  font-size: 0.62em;
+  margin-right: 3px;
+  vertical-align: 0.1em;
+}
+.delta.down::before {
+  content: '▼';
+  content: '▼' / '';
+  font-size: 0.62em;
+  margin-right: 3px;
+  vertical-align: 0.1em;
 }
 .delta.up {
   background: var(--good-soft);
@@ -588,36 +723,54 @@
   gap: 6px;
   overflow-x: auto;
   padding-bottom: 4px;
+  padding-right: 32px;
   scrollbar-width: thin;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent);
 }
 .theme-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   flex: none;
-  padding: 5px 11px;
+  padding: 5px 12px;
   border-radius: 999px;
   border: 1px solid var(--line-strong);
   background: var(--surface);
+  box-shadow: var(--hl-top);
   font-size: 0.84rem;
-  font-weight: 600;
+  font-weight: 650;
   cursor: pointer;
   color: var(--ink-2);
+  transition:
+    background 140ms var(--ease),
+    color 140ms var(--ease),
+    border-color 140ms var(--ease);
+}
+.theme-chip:hover {
+  border-color: color-mix(in oklab, var(--accent) 50%, var(--line-strong));
+  color: var(--ink);
 }
 .theme-chip.on {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--bg);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  box-shadow: var(--hl-top);
 }
 .theme-chip.on .faint {
-  color: inherit;
-  opacity: 0.7;
+  color: var(--accent-strong);
+  opacity: 0.8;
+}
+@media (pointer: coarse) {
+  .theme-chip {
+    min-height: 34px;
+  }
 }
 .rush-intro {
   display: flex;
   padding: 32px;
   background:
-    repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface) 0 50%) 100% 0 / 36px 36px no-repeat,
+    repeating-conic-gradient(color-mix(in oklab, var(--accent) 10%, transparent) 0 25%, transparent 0 50%) 100% 0 / 36px 36px no-repeat,
     var(--surface);
 }
 .rush-intro-text {
@@ -642,16 +795,16 @@
 .strike {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 1.5px dashed var(--line-strong);
+  border: 1.5px solid var(--line-strong);
   color: transparent;
 }
 .strike.on {
   border: 0;
   background: var(--bad);
-  color: #fff;
+  color: var(--on-bad);
 }
 
 /* ---------- Openings ---------- */
@@ -661,8 +814,9 @@
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
-  border-color: var(--warn);
-  background: var(--warn-soft);
+  background: color-mix(in oklab, var(--warn) 10%, var(--surface));
+  border: 1px solid color-mix(in oklab, var(--warn) 45%, var(--line));
+  border-left: 3px solid var(--warn);
 }
 .opening-card {
   display: grid;
@@ -673,12 +827,8 @@
   align-items: start;
   color: var(--ink);
 }
-.opening-card:hover {
-  border-color: var(--line-strong);
-  box-shadow: var(--shadow-1);
-}
 .opening-card-board .board {
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.1);
+  box-shadow: var(--board-shadow-mini);
 }
 .opening-card-body {
   display: flex;
@@ -758,6 +908,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 2px 8px;
+  font-family: var(--font-mono);
+  font-weight: 400;
   font-size: 0.86rem;
   line-height: 1.8;
 }
@@ -771,7 +923,11 @@
 }
 .lm.cur {
   color: var(--accent-strong);
-  font-weight: 700;
+  font-weight: 600;
+  background: var(--accent-soft);
+  border-radius: 4px;
+  padding: 0 4px;
+  margin: 0 -4px;
 }
 
 /* ---------- Endgames ---------- */
@@ -784,15 +940,11 @@
   padding: 12px;
   color: var(--ink);
 }
-.drill-card:hover {
-  border-color: var(--line-strong);
-  box-shadow: var(--shadow-1);
-}
 .drill-board {
   position: relative;
 }
 .drill-board .board {
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.1);
+  box-shadow: var(--board-shadow-mini);
 }
 .drill-done {
   position: absolute;
@@ -805,7 +957,7 @@
   height: 26px;
   border-radius: 50%;
   background: var(--good);
-  color: #fff;
+  color: var(--on-good);
   box-shadow: var(--shadow-1);
 }
 .drill-card-body {
@@ -850,20 +1002,19 @@
   border-radius: var(--radius-m);
   border: 1px solid var(--line);
   background: var(--surface);
+  box-shadow: var(--hl-top), var(--shadow-1);
   cursor: pointer;
 }
-.level-card:hover {
-  border-color: var(--line-strong);
-}
-.level-card.on {
+.level-card.on,
+.level-card.on:hover,
+.swatch.on {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent), var(--shadow-1);
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface));
 }
 .level-n {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 1.3rem;
+  font: italic 600 1.5rem var(--font-display);
+  font-variant-numeric: lining-nums;
   color: var(--accent-strong);
   grid-row: span 2;
   align-self: center;
@@ -875,6 +1026,7 @@
 .level-elo {
   font-size: 0.78rem;
   color: var(--ink-3);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 .level-blurb {
   grid-column: 2 / -1;
@@ -908,8 +1060,8 @@
   height: 16px;
   margin-top: 2px;
   border-radius: 50%;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--accent);
   animation: spin 800ms linear infinite;
   flex: none;
 }
@@ -936,9 +1088,14 @@
   padding: 10px 12px;
   border-radius: var(--radius-s);
   background: var(--surface-2);
+  border: 1px solid var(--line);
 }
 .acc.me {
+  background: var(--accent-soft);
   box-shadow: inset 0 0 0 1px var(--accent);
+}
+.acc .stat-value {
+  font-size: 1.6rem;
 }
 .acc .stat-label {
   display: flex;
@@ -958,6 +1115,7 @@
   padding: 12px 14px;
   border-radius: var(--radius-s);
   background: var(--surface-2);
+  border: 1px solid var(--line);
 }
 .verdict-head {
   display: flex;
@@ -984,9 +1142,6 @@
   text-align: left;
   font-size: 0.88rem;
 }
-.moment:hover {
-  border-color: var(--accent);
-}
 .moment .faint {
   text-align: right;
 }
@@ -1004,9 +1159,6 @@
   cursor: pointer;
   padding: 14px 16px;
   color: var(--ink);
-}
-.game-row:hover {
-  border-color: var(--line-strong);
 }
 .game-row .pill {
   justify-content: center;
@@ -1026,7 +1178,7 @@
   align-items: flex-end;
 }
 .game-row-acc .stat-value {
-  font-size: 1.25rem;
+  font-size: 1.3rem;
 }
 
 /* ---------- Vision ---------- */
@@ -1034,10 +1186,8 @@
   display: grid;
   place-items: center;
   height: 64px;
-  font-family: var(--font-display);
-  font-size: 2.6rem;
-  font-weight: 800;
-  line-height: 1;
+  font: italic 600 3rem/1 var(--font-display);
+  font-variant-numeric: lining-nums;
 }
 .coord-prompt .faint {
   font-family: var(--font-body);
@@ -1051,16 +1201,21 @@
 }
 .name-option {
   padding: 14px;
-  font-size: 1.4rem;
-  font-weight: 700;
+  font: 600 1.4rem var(--font-display);
+  font-variant-numeric: lining-nums;
   border-radius: var(--radius-m);
   border: 1px solid var(--line-strong);
   background: var(--surface);
+  box-shadow: var(--hl-top), var(--shadow-1);
+  color: var(--ink);
   cursor: pointer;
+  transition: border-color 160ms var(--ease), background 160ms var(--ease), box-shadow 160ms var(--ease);
 }
-.name-option:hover {
+.name-option:hover,
+.name-option.on {
   border-color: var(--accent);
   background: var(--accent-soft);
+  box-shadow: var(--hl-top), var(--shadow-2);
 }
 .found-list {
   display: flex;
@@ -1077,16 +1232,14 @@
   cursor: pointer;
   color: var(--ink);
 }
-.hub-card:hover {
-  border-color: var(--accent);
-}
 .hub-icon {
   display: grid;
   place-items: center;
   width: 48px;
   height: 48px;
-  border-radius: var(--radius-m);
-  background: var(--accent-soft);
+  border-radius: 10px;
+  background: var(--surface-sunk);
+  box-shadow: var(--sunk);
   color: var(--accent-strong);
 }
 .hub-text {
@@ -1099,19 +1252,29 @@
 }
 
 /* ---------- Progress ---------- */
+/* One strip of tiles with hairline dividers; the outer edges are clipped by overflow. */
 .tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr));
-  gap: 10px;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  box-shadow: var(--hl-top), var(--shadow-1);
+  overflow: hidden;
 }
 .tile {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 14px 16px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-m);
+  padding: 16px 18px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: 1px 0 0 var(--line), 0 1px 0 var(--line);
+}
+.tile .stat-value {
+  font-size: 1.9rem;
 }
 .progress-grid {
   display: grid;
@@ -1148,9 +1311,10 @@
   padding: 5px 9px;
   border-radius: var(--radius-s);
   background: var(--surface);
-  border: 1px solid var(--line-strong);
-  box-shadow: var(--shadow-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-3);
   font-size: 0.78rem;
+  font-variant-numeric: tabular-nums lining-nums;
   pointer-events: none;
   white-space: nowrap;
 }
@@ -1225,16 +1389,18 @@
   font-weight: 600;
 }
 .theme-bar-track {
-  height: 10px;
+  height: 6px;
   border-radius: 999px;
-  background: var(--surface-3);
+  background: var(--surface-sunk);
+  box-shadow: var(--sunk);
   overflow: hidden;
 }
 .theme-bar-fill {
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: var(--accent);
+  background: linear-gradient(90deg, var(--brass-lo), var(--accent) 40%, var(--brass-hi));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3);
 }
 .theme-bar-val {
   text-align: right;
@@ -1252,7 +1418,7 @@
   align-items: center;
   padding: 12px 14px;
   border-radius: var(--radius-m);
-  border: 1px dashed var(--line-strong);
+  border: 1px dashed color-mix(in oklab, var(--line-strong) 70%, transparent);
   color: var(--ink-3);
 }
 .achievement > span:last-child {
@@ -1269,17 +1435,21 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: var(--surface-3);
+  background: var(--surface-sunk);
+  box-shadow: var(--sunk);
 }
 .achievement.on {
   border-style: solid;
   border-color: var(--line);
   background: var(--surface);
+  box-shadow: var(--hl-top), var(--shadow-1);
   color: var(--ink);
 }
 .achievement.on .achievement-icon {
-  background: var(--accent);
-  color: var(--on-accent);
+  /* A brass coin: rewards only. */
+  background: radial-gradient(circle at 35% 30%, var(--brass-hi), var(--accent) 60%, var(--brass-lo));
+  color: var(--accent-ink);
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.2), 0 1px 2px rgb(0 0 0 / 0.25);
 }
 
 /* ---------- Settings ---------- */
@@ -1293,6 +1463,28 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+.settings-section h2 {
+  font-size: 1.3rem;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.settings-row > span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.settings-row .muted {
+  font-size: 0.88rem;
 }
 .theme-swatches {
   display: flex;
@@ -1308,32 +1500,50 @@
   border-radius: var(--radius-s);
   border: 1px solid var(--line);
   background: var(--surface);
+  box-shadow: var(--hl-top);
   cursor: pointer;
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 650;
+  color: var(--ink-2);
+  transition: border-color 140ms var(--ease), box-shadow 140ms var(--ease);
+}
+.swatch:hover:not(.on) {
+  border-color: color-mix(in oklab, var(--accent) 45%, var(--line-strong));
 }
 .swatch.on {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  color: var(--accent-strong);
 }
 .swatch-squares {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
   border-radius: 4px;
   overflow: hidden;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.18), 0 4px 10px -6px rgb(0 0 0 / 0.5);
 }
 .settings-preview {
-  max-width: 260px;
+  max-width: 300px;
 }
+/* The field skin comes from the shared inputs recipe in app.css. */
 .import-box {
   width: 100%;
   resize: vertical;
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   padding: 8px;
-  border-radius: var(--radius-s);
-  border: 1px solid var(--line-strong);
-  background: var(--surface-2);
-  color: var(--ink);
+}
+
+/* ---------- Reduced motion (page specifics; last so they win the cascade) ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .choice.wrong {
+    animation: none;
+  }
+  .step-wrap,
+  .rating-box .stat-value {
+    animation: none;
+  }
+  .lesson-card:hover {
+    transform: none;
+  }
 }
