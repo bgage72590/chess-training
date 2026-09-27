@@ -44,6 +44,8 @@ export interface BoardProps {
   /** Override the learner's board theme / piece set (e.g. a Kids mode look). */
   boardTheme?: BoardTheme;
   pieceSet?: PieceSet;
+  /** Force auto-queen (true) or the promotion picker (false); defaults to the learner's setting. */
+  autoQueen?: boolean;
 }
 
 const ARROW_VAR: Record<MarkColor, string> = {
@@ -70,6 +72,7 @@ export function Board({
   squareContent,
   boardTheme,
   pieceSet,
+  autoQueen,
 }: BoardProps) {
   const settings = useSettings();
   const showCoords = coordinates ?? settings.coordinates;
@@ -154,7 +157,7 @@ export function Board({
     const opts = dests.get(from)?.filter((d) => d.to === to) ?? [];
     if (!opts.length) return false;
     if (opts[0].promotion) {
-      if (settings.autoQueen) finishMove(from, to, 'q');
+      if (autoQueen ?? settings.autoQueen) finishMove(from, to, 'q');
       else setPromo({ from, to });
       return true;
     }

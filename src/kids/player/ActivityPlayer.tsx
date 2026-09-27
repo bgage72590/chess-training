@@ -1,0 +1,704 @@
+// The activity player: runs a node (or a warm-up, placement checkpoint or playground set) item by
+// item. It owns the intro ("Watch Pip"), the Piece Parade, Pip's voice, the hint ladder, scoring,
+// "Easier one?" / "Skip this one" / "Super Star?", the ease ladder offers, session breaks and results.
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import type { ActivityDef, AgeBand, BandText, HintStep, ItemMeta, ItemResult, LevelSet, PlayerApi, PlayMode, TrayButton } from '../activities/types';
+import { bandText } from '../activities/types';
+import { resolveItem } from '../curriculum/tuning';
+import { NODE_BY_ID, WORLDS } from '../curriculum/worlds';
+import { stickerDef, TROPHY_BY_ID } from '../curriculum/stickers';
+import { ACTIVITIES, REGISTRY } from '../packs';
+import { awardTo, getKid, updateKid, updateKids, type KidProfile } from '../store/kidsStore';
+import { acceptEase, acceptFastTrack, fastTrackOffer, addFamilyStars, bossOffers, nextNode, nodeScore, recordRun, recordWarmup, skipNode, activeNodes, type RunOutcome } from '../store/progress';
+import { hashSeed, mulberry32 } from '../lib/rng';
+import { kidSound, type KidSound } from '../lib/kidsSound';
+import { toast } from '../../lib/toast';
+import { engine } from '../../engine/engine';
+import { RunPicker, type RunItem } from './run';
+import { lineId, speech } from './speech';
+import { sessionOver } from './useSession';
+import { useKidCtx } from './context';
+import { Intro, PiecePick } from './Intro';
+import { Results } from './Results';
+import { TopBar } from '../ui/TopBar';
+import { Coach } from '../ui/Coach';
+import { Tray } from '../ui/Tray';
+import { BigButton } from '../ui/BigButton';
+import { Confetti } from '../ui/Confetti';
+import { KidsIcon } from '../ui/KidsIcon';
+import type { PipState } from '../ui/ProgressPips';
+import type { PipMood } from '../ui/Pip';
+import { BreakTime } from '../screens/BreakTime';
+import { go } from '../routes';
+
+export interface PlanItem {
+  setId: string;
+  nodeId?: string;
+  run: RunItem;
+}
+
+export interface ActivityPlayerProps {
+  mode: PlayMode;
+  kid: KidProfile;
+  /** node / playground / placement: the level set to run. */
+  set?: LevelSet;
+  nodeId?: string;
+  /** warm-up: one item from each due node. */
+  plan?: PlanItem[];
+  title: string;
+  opponent?: PlayerApi['opponent'];
+  /** placement: called with the item results when the checkpoint is decided. */
+  onPlacementDone?(results: ItemResult[]): void;
+  /** Where X / Map go (defaults to the map). */
+  onExit?(): void;
+  /** warm-up: continue after the results. */
+  onContinue?(): void;
+  /** node: play again (the parent remounts the player). */
+  onAgain?(): void;
+  /** Placement: a small path of dots per world is drawn by the parent. */
+  header?: ReactNode;
+}
+
+type Current = { run: RunItem; act: ActivityDef<unknown>; item: ItemMeta & Record<string, unknown>; key: string; superStar: boolean; nodeId?: string };
+
+const LOWER: Record<AgeBand, AgeBand | null> = { sprout: null, explorer: 'sprout', champion: 'explorer' };
+const DEFAULT_SAY: Record<string, BandText> = {
+  stars: { all: 'Collect every star!', sprout: 'Get the stars!' },
+  'find-move': { all: 'Find the move!' },
+};
+const FALLBACK_HINT: BandText[] = ['', 'Try this piece!', 'Follow the arrow!', 'Watch me!'];
+
+export function ActivityPlayer(props: ActivityPlayerProps) {
+  const { mode, kid } = props;
+  const { band, tuning } = useKidCtx();
+  const node = props.nodeId ? NODE_BY_ID.get(props.nodeId) : undefined;
+  const np = props.nodeId ? kid.nodes[props.nodeId] : undefined;
+  const set = props.set;
+  const act = set ? ACTIVITIES.get(set.activity) : undefined;
+  const isGame = !!act?.game;
+
+  // ---------- run setup ----------
+  const rngRef = useRef(mulberry32(hashSeed(kid.id, props.nodeId ?? set?.id ?? mode, np?.plays ?? 0, Date.now() % 997)));
+  const picker = useMemo(
+    () =>
+      set && mode !== 'warmup'
+        ? new RunPicker(set, band, {
+            itemsPerRun: tuning.itemsPerRun,
+            startTier: band === 'explorer' && kid.start !== 'new' ? 2 : tuning.startTier,
+            rng: rngRef.current,
+            lastItems: np?.lastItems,
+            game: isGame,
+            won: np?.won,
+          })
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const total = mode === 'warmup' ? props.plan?.length ?? 0 : picker?.total ?? 0;
+  const introSteps = useMemo(() => (mode === 'node' && set?.intro && (np?.plays ?? 0) === 0 ? set.intro : []), [mode, set, np?.plays]);
+  const watchSteps = introSteps.filter((s) => !s.pick);
+  const pickStep = introSteps.find((s) => s.pick);
+
+  const [phase, setPhase] = useState<'intro' | 'item' | 'parade' | 'results' | 'break' | 'empty'>(watchSteps.length ? 'intro' : 'item');
+  const [current, setCurrent] = useState<Current | null>(null);
+  const [pips, setPips] = useState<PipState[]>(() => Array.from({ length: total }, (_, i) => (i === 0 ? 'current' : 'todo')));
+  const results = useRef<ItemResult[]>([]);
+  const itemIds = useRef<string[]>([]);
+  const braveTry = useRef(false);
+  const perfectStreak = useRef(0);
+  const warmIdx = useRef(0);
+  const paradeDone = useRef(!pickStep);
+  const [outcome, setOutcome] = useState<(RunOutcome & { playgroundScore?: number }) | null>(null);
+  const [offer, setOffer] = useState<'easier' | 'super' | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [confetti, setConfetti] = useState(0);
+  const pendingAfterBreak = useRef<(() => void) | null>(null);
+
+  // ---------- coach / voice ----------
+  const [coach, setCoach] = useState<{ text: string; token?: number }>({ text: '' });
+  const [mood, setMood] = useState<PipMood>('idle');
+  const moodTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const setMoodFor = (m: PipMood, ms = 1400) => {
+    setMood(m);
+    if (moodTimer.current) clearTimeout(moodTimer.current);
+    moodTimer.current = setTimeout(() => setMood('idle'), ms);
+  };
+  const rate = kid.settings.rate ?? tuning.speechRate;
+
+  const say = useCallback(
+    (text: BandText | BandText[], m?: PipMood, force = false) => {
+      const lines = (Array.isArray(text) ? text : [text]).map((t) => bandText(t, band)).filter(Boolean);
+      const caption = lines.join(' ');
+      if (!caption) return;
+      const voice = kid.settings.voice;
+      const id = lineId(caption);
+      const k = getKid(kid.id);
+      const speakIt = force || voice === 'auto' || (voice === 'first' && !k?.firsts.includes(id));
+      let token: number | undefined;
+      if (speakIt) {
+        token = speech.speak(lines, { rate, pitch: tuning.pitch });
+        if (voice === 'first' && !force && !k?.firsts.includes(id)) updateKid(kid.id, (d) => void d.firsts.push(id));
+      } else speech.cancel();
+      setCoach({ text: caption, token });
+      if (m) setMoodFor(m, m === 'cheer' ? 1200 : 1800);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [band, kid.id, kid.settings.voice, rate, tuning.pitch],
+  );
+
+  // ---------- per-item state ----------
+  const [hintLevel, setHintLevel] = useState<0 | 1 | 2 | 3 | 4>(0);
+  const [hintSteps, setHintSteps] = useState<HintStep[]>([]);
+  const [pulse, setPulse] = useState(false);
+  const [tray, setTray] = useState<TrayButton[] | null>(null);
+  const [chip, setChip] = useState<{ done: number; total: number } | null>(null);
+  const [par, setPar] = useState<{ used: number; par: number } | null>(null);
+  const itemMistakes = useRef(0);
+  const easierOffered = useRef(false);
+  const pops = useRef(0);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const itemLive = phase === 'item' && !!current && !offer;
+
+  const hintShift = kid.settings.hints === 'generous' ? -1 : kid.settings.hints === 'few' ? 1 : 0;
+  const hintAfter = Math.max(1, tuning.hintAfterWrong + hintShift);
+
+  const hintStep = (level: number): HintStep | null => {
+    if (!level) return null;
+    const s = hintSteps[level - 1] ?? {};
+    const fallbackSay = level === 1 ? current?.item.rule : FALLBACK_HINT[level - 1];
+    return { ...s, say: s.say ?? fallbackSay };
+  };
+
+  const advanceHint = useCallback(() => {
+    setPulse(false);
+    if (hintLevel >= 4) return;
+    const next = (hintLevel + 1) as 1 | 2 | 3 | 4;
+    setHintLevel(next);
+    const line = hintSteps[next - 1]?.say ?? (next === 1 ? current?.item.rule : FALLBACK_HINT[next - 1]);
+    kidSound('sparkle');
+    if (line) say(line, next === 4 ? 'talk' : 'think');
+  }, [hintLevel, hintSteps, current, say]);
+
+  // Idle: step up the ladder (Sprout/Explorer) or pulse the bulb (Champion).
+  const resetIdle = useCallback(() => {
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    if (!itemLive || hintLevel >= 4) return;
+    const sec = tuning.hintOfferOnly ? tuning.bulbPulseSec : tuning.hintAfterIdleSec;
+    if (!sec) return;
+    idleTimer.current = setTimeout(() => (tuning.hintOfferOnly ? setPulse(true) : advanceHint()), sec * 1000);
+  }, [itemLive, hintLevel, tuning, advanceHint]);
+  useEffect(() => {
+    resetIdle();
+    return () => {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+    };
+  }, [resetIdle]);
+
+  // ---------- items ----------
+  const pipSet = (i: number, s: PipState) => setPips((p) => p.map((x, j) => (j === i ? s : j === i + 1 && s !== 'current' && x === 'todo' ? 'current' : x)));
+
+  const beginItem = useCallback(
+    (run: RunItem, opts: { superStar?: boolean; lowerBand?: AgeBand; setId?: string; nodeId?: string } = {}) => {
+      const a = ACTIVITIES.get(opts.setId ? REGISTRY.LEVEL_SETS.get(opts.setId)?.activity ?? '' : set?.activity ?? '');
+      if (!a) return;
+      const ease = isGame ? np?.ease ?? 0 : 0;
+      let item = resolveItem(run.item, band, { super: opts.superStar, ease: Math.min(ease, run.item.ease?.length ?? 0) });
+      if (opts.lowerBand) item = { ...item, ...(run.item.tune?.[opts.lowerBand] ?? {}) };
+      itemMistakes.current = 0;
+      easierOffered.current = false;
+      pops.current = 0;
+      setHintLevel(0);
+      setHintSteps([]);
+      setPulse(false);
+      setTray(null);
+      setChip(null);
+      setPar(null);
+      setCurrent({ run, act: a, item, key: `${run.id}-${Date.now()}`, superStar: !!opts.superStar, nodeId: opts.nodeId });
+      setPhase('item');
+      say(item.say ?? DEFAULT_SAY[a.id] ?? 'Your turn!', 'idle');
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [band, set, isGame, np?.ease, say],
+  );
+
+  const nextItem = useCallback(() => {
+    if (sessionOver(getKid(kid.id)) && results.current.length > 0 && mode !== 'placement') {
+      pendingAfterBreak.current = () => nextItem();
+      setPhase('break');
+      return;
+    }
+    if (mode === 'warmup') {
+      const p = props.plan?.[warmIdx.current++];
+      if (!p) return finishRun();
+      return beginItem(p.run, { setId: p.setId, nodeId: p.nodeId });
+    }
+    const r = picker?.next();
+    if (!r) return finishRun();
+    beginItem(r);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beginItem, picker, mode]);
+
+  // Start (after the intro).
+  const started = useRef(false);
+  useEffect(() => {
+    if (phase === 'item' && !started.current) {
+      started.current = true;
+      if (!total) setPhase('empty');
+      else nextItem();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  const onDone = useCallback(
+    (r: ItemResult) => {
+      if (!current) return;
+      const i = results.current.length;
+      const res: ItemResult = { ...r, golden: r.golden || (current.superStar && r.score === 3) };
+      results.current.push(res);
+      itemIds.current.push(current.run.id);
+      if (itemMistakes.current >= 3) braveTry.current = true;
+      pipSet(i, 'done');
+      picker?.report(res.score);
+      perfectStreak.current = res.score === 3 && res.mistakes === 0 ? perfectStreak.current + 1 : 0;
+      setOffer(null);
+      setTray(null);
+      if (current.superStar && res.score === 3) {
+        kidSound('sparkle');
+        say({ all: 'A golden star! Super!', champion: 'Golden star.' }, 'cheer');
+      }
+      if (mode === 'warmup' && current.nodeId) {
+        const nid = current.nodeId;
+        updateKid(kid.id, (d) => recordWarmup(d, nid, res.score, current.run.id));
+      }
+      if (mode === 'placement') {
+        const pass = results.current.filter((x) => x.score >= 2 && x.hintLevel <= 1).length;
+        const miss = results.current.length - pass;
+        if (pass >= 2 || miss >= 2 || results.current.length >= total) {
+          props.onPlacementDone?.(results.current);
+          return;
+        }
+      }
+      // Piece Parade after the first item.
+      if (!paradeDone.current && pickStep) {
+        paradeDone.current = true;
+        setPhase('parade');
+        return;
+      }
+      // Super Star offer after 3 perfect items in a row.
+      if (mode === 'node' && perfectStreak.current >= 3 && picker && picker.count < picker.total && picker.superItem()) {
+        perfectStreak.current = 0;
+        setOffer('super');
+        say({ all: 'Wow, three perfect in a row! Want to try a Super Star?', champion: 'Three perfect. Try a harder one?' }, 'wow');
+        return;
+      }
+      nextItem();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [current, picker, mode, nextItem, say, total, pickStep],
+  );
+
+  const skipItem = () => {
+    if (!current) return;
+    const i = results.current.length;
+    onDone({ score: 1, mistakes: itemMistakes.current, hintLevel });
+    pipSet(i, 'skipped');
+  };
+
+  const easier = () => {
+    if (!current) return;
+    setOffer(null);
+    const e = picker?.easier(current.run);
+    if (e) return beginItem(e);
+    const lower = LOWER[band];
+    if (lower && current.run.item.tune?.[lower]) return beginItem(current.run, { lowerBand: lower });
+  };
+  const canEasier = !!current && ((picker && current.run.tier > 1) || (LOWER[band] && !!current.run.item.tune?.[LOWER[band]!]));
+
+  // ---------- finishing ----------
+  function finishRun() {
+    if (mode === 'node' && props.nodeId) {
+      let out: RunOutcome | null = null;
+      updateKids((s) => {
+        const d = s.kids.find((x) => x.id === kid.id)!;
+        out = recordRun(d, { nodeId: props.nodeId!, results: results.current, itemIds: itemIds.current, game: isGame, braveTry: braveTry.current }, REGISTRY);
+        addFamilyStars(s, out.gained);
+      });
+      const o = out as RunOutcome | null;
+      if (o?.bossPassedNow) setConfetti(Date.now());
+      setOutcome(o);
+    } else if (mode === 'playground') {
+      const score = nodeScore(results.current.map((r) => r.score));
+      if (props.opponent?.kind === 'friend') {
+        awardTo(kid.id, 'st-friend-game');
+        if (props.opponent.kidId) awardTo(props.opponent.kidId, 'st-friend-game');
+      }
+      setOutcome({ score, golden: false, starsBefore: 0, starsAfter: score, gained: 0, firstCompletion: false, bossPassedNow: false, worldOpened: null, stickers: [], trophies: [], hats: [], crown: null, crownNew: false, easeAuto: false, gardenFlower: false, playgroundScore: score });
+    } else if (mode === 'warmup') {
+      setOutcome({ score: nodeScore(results.current.map((r) => r.score)), golden: false, starsBefore: 0, starsAfter: 0, gained: 0, firstCompletion: false, bossPassedNow: false, worldOpened: null, stickers: [], trophies: [], hats: [], crown: null, crownNew: false, easeAuto: false, gardenFlower: false });
+    }
+    if (sessionOver(getKid(kid.id)) && mode !== 'placement') {
+      pendingAfterBreak.current = () => setPhase('results');
+      setPhase('break');
+    } else setPhase('results');
+  }
+
+  // ---------- the API activities see ----------
+  const player: PlayerApi = {
+    band,
+    tuning,
+    kid,
+    mode,
+    say: (t, m) => say(t, m),
+    mistake: (text) => {
+      itemMistakes.current += 1;
+      kidSound('boop');
+      setMoodFor('oops', 1600);
+      const n = itemMistakes.current;
+      let hintLine: BandText | undefined;
+      if (!tuning.hintOfferOnly && n >= hintAfter && hintLevel < 4) {
+        const next = (hintLevel + 1) as 1 | 2 | 3 | 4;
+        setHintLevel(next);
+        hintLine = hintSteps[next - 1]?.say ?? (next === 1 ? current?.item.rule : FALLBACK_HINT[next - 1]);
+        kidSound('sparkle');
+      }
+      if (tuning.hintOfferOnly && n >= 3) setPulse(true);
+      say([text ?? "Hmm, let's try another way!", ...(hintLine ? [hintLine] : [])], 'oops');
+      if (n >= 3 && !easierOffered.current && mode !== 'placement' && !isGame) {
+        easierOffered.current = true;
+        setTimeout(() => setOffer('easier'), 900);
+      }
+      resetIdle();
+    },
+    setHints: (steps) => setHintSteps(steps),
+    get hint() {
+      return hintStep(hintLevel);
+    },
+    get hintLevel() {
+      return hintLevel;
+    },
+    progress: (done, tot) => setChip({ done, total: tot }),
+    par: (used, p) => setPar(band === 'sprout' ? null : { used, par: p }),
+    celebrate: (kind) => {
+      if (kind === 'big') setConfetti(Date.now());
+      if (kind === 'promotion') {
+        kidSound('sparkle');
+        setMoodFor('wow', 1600);
+      } else setMoodFor('cheer', kind === 'small' ? 1100 : 1800);
+    },
+    sound: (name: KidSound) => {
+      if (name === 'pop') kidSound('pop', pops.current++);
+      else kidSound(name);
+    },
+    award: (id) => {
+      // Placement ("Show Pip what you know") grants nothing, so everything can still be earned.
+      if (mode === 'placement') return;
+      if (awardTo(kid.id, id)) {
+        const def = stickerDef(id);
+        const tr = TROPHY_BY_ID.get(id);
+        kidSound('chime');
+        toast({ title: def ? `New sticker: ${def.title}!` : `New trophy: ${tr?.title ?? id}!`, icon: 'star', tone: 'accent' }, 2500);
+      }
+    },
+    setTray: (b) => setTray(b),
+    rng: () => rngRef.current(),
+    best: (key, value, better) => {
+      const cur = getKid(kid.id)?.bests[key];
+      const improved = cur == null || (better === 'higher' ? value > cur : value < cur);
+      if (improved) updateKid(kid.id, (d) => void (d.bests[key] = value));
+      return improved;
+    },
+    puzzle: {
+      rating: kid.puzzle.rating,
+      isSeen: (id) => !!getKid(kid.id)?.puzzle.seen.includes(id),
+      report: (id, rating, ok) =>
+        updateKid(kid.id, (d) => {
+          const k = d.puzzle.attempts < 20 ? 40 : 24;
+          const expect = 1 / (1 + Math.pow(10, (rating - d.puzzle.rating) / 400));
+          d.puzzle.rating = Math.max(500, Math.round(d.puzzle.rating + k * ((ok ? 1 : 0) - expect)));
+          d.puzzle.attempts += 1;
+          d.puzzle.seen = [...d.puzzle.seen.filter((x) => x !== id), id].slice(-300);
+          d.puzzle.streak = ok ? d.puzzle.streak + 1 : 0;
+          d.puzzle.bestStreak = Math.max(d.puzzle.bestStreak, d.puzzle.streak);
+        }),
+    },
+    engineReady: () => engine.status === 'ready',
+    opponent: props.opponent,
+  };
+
+  // ---------- leaving ----------
+  const exit = () => {
+    speech.cancel();
+    if (props.onExit) props.onExit();
+    else go.map();
+  };
+  const onX = () => (itemLive && results.current.length < total ? setConfirmLeave(true) : exit());
+
+  // ---------- results ----------
+  const renderResults = () => {
+    if (!outcome) return null;
+    const k = getKid(kid.id) ?? kid;
+    if (mode === 'warmup')
+      return (
+        <Results
+          band={band}
+          title="Warm-up done!"
+          stars={0}
+          recap={band === 'champion' ? 'Warm-up complete. On to new things.' : 'Your brain is all warmed up!'}
+          stickers={[]}
+          trophies={[]}
+          hats={[]}
+          onNext={props.onContinue}
+          nextLabel="Let's play!"
+          onMap={exit}
+          onSpeak={(t) => say(t)}
+        />
+      );
+    if (mode === 'playground')
+      return (
+        <Results
+          band={band}
+          title={props.title}
+          stars={outcome.score}
+          recap="Great hunting!"
+          stickers={[]}
+          trophies={[]}
+          hats={[]}
+          onAgain={props.onAgain}
+          onMap={() => go.playground()}
+          mapLabel="Playground"
+          onSpeak={(t) => say(t)}
+        />
+      );
+    const offers = node ? bossOffers(k, node) : { practice: false, skip: false, easeOffer: false };
+    const nextN = nextNode(k, REGISTRY);
+    const opened = outcome.worldOpened ? WORLDS.find((w) => w.id === outcome.worldOpened) : null;
+    const lowest = node && offers.practice ? activeNodes(node.world, k.band, REGISTRY).filter((n) => !n.boss && !n.bonus).sort((a, b) => (k.nodes[a.id]?.stars ?? 0) - (k.nodes[b.id]?.stars ?? 0))[0] : undefined;
+    const recap = recapFor(outcome, node?.title ?? '', band, isGame);
+    const fast = node ? fastTrackOffer(k, node.id, REGISTRY) : null;
+    return (
+      <Results
+        band={band}
+        title={node?.title ?? props.title}
+        stars={outcome.score}
+        golden={outcome.golden}
+        recap={recap}
+        stickers={outcome.stickers.filter((s) => !s.startsWith('st-garden'))}
+        trophies={outcome.trophies}
+        hats={outcome.hats}
+        bossPassed={outcome.bossPassedNow}
+        openedRank={opened ? { rank: opened.rank, title: opened.title } : null}
+        crown={outcome.crown}
+        onSpeak={(t) => say(t)}
+        extra={
+          (offers.practice || offers.skip || offers.easeOffer || fast) && (
+            <div className="k-results-offers">
+              {fast && (
+                <>
+                  <p className="k-results-fast">Wow, no mistakes! Want to try the boss now?</p>
+                  <BigButton
+                    variant="boss"
+                    icon="castle"
+                    onClick={() => {
+                      updateKid(kid.id, (d) => acceptFastTrack(d, fast.id));
+                      go.play(fast.id);
+                    }}
+                  >
+                    Try the boss!
+                  </BigButton>
+                </>
+              )}
+              {offers.easeOffer && (
+                <BigButton variant="magic" icon="cloud" onClick={() => (updateKid(kid.id, (d) => acceptEase(d, node!.id)), props.onAgain?.())}>
+                  Play sleepier?
+                </BigButton>
+              )}
+              {lowest && (
+                <BigButton variant="info" icon="again" onClick={() => go.play(lowest.id)}>
+                  Practice first
+                </BigButton>
+              )}
+              {offers.skip && (
+                <BigButton
+                  variant="plain"
+                  icon="leaf"
+                  onClick={() => {
+                    updateKid(kid.id, (d) => skipNode(d, node!.id));
+                    say("We'll come back to this one later!");
+                    go.map();
+                  }}
+                >
+                  Skip for now
+                </BigButton>
+              )}
+            </div>
+          )
+        }
+        onNext={
+          nextN && nextN.id !== node?.id
+            ? () => (nextN.world !== node?.world || outcome.worldOpened ? go.map() : go.play(nextN.id))
+            : undefined
+        }
+        onAgain={props.onAgain}
+        onMap={exit}
+      />
+    );
+  };
+
+  // ---------- render ----------
+  const Comp = current?.act.Component;
+  const chipNode =
+    chip || par ? (
+      <>
+        {chip && (
+          <span className="k-chip-stars">
+            <KidsIcon name="star" size={20} fill /> {chip.done}/{chip.total}
+          </span>
+        )}
+        {par && (
+          <span className="k-chip-feet" aria-label={`${par.used} of ${par.par} moves`}>
+            {Array.from({ length: Math.min(par.par, 10) }, (_, i) => (
+              <svg key={i} className={`k-foot${i < par.used ? ' on' : ''}`} viewBox="0 0 12 18" aria-hidden="true">
+                <ellipse cx="6" cy="11.5" rx="4.2" ry="5.8" />
+                <circle cx="2.6" cy="3.6" r="1.5" />
+                <circle cx="5.8" cy="2.4" r="1.6" />
+                <circle cx="9.1" cy="3.4" r="1.4" />
+              </svg>
+            ))}
+          </span>
+        )}
+      </>
+    ) : null;
+
+  return (
+    <div className={`k-player${kid.settings.leftHanded ? ' left-handed' : ''} mode-${mode}`} onPointerDown={() => itemLive && resetIdle()}>
+      <TopBar
+        onExit={onX}
+        pips={pips}
+        chip={chipNode}
+        hint={phase === 'item' && current ? { onPress: advanceHint, pulse, disabled: hintLevel >= 4 } : undefined}
+        onSpeaker={coach.text ? () => say(coach.text, undefined, true) : undefined}
+      />
+      {props.header}
+      <div className="k-player-body">
+        <aside className="k-player-coach">
+          <Coach text={coach.text} mood={mood} token={coach.token} size={band === 'sprout' ? 80 : 72} />
+        </aside>
+        <main className="k-player-main" data-item={current?.run.id} data-set={current?.run.setId} data-phase={phase}>
+          {phase === 'intro' && <Intro steps={watchSteps} band={band} rate={rate} onSay={(t) => say(t, 'talk', true)} onDone={() => setPhase('item')} />}
+          {phase === 'parade' && pickStep?.pick && (
+            <PiecePick
+              pick={pickStep.pick}
+              band={band}
+              onSay={(t, m) => say(t, m, true)}
+              onDone={() => {
+                setPhase('item');
+                nextItem();
+              }}
+            />
+          )}
+          {phase === 'empty' && (
+            <div className="k-empty">
+              <p>More games are coming!</p>
+            </div>
+          )}
+          {(phase === 'item' || phase === 'results' || phase === 'break') && current && Comp && (
+            <Comp key={current.key} item={current.item} itemKey={current.key} band={band} kid={getKid(kid.id) ?? kid} player={player} onDone={onDone} />
+          )}
+        </main>
+        <aside className="k-player-tray">
+          <Tray buttons={phase === 'item' ? tray : null} band={band} />
+        </aside>
+      </div>
+
+      <Confetti run={confetti} />
+
+      {offer === 'easier' && (
+        <div className="k-sheet" role="dialog" aria-label="Want an easier one?">
+          <div className="k-sheet-card">
+            <p className="k-sheet-title">That one is tricky! What would you like?</p>
+            <div className="k-sheet-actions">
+              {canEasier && (
+                <BigButton variant="go" icon="leaf" onClick={easier}>
+                  Easier one
+                </BigButton>
+              )}
+              <BigButton variant="primary" icon="again" onClick={() => setOffer(null)}>
+                Keep trying
+              </BigButton>
+              <BigButton variant="plain" icon="next" onClick={skipItem}>
+                Skip this one
+              </BigButton>
+            </div>
+          </div>
+        </div>
+      )}
+      {offer === 'super' && (
+        <div className="k-sheet" role="dialog" aria-label="Super Star?">
+          <div className="k-sheet-card">
+            <p className="k-sheet-title">Super Star? Win a golden star!</p>
+            <div className="k-sheet-actions">
+              <BigButton
+                variant="magic"
+                icon="star"
+                onClick={() => {
+                  setOffer(null);
+                  const s = picker?.superItem();
+                  const taken = s ? picker!.take(s) : null;
+                  if (taken) beginItem(taken, { superStar: true });
+                  else nextItem();
+                }}
+              >
+                Yes, Super Star!
+              </BigButton>
+              <BigButton
+                variant="plain"
+                icon="next"
+                onClick={() => {
+                  setOffer(null);
+                  nextItem();
+                }}
+              >
+                No thanks
+              </BigButton>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmLeave && (
+        <div className="k-sheet" role="dialog" aria-label="Leave?">
+          <div className="k-sheet-card">
+            <p className="k-sheet-title">Leave? Your stars are saved.</p>
+            <div className="k-sheet-actions">
+              <BigButton variant="go" icon="play" onClick={() => setConfirmLeave(false)} autoFocus>
+                Stay
+              </BigButton>
+              <BigButton variant="plain" icon="map" onClick={exit}>
+                Leave
+              </BigButton>
+            </div>
+          </div>
+        </div>
+      )}
+      {phase === 'results' && renderResults()}
+      {phase === 'break' && (
+        <BreakTime
+          kid={getKid(kid.id) ?? kid}
+          onContinue={() => {
+            const f = pendingAfterBreak.current;
+            pendingAfterBreak.current = null;
+            setPhase('item');
+            f?.();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function recapFor(o: RunOutcome, title: string, band: AgeBand, game: boolean): string {
+  if (game) return o.score === 3 ? 'You won! Brilliant playing!' : o.score === 2 ? "A draw! That's a good fight." : 'Good game! Every game makes you stronger.';
+  if (o.bossPassedNow) return band === 'champion' ? `${title} complete.` : `You beat ${title}! Amazing!`;
+  if (o.score === 3) return band === 'champion' ? 'Clean and efficient.' : 'Perfect! You found the best way!';
+  if (o.score === 2) return 'Great job! You kept thinking.';
+  return 'You did it! Practice makes it easier.';
+}

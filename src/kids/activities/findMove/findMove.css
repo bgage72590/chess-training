@@ -1,0 +1,4 @@
+/* Find the Move: the board is sized by the player (kids.css); nothing extra needed yet. */
+.k-findmove {
+  position: relative;
+}

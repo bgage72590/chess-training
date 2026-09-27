@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { navigate, routeParts, useRoute } from './router';
 import { Icon } from './components/Icon';
 import { getProfile, levelFromXp, liveStreak, updateProfile, useProfile } from './store/profile';
@@ -22,7 +22,8 @@ import { VisionPage } from './pages/Vision';
 import { ProgressPage } from './pages/Progress';
 import { SettingsPage } from './pages/Settings';
 import { TrainPage } from './pages/Train';
-import { KidsApp } from './kids/KidsApp';
+import { isKidsLocked } from './kids/lock';
+const KidsApp = lazy(() => import('./kids/KidsApp').then((m) => ({ default: m.KidsApp })));
 
 interface NavItem {
   route: string;
@@ -212,16 +213,23 @@ export function App() {
   useThemeAttribute();
   useAchievementWatcher();
   useLevelWatcher();
+  const locked = isKidsLocked();
+  useEffect(() => {
+    if (locked && section !== 'kids') navigate('kids', { replace: true });
+  }, [locked, section]);
 
   // Kids mode is its own full-screen app, without the grown-up navigation.
   if (section === 'kids') {
     return (
       <>
-        <KidsApp route={route} />
+        <Suspense fallback={<div className="kids-loading" aria-busy="true" style={{ position: 'fixed', inset: 0, background: '#fffaf0' }} />}>
+          <KidsApp route={route} />
+        </Suspense>
         <Toasts />
       </>
     );
   }
+  if (locked) return null; // avoid a flash of the grown-up app while redirecting
 
   return (
     <div className="app">
