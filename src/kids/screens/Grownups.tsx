@@ -191,7 +191,7 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
                 speech.setVoice(v);
               }}
             >
-              <option value="">Automatic: most natural voice{!device.voiceURI && speech.current() ? ` (${speech.current()!.name})` : ''}</option>
+              <option value="">{speech.recorded() || device.voiceURI ? "Pip's recorded voice (most natural)" : `Automatic: best device voice${speech.current() ? ` (${speech.current()!.name})` : ''}`}</option>
               {voices.map((v) => {
                 const note = voiceNote(v);
                 return (
@@ -208,7 +208,7 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
           </div>
         </div>
       )}
-      {speech.supported() && voices.length > 0 && !voices.some((v) => voiceScore(v) >= 80) && (
+      {speech.supported() && device.voiceURI && voices.length > 0 && !voices.some((v) => voiceScore(v) >= 80) && (
         <p className="k-gu-note">
           This device has no natural-sounding voice yet. For a much better one: on a Mac, iPhone or iPad, go to Settings, Accessibility, Spoken Content (Read &amp; Speak on a Mac), Voices, English, and download a Premium or Enhanced voice such as Ava or Zoe. On
           Windows, open Tempo in Microsoft Edge (its Natural voices are built in). On Android, install Google Speech Services voices.

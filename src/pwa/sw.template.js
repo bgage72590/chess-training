@@ -4,6 +4,7 @@ const VERSION = '__VERSION__';
 const FILES = __FILES__;
 const CACHE = `tempo-${VERSION}`;
 const FONTS = 'tempo-fonts';
+const VOICE = 'tempo-voice-af_heart';
 const scoped = (path) => new URL(path, self.registration.scope).href;
 
 self.addEventListener('install', (event) => {
@@ -19,7 +20,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('tempo-') && k !== CACHE && k !== FONTS).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('tempo-') && k !== CACHE && k !== FONTS && k !== VOICE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -45,6 +46,35 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   if (url.origin !== self.location.origin) return;
+
+  // Pip's voice: clips are named by their text, so a cached clip never goes stale; the clip
+  // list is fetched fresh when online.
+  if (req.method === 'GET' && url.pathname.includes('/voice/')) {
+    if (url.pathname.endsWith('/manifest.json')) {
+      event.respondWith(
+        fetch(req)
+          .then((res) => {
+            if (res.ok) void caches.open(VOICE).then((c) => c.put(req, res.clone()));
+            return res;
+          })
+          .catch(() => caches.open(VOICE).then((c) => c.match(req)).then((hit) => hit ?? Response.error())),
+      );
+    } else {
+      event.respondWith(
+        caches.open(VOICE).then((cache) =>
+          cache.match(req).then(
+            (hit) =>
+              hit ??
+              fetch(req).then((res) => {
+                if (res.ok) void cache.put(req, res.clone());
+                return res;
+              }),
+          ),
+        ),
+      );
+    }
+    return;
+  }
 
   // Pages: network first so a new version appears when online; the cached app works offline.
   if (req.mode === 'navigate') {

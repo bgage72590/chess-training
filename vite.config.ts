@@ -30,7 +30,8 @@ function serviceWorker(): Plugin {
       outDir = path.resolve(c.root, c.build.outDir);
     },
     closeBundle() {
-      const files = listFiles(outDir).filter((f) => f !== 'sw.js');
+      // Pip's voice clips (voice/) are cached as they are used, not with the install.
+      const files = listFiles(outDir).filter((f) => f !== 'sw.js' && !f.startsWith('voice/'));
       const hash = createHash('sha256');
       for (const f of files) hash.update(f).update(fs.readFileSync(path.join(outDir, f)));
       const sw = fs

@@ -2,10 +2,10 @@
 // English voice on the device (voices.ts), unlocks on the first tap (iOS), queues lines, and reports the spoken word for
 // karaoke highlighting (with a timed fallback when the engine sends no boundary events).
 import { useSyncExternalStore } from 'react';
-import { pronounce } from '../lib/pronounce';
 import { BAND_TUNING } from '../curriculum/tuning';
 import { getKid, updateKid, type KidProfile } from '../store/kidsStore';
 import { rankVoices } from './voices';
+import { clipKey, spokenText } from '../lib/clipKey';
 
 interface SpeakOpts {
   rate?: number;
@@ -76,84 +76,182 @@ if (typeof window !== 'undefined') {
 
 const words = (t: string) => t.split(/\s+/).filter(Boolean);
 
+// ---------- Pip's recorded voice ----------
+// Every fixed line has a clip recorded with a natural neural voice (scripts/voice). Lines without
+// a clip (built at run time, e.g. with a kid's name) use the best device voice instead.
+interface VoiceManifest {
+  v: 1;
+  voice: string;
+  clips: Record<string, number>; // clip key -> duration (ms)
+}
+let manifest: VoiceManifest | null = null;
+let manifestLoad: Promise<void> | null = null;
+let audioEl: HTMLAudioElement | null = null;
+const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+const voiceUrl = (file: string) => new URL(`voice/${file}`, document.baseURI).href;
+
+function loadManifest(): Promise<void> {
+  if (manifestLoad) return manifestLoad;
+  if (typeof document === 'undefined' || typeof fetch === 'undefined' || typeof Audio === 'undefined') return (manifestLoad = Promise.resolve());
+  manifestLoad = fetch(voiceUrl('manifest.json'))
+    .then((r) => (r.ok ? r.json() : null))
+    .then((m: VoiceManifest | null) => {
+      if (m?.v === 1 && m.clips) manifest = m;
+    })
+    .catch(() => undefined);
+  return manifestLoad;
+}
+
+/** The recorded voice is used unless the grown-ups picked a device voice. */
+const recordedOn = () => !voiceURI && !!manifest;
+
+/** Fetches every clip once in the background (the service worker keeps them for offline play). */
+let prefetched = false;
+function prefetchClips() {
+  if (prefetched || !manifest || typeof navigator === 'undefined' || !navigator.serviceWorker?.controller) return;
+  if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
+  prefetched = true;
+  const keys = Object.keys(manifest.clips);
+  let i = 0;
+  const step = () => {
+    if (i >= keys.length || !navigator.onLine) return;
+    fetch(voiceUrl(`${keys[i++]}.mp3`))
+      .then((r) => r.arrayBuffer())
+      .catch(() => undefined)
+      .finally(() => setTimeout(step, 60));
+  };
+  setTimeout(step, 4000);
+}
+
+if (typeof window !== 'undefined') void loadManifest().then(prefetchClips);
+
 let runGen = 0;
 
-function run(lines: string[], opts: SpeakOpts, token: number) {
+interface LinePlan {
+  spoken: string;
+  capWords: number;
+  base: number;
+}
+
+/** Highlights caption words evenly over `ms` (used when the engine reports no word positions). */
+function timedWords(p: LinePlan, ms: number, live: () => boolean) {
+  const per = ms / Math.max(1, p.capWords);
+  for (let i = 1; i < p.capWords; i++) timers.push(setTimeout(() => live() && set({ word: p.base + i }), i * per));
+}
+
+function playClip(p: LinePlan, key: string, ms: number, rate: number, live: () => boolean, done: () => void, fallback: () => void) {
+  const el = (audioEl ??= new Audio());
+  let settled = false;
+  const fail = () => {
+    if (settled || !live()) return;
+    settled = true;
+    fallback();
+  };
+  el.onended = () => {
+    if (settled || !live()) return;
+    settled = true;
+    done();
+  };
+  el.onerror = fail;
+  el.src = voiceUrl(`${key}.mp3`);
+  el.playbackRate = Math.min(1.2, Math.max(0.7, rate));
+  el.play()
+    .then(() => {
+      if (!live()) return el.pause();
+      set({ speaking: true, word: p.base });
+      timedWords(p, Math.max(300, ms - 160) / el.playbackRate, live);
+    })
+    .catch(fail);
+}
+
+function speakTts(p: LinePlan, opts: SpeakOpts, live: () => boolean, done: () => void) {
   const s = synth();
-  if (!s) return;
-  const gen = ++runGen; // a retry with another voice retires this run's handlers
+  if (!s) return done();
+  const rate = opts.rate ?? 1;
+  const spokenWords = Math.max(1, words(p.spoken).length);
+  const u = new SpeechSynthesisUtterance(p.spoken);
+  if (voice) u.voice = voice;
+  u.lang = voice?.lang ?? 'en-US';
+  u.rate = rate;
+  u.pitch = opts.pitch ?? 1;
+  let gotBoundary = false;
+  u.onstart = () => {
+    if (!live()) return;
+    set({ speaking: true, word: p.base });
+    // Graceful fallback: no word events within 700 ms -> timed highlighting.
+    timers.push(
+      setTimeout(() => {
+        if (gotBoundary || !live()) return;
+        const perWord = 1000 / (2.4 * rate);
+        for (let i = 1; i < p.capWords; i++) timers.push(setTimeout(() => live() && set({ word: p.base + i }), i * perWord - 700 > 0 ? i * perWord - 700 : 0));
+      }, 700),
+    );
+  };
+  u.onboundary = (e) => {
+    if (!live() || e.name === 'sentence') return;
+    gotBoundary = true;
+    const before = words(p.spoken.slice(0, e.charIndex)).length;
+    set({ word: p.base + Math.min(p.capWords - 1, Math.round((before * p.capWords) / spokenWords)) });
+  };
+  u.onerror = (e) => {
+    if (!live()) return;
+    // An online voice that cannot be reached: switch to the best on-device voice and say it again.
+    if (voice && !voice.localService && e.error !== 'interrupted' && e.error !== 'canceled' && !failed.has(voice.voiceURI)) {
+      failed.add(voice.voiceURI);
+      pickVoice();
+      return speakTts(p, opts, live, done);
+    }
+    done();
+  };
+  u.onend = () => live() && done();
+  try {
+    s.speak(u);
+  } catch {
+    done(); // a speech error never breaks a screen
+  }
+}
+
+/** Says the lines one after another: recorded clips where there are some, the device voice otherwise. */
+function run(lines: string[], opts: SpeakOpts, token: number) {
+  const gen = ++runGen;
+  const live = () => token === state.token && gen === runGen;
   const rate = opts.rate ?? 1;
   let offset = 0;
-  lines.forEach((caption, li) => {
-    const spoken = pronounce(caption);
-    const capWords = words(caption).length;
-    const spokenWords = Math.max(1, words(spoken).length);
-    const base = offset;
-    offset += capWords;
-    const u = new SpeechSynthesisUtterance(spoken);
-    if (voice) u.voice = voice;
-    u.lang = voice?.lang ?? 'en-US';
-    u.rate = rate;
-    u.pitch = opts.pitch ?? 1;
-    let gotBoundary = false;
-    u.onstart = () => {
-      if (token !== state.token || gen !== runGen) return;
-      set({ speaking: true, word: base });
-      // Graceful fallback: no word events within 700 ms -> timed highlighting.
-      timers.push(
-        setTimeout(() => {
-          if (gotBoundary || token !== state.token) return;
-          const perWord = 1000 / (2.4 * rate);
-          for (let i = 1; i < capWords; i++) timers.push(setTimeout(() => token === state.token && set({ word: base + i }), i * perWord - 700 > 0 ? i * perWord - 700 : 0));
-        }, 700),
-      );
-    };
-    u.onboundary = (e) => {
-      if (token !== state.token || gen !== runGen || e.name === 'sentence') return;
-      gotBoundary = true;
-      const before = words(spoken.slice(0, e.charIndex)).length;
-      set({ word: base + Math.min(capWords - 1, Math.round((before * capWords) / spokenWords)) });
-    };
-    u.onerror = (e) => {
-      if (token !== state.token || gen !== runGen) return;
-      // An online voice that cannot be reached: switch to the best on-device voice and say it again.
-      if (voice && !voice.localService && e.error !== 'interrupted' && e.error !== 'canceled' && !failed.has(voice.voiceURI)) {
-        failed.add(voice.voiceURI);
-        pickVoice();
-        try {
-          s.cancel();
-        } catch {
-          /* ignore */
-        }
-        run(lines.slice(li), opts, token);
-        return;
-      }
-      if (li === lines.length - 1) {
-        clearTimers();
-        set({ speaking: false, word: -1 });
-      }
-    };
-    u.onend = () => {
-      if (token !== state.token || gen !== runGen) return;
-      if (li === lines.length - 1) {
-        clearTimers();
-        set({ speaking: false, word: -1 });
-      }
-    };
-    try {
-      s.speak(u);
-    } catch {
-      /* a speech error never breaks a screen */
-    }
+  const plan: LinePlan[] = lines.map((caption) => {
+    const p = { spoken: spokenText(caption), capWords: words(caption).length, base: offset };
+    offset += p.capWords;
+    return p;
   });
+  const next = (i: number) => {
+    if (!live()) return;
+    clearTimers();
+    if (i >= plan.length) return set({ speaking: false, word: -1 });
+    const p = plan[i];
+    const key = recordedOn() ? clipKey(p.spoken) : '';
+    const ms = key ? manifest!.clips[key] : undefined;
+    if (key && ms !== undefined) playClip(p, key, ms, rate, live, () => next(i + 1), () => speakTts(p, opts, live, () => next(i + 1)));
+    else speakTts(p, opts, live, () => next(i + 1));
+  };
+  // The clip list loads with Kids mode; give it a moment on the very first line.
+  if (!manifest && manifestLoad) void Promise.race([manifestLoad, new Promise((r) => setTimeout(r, 800))]).then(() => next(0));
+  else next(0);
 }
 
 export const speech = {
-  supported: () => !!synth(),
-  /** Call from the first pointerdown (iOS): speaks an empty utterance at volume 0. */
+  supported: () => !!synth() || typeof Audio !== 'undefined',
+  /** Whether Pip's recorded voice is in use (not a device voice). */
+  recorded: () => recordedOn(),
+  /** Call from the first pointerdown (iOS): unlocks audio playback and speech inside the tap. */
   unlock() {
     if (unlocked) return;
     unlocked = true;
+    try {
+      audioEl ??= new Audio();
+      audioEl.src = SILENCE;
+      void audioEl.play().catch(() => undefined);
+    } catch {
+      /* ignore */
+    }
     const s = synth();
     if (s) {
       try {
@@ -176,7 +274,7 @@ export const speech = {
     speech.cancel(false);
     set({ token, word: -1, speaking: false });
     const clean = lines.map((l) => l.trim()).filter(Boolean);
-    if (!clean.length || muted || !synth()) return token;
+    if (!clean.length || muted || !speech.supported()) return token;
     if (!unlocked) {
       pending = { lines: clean, opts, token };
       return token;
@@ -187,6 +285,15 @@ export const speech = {
   cancel(bump = true) {
     clearTimers();
     pending = null;
+    runGen++;
+    if (audioEl) {
+      audioEl.onended = audioEl.onerror = null;
+      try {
+        audioEl.pause();
+      } catch {
+        /* ignore */
+      }
+    }
     try {
       synth()?.cancel();
     } catch {
