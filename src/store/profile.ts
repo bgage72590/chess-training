@@ -6,9 +6,12 @@ import { RD_START } from '../lib/rating';
 import type { SrsCard } from '../lib/srs';
 
 export type BoardTheme = 'slate' | 'walnut' | 'tourney' | 'ink' | 'rose';
+/** Piece artwork: the classic flat set, or rendered 3D Staunton pieces. */
+export type PieceSet = 'cburnett' | 'staunton3d';
 
 export interface Settings {
   boardTheme: BoardTheme;
+  pieceSet: PieceSet;
   sound: boolean;
   coordinates: boolean;
   autoQueen: boolean;
@@ -114,7 +117,7 @@ export function defaultProfile(): Profile {
     xp: 0,
     days: {},
     streak: { current: 0, best: 0, last: '' },
-    settings: { boardTheme: 'slate', sound: true, coordinates: true, autoQueen: false, theme: 'system', dailyGoal: 60 },
+    settings: { boardTheme: 'slate', pieceSet: 'cburnett', sound: true, coordinates: true, autoQueen: false, theme: 'system', dailyGoal: 60 },
     puzzles: { rating: 1000, rd: RD_START, history: [], attempts: 0, solved: 0, themes: {}, seen: {}, review: {}, rushBest: 0, bestStreak: 0 },
     lessons: {},
     lines: {},

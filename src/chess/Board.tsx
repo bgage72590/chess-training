@@ -1,12 +1,20 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import { Chess, type Color, type Move, type PieceSymbol } from 'chess.js';
 import type { Arrow, Mark, MarkColor } from '../content/types';
 import { colorName, FILES } from './utils';
 import { diffPieces, parsePlacement, type PieceState } from './pieces';
-import { useSettings } from '../store/profile';
+import { useSettings, type BoardTheme, type PieceSet } from '../store/profile';
 import { sound } from './sound';
 
 export type SquareTone = 'good' | 'bad' | 'hint' | 'focus';
+
+/** A target square for the piece being moved. `move` is set for real chess moves. */
+interface Dest {
+  to: string;
+  captured: boolean;
+  promotion?: PieceSymbol;
+  move?: Move;
+}
 
 export interface BoardProps {
   fen: string;
@@ -25,6 +33,17 @@ export interface BoardProps {
   coordinates?: boolean;
   /** Allow right-click arrows and circles. */
   drawable?: boolean;
+  /**
+   * Moves by custom rules, for positions chess.js cannot play (e.g. a lone knight collecting
+   * stars in Kids mode): the target squares for each movable square, and a callback. When
+   * set, it replaces the rules of chess; drag and click work as usual.
+   */
+  freeMoves?: { dests: Record<string, string[]>; onMove: (from: string, to: string) => void };
+  /** Extra content drawn inside squares (e.g. stars to collect), keyed by square. */
+  squareContent?: Record<string, ReactNode>;
+  /** Override the learner's board theme / piece set (e.g. a Kids mode look). */
+  boardTheme?: BoardTheme;
+  pieceSet?: PieceSet;
 }
 
 const ARROW_VAR: Record<MarkColor, string> = {
@@ -47,6 +66,10 @@ export function Board({
   onSquareClick,
   coordinates,
   drawable = true,
+  freeMoves,
+  squareContent,
+  boardTheme,
+  pieceSet,
 }: BoardProps) {
   const settings = useSettings();
   const showCoords = coordinates ?? settings.coordinates;
@@ -91,19 +114,25 @@ export function Board({
 
   const turn = chess?.turn() ?? 'w';
   const gameOver = useMemo(() => !chess || chess.isGameOver(), [chess]);
-  const canMove = interactive && !gameOver && (!playerColor || playerColor === turn);
+  const canMove = freeMoves ? interactive : interactive && !gameOver && (!playerColor || playerColor === turn);
 
-  // Legal moves grouped by origin square; the chosen Move is what onMove receives.
+  // Targets grouped by origin square: legal chess moves, or the custom free moves.
   const dests = useMemo(() => {
-    const m = new Map<string, Move[]>();
-    if (!canMove || !chess) return m;
+    const m = new Map<string, Dest[]>();
+    if (!canMove) return m;
+    if (freeMoves) {
+      const occupied = new Set(parsePlacement(fen).map((p) => p.square));
+      for (const [from, tos] of Object.entries(freeMoves.dests)) m.set(from, tos.map((to) => ({ to, captured: occupied.has(to) })));
+      return m;
+    }
+    if (!chess) return m;
     for (const mv of chess.moves({ verbose: true })) {
       const list = m.get(mv.from) ?? [];
-      list.push(mv);
+      list.push({ to: mv.to, captured: !!mv.captured, promotion: mv.promotion, move: mv });
       m.set(mv.from, list);
     }
     return m;
-  }, [chess, canMove]);
+  }, [chess, canMove, freeMoves, fen]);
 
   const checkSquare = useMemo(() => {
     if (!chess || !chess.inCheck()) return null;
@@ -134,12 +163,13 @@ export function Board({
   };
 
   const finishMove = (from: string, to: string, promotion?: PieceSymbol) => {
-    const mv = dests.get(from)?.find((d) => d.to === to && d.promotion === promotion);
+    const d = dests.get(from)?.find((x) => x.to === to && x.promotion === promotion);
     setSelected(null);
     setPromo(null);
-    if (!mv) return;
+    if (!d) return;
     moveHint.current = [from, to];
-    onMove?.(mv);
+    if (d.move) onMove?.(d.move);
+    else freeMoves?.onMove(from, to);
   };
 
   const onPointerDown = (e: RPointerEvent<HTMLDivElement>) => {
@@ -239,6 +269,7 @@ export function Board({
       squares.push(
         <div key={sq} className={cls.join(' ')} data-square={sq}>
           {dest && <span className={dest.captured ? 'dest capture' : 'dest'} />}
+          {squareContent?.[sq]}
           {showCoords && x === 0 && <span className="coord rank">{rank}</span>}
           {showCoords && y === 7 && <span className="coord file">{FILES[f]}</span>}
         </div>,
@@ -263,7 +294,7 @@ export function Board({
   return (
     <div
       ref={ref}
-      className={`board board-${settings.boardTheme}${canMove ? ' can-move' : ''}`}
+      className={`board board-${boardTheme ?? settings.boardTheme} pieces-${pieceSet ?? settings.pieceSet}${canMove ? ' can-move' : ''}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

@@ -33,18 +33,6 @@
   --font-body: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 
-  /* Board themes (overridden per theme class on the board) */
-  --sq-light: #dfe5ea;
-  --sq-dark: #7f98ab;
-  --coord-on-light: #6a8397;
-  --coord-on-dark: #eef2f5;
-  --hl-last: rgb(247 206 96 / 0.55);
-  --hl-select: rgb(247 206 96 / 0.8);
-  --dest-dot: rgb(20 29 39 / 0.28);
-  --arrow-green: #2f9e6b;
-  --arrow-red: #d2463b;
-  --arrow-blue: #3a7cc9;
-  --arrow-yellow: #e0a526;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -107,47 +95,4 @@
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3), 0 2px 8px rgb(0 0 0 / 0.25);
   --shadow-2: 0 2px 6px rgb(0 0 0 / 0.35), 0 16px 40px rgb(0 0 0 / 0.4);
   --dest-dot: rgb(10 14 20 / 0.35);
-}
-
-/* Board themes. Dark squares use --hl-*-dark when a theme sets it, else the plain highlight. */
-.board-slate,
-.board-ink,
-.board-rose {
-  /* Gold washes out on these muted dark squares: use a deeper tone there. */
-  --hl-last-dark: rgb(226 176 72 / 0.74);
-  --hl-select-dark: rgb(226 176 72 / 0.9);
-}
-.board-slate {
-  --sq-light: #dfe5ea;
-  --sq-dark: #7f98ab;
-  --coord-on-light: #6a8397;
-  --coord-on-dark: #eef2f5;
-}
-.board-walnut {
-  --hl-last: rgb(205 210 106 / 0.6);
-  --hl-select: rgb(20 85 30 / 0.5);
-  --sq-light: #f0d9b5;
-  --sq-dark: #b58863;
-  --coord-on-light: #a07550;
-  --coord-on-dark: #f6e6cc;
-}
-.board-tourney {
-  --hl-last: rgb(255 255 51 / 0.45);
-  --hl-select: rgb(255 255 51 / 0.7);
-  --sq-light: #ebecd0;
-  --sq-dark: #739552;
-  --coord-on-light: #6c8a4e;
-  --coord-on-dark: #f2f3dd;
-}
-.board-ink {
-  --sq-light: #c9cfd8;
-  --sq-dark: #4d5b72;
-  --coord-on-light: #4d5b72;
-  --coord-on-dark: #d8dde5;
-}
-.board-rose {
-  --sq-light: #efe3dc;
-  --sq-dark: #b9867c;
-  --coord-on-light: #a1716a;
-  --coord-on-dark: #f7ece7;
 }

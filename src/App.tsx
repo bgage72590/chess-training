@@ -22,6 +22,7 @@ import { VisionPage } from './pages/Vision';
 import { ProgressPage } from './pages/Progress';
 import { SettingsPage } from './pages/Settings';
 import { TrainPage } from './pages/Train';
+import { KidsApp } from './kids/KidsApp';
 
 interface NavItem {
   route: string;
@@ -211,6 +212,16 @@ export function App() {
   useThemeAttribute();
   useAchievementWatcher();
   useLevelWatcher();
+
+  // Kids mode is its own full-screen app, without the grown-up navigation.
+  if (section === 'kids') {
+    return (
+      <>
+        <KidsApp route={route} />
+        <Toasts />
+      </>
+    );
+  }
 
   return (
     <div className="app">
