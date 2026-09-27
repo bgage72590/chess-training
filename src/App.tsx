@@ -23,6 +23,7 @@ import { ProgressPage } from './pages/Progress';
 import { SettingsPage } from './pages/Settings';
 import { TrainPage } from './pages/Train';
 import { KidsApp } from './kids/KidsApp';
+import { SyncJoinPage } from './sync/SyncJoinPage';
 
 interface NavItem {
   route: string;
@@ -197,6 +198,8 @@ function Page({ route }: { route: string }): ReactNode {
       return <SettingsPage />;
     case 'train':
       return <TrainPage />;
+    case 'sync':
+      return <SyncJoinPage code={arg} />;
     default:
       return <HomePage />;
   }

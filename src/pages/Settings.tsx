@@ -6,6 +6,7 @@ import { Button, PageHeader, Segmented } from '../components/ui';
 import { toast } from '../lib/toast';
 import { useSyncState } from '../store/cloud';
 import { InstallCard } from '../components/InstallCard';
+import { SyncCard } from '../sync/SyncCard';
 
 const SAMPLE = 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4';
 
@@ -100,6 +101,7 @@ export function SettingsPage() {
             />
           </div>
         </section>
+        <SyncCard />
         <InstallCard />
         <section className="card settings-section">
           <h2>Your data</h2>

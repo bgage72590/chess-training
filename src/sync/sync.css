@@ -1,0 +1,39 @@
+/* Cross-device sync card and join page. */
+.sync-link {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.sync-qr {
+  width: 136px;
+  height: 136px;
+  flex: none;
+  border-radius: var(--radius-s);
+  box-shadow: 0 0 0 1px var(--line);
+  background: #fff;
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
+}
+.sync-code-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.sync-code {
+  font-size: clamp(0.95rem, 3.4vw, 1.15rem);
+  letter-spacing: 0.04em;
+  word-break: break-all;
+  font-variant-numeric: tabular-nums;
+}
+.sync-join {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sync-join input {
+  max-width: 340px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}

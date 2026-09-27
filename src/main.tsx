@@ -8,6 +8,7 @@ import './styles/pages.css';
 import { App } from './App';
 import { startCloudSync } from './store/cloud';
 import { setupInstall } from './pwa/install';
+import { startSync } from './sync';
 
 setupInstall();
 
@@ -18,3 +19,4 @@ createRoot(document.getElementById('root')!).render(
 );
 
 void startCloudSync();
+startSync();

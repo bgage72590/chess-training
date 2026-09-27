@@ -38,9 +38,27 @@ and works offline, full-strength Stockfish included. Open
 | iPhone / iPad | Safari's **Share** button → **Add to Home Screen** |
 | Android | Chrome menu → **Install app** / **Add to Home screen** |
 
-Right-click (or long-press) the icon for shortcuts to Puzzles, Play and Learn. Progress is kept
-by each installed copy; use Export / Import in Settings to move it between devices. The app
-updates itself the next time it is opened online.
+Right-click (or long-press) the icon for shortcuts to Puzzles, Play and Learn. The app updates
+itself the next time it is opened online.
+
+## Sync across devices
+
+No account needed. In **Settings → Sync across devices**, tap **Turn on sync** to get a private
+sync code (with a QR code and a link). On your other phones, tablets and computers, scan the QR
+code, open the link, or type the code under **I have a sync code**. Progress from every linked
+device is combined, never overwritten: lessons, puzzles, openings, games, streaks and XP made on
+any of them add up, and settings follow the device where they were changed last. Syncing happens
+in the background a few seconds after you train, when you come back to the app, and when a
+device comes back online.
+
+The code works like a password: anyone who has it can see and change that progress. **Stop
+syncing on this device** keeps the device's progress but unlinks it; **Delete synced copy**
+removes the stored copy for all devices. Export / Import in Settings still works for a manual
+backup.
+
+Synced copies live in a Supabase database (`docs/sync.sql`) that only exposes three functions;
+each copy is stored under a hash of its code, which is 100 random bits and cannot be guessed or
+listed.
 
 ## Getting started
 
@@ -84,6 +102,7 @@ src/
   store/        Profile: XP, streaks, ratings, spaced repetition (localStorage)
   lib/          Rating (Glicko), spaced repetition, game analysis, achievements, hooks
   pwa/          Install prompt, service worker registration and template
+  sync/         Cross-device sync: sync codes, profile merge, sync engine, Supabase client
 public/         Stockfish (copied at install), app icons, web app manifest
 scripts/        Content validator, puzzle generator/builder, engine copy, single-page build
 tests/          Vitest suites

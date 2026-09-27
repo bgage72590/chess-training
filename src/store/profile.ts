@@ -106,6 +106,8 @@ export interface Profile {
   lastVisit: string;
   /** Last local change (ms). Used to merge with the cloud copy. */
   updatedAt: number;
+  /** Last change to settings (ms), so syncing keeps the most recent choices. */
+  settingsAt?: number;
 }
 
 const KEY = 'tempo.profile.v1';
@@ -182,6 +184,7 @@ export function updateProfile(fn: (draft: Profile) => void) {
   const next = structuredClone(state);
   fn(next);
   next.updatedAt = Date.now();
+  if (JSON.stringify(next.settings) !== JSON.stringify(state.settings)) next.settingsAt = next.updatedAt;
   state = next;
   persist();
   listeners.forEach((l) => l());
