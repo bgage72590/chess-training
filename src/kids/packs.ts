@@ -3,12 +3,12 @@
 import type { ActivityDef, KidsPack, LevelSet, PlaygroundEntry } from './activities/types';
 import { corePack, CHECKPOINTS as CORE_CHECKPOINTS } from './content/core';
 // PACK A: import { movementPack } from './content/movement';
-// PACK B: import { minigamesPack } from './content/minigames';
+import { minigamesPack } from './content/minigames';
 // PACK C: import { rulesPack } from './content/rules';
 // PACK D: import { buddiesPack } from './content/games';
 // PACK E: import { tacticsPack } from './content/tactics';
 
-export const PACKS: KidsPack[] = [corePack /* , movementPack, minigamesPack, rulesPack, buddiesPack, tacticsPack */];
+export const PACKS: KidsPack[] = [corePack, minigamesPack /* , movementPack, rulesPack, buddiesPack, tacticsPack */];
 
 export interface KidsRegistry {
   packs: KidsPack[];

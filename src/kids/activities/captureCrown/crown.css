@@ -1,0 +1,15 @@
+/* Capture the Crown: shares the Pack B game strip (battle.css); the danger-bell king rings. */
+.k-crown .k-art-danger {
+  animation: k-crown-bell 600ms ease-in-out 2;
+}
+@keyframes k-crown-bell {
+  25% {
+    rotate: -12deg;
+  }
+  75% {
+    rotate: 12deg;
+  }
+}
+.kids-app[data-motion='reduced'] .k-crown .k-art-danger {
+  animation: none;
+}

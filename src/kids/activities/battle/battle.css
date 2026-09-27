@@ -1,0 +1,163 @@
+/* Pack B games (battle, capture-crown): a slim game strip above the board, the result card and
+   the danger-bell king. The board keeps the player's square sizing minus the strip. */
+.kids-app .k-player-main > .k-game {
+  width: min(100cqw, calc(100cqh - 60px), 720px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+}
+.k-game-bar {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 10px;
+  background: var(--k-card);
+  border: 2px solid var(--k-line);
+  border-radius: var(--k-r);
+  font-family: var(--k-font-display);
+  color: var(--k-ink);
+  min-width: 0;
+}
+.k-game-seat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  border-radius: var(--k-r-pill);
+  padding: 2px 8px 2px 2px;
+}
+.k-game-seat.active {
+  background: var(--k-sun);
+  box-shadow: 0 0 0 3px var(--k-sun-edge);
+  animation: k-game-pulse 1.4s ease-in-out infinite;
+}
+@keyframes k-game-pulse {
+  50% {
+    transform: scale(1.06);
+  }
+}
+.k-game-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 40px;
+  overflow: hidden;
+}
+.k-game-name {
+  font-weight: 600;
+  font-size: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 7.5em;
+}
+.k-game-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--k-ink);
+  flex: none;
+}
+.k-game-dot.w {
+  background: #fff;
+}
+.k-game-dot.b {
+  background: var(--k-ink);
+}
+.k-game-turn {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--k-ink-soft);
+  text-align: center;
+  white-space: nowrap;
+}
+.k-game-turn.mine {
+  color: var(--k-good-ink);
+}
+.k-game-bar.friend .k-game-turn {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.k-game-think {
+  display: inline-flex;
+  gap: 4px;
+}
+.k-game-think i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--k-sea-edge);
+  animation: k-game-think 900ms ease-in-out infinite;
+}
+.k-game-think i:nth-child(2) {
+  animation-delay: 150ms;
+}
+.k-game-think i:nth-child(3) {
+  animation-delay: 300ms;
+}
+@keyframes k-game-think {
+  50% {
+    transform: translateY(-5px);
+    opacity: 0.5;
+  }
+}
+.k-game-board {
+  position: relative;
+}
+.k-game-result {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 32px);
+  padding: 14px 22px;
+  background: var(--k-card);
+  border: 3px solid var(--k-sun-edge);
+  border-radius: var(--k-r-lg);
+  box-shadow: var(--k-lift);
+  font-family: var(--k-font-display);
+  font-size: var(--k-title);
+  font-weight: 600;
+  color: var(--k-ink);
+  text-align: center;
+  animation: k-game-pop 380ms var(--k-ease-spring);
+}
+.k-game-result.win .k-icon {
+  color: var(--k-sun-edge);
+}
+.k-game-result.loss {
+  border-color: var(--k-sea-edge);
+}
+@keyframes k-game-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+@media (max-width: 420px) {
+  .k-game-result {
+    font-size: 24px;
+    padding: 10px 14px;
+  }
+  .k-game-name {
+    font-size: 16px;
+    max-width: 5.5em;
+  }
+  .k-game-turn {
+    font-size: 16px;
+  }
+}
+.kids-app[data-motion='reduced'] .k-game-seat.active,
+.kids-app[data-motion='reduced'] .k-game-think i,
+.kids-app[data-motion='reduced'] .k-game-result {
+  animation: none;
+}
