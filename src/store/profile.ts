@@ -108,6 +108,8 @@ export interface Profile {
   updatedAt: number;
   /** Last change to settings (ms), so syncing keeps the most recent choices. */
   settingsAt?: number;
+  /** Look version: 1 = the walnut board and 3D pieces became the defaults. */
+  look?: number;
 }
 
 const KEY = 'tempo.profile.v1';
@@ -119,7 +121,7 @@ export function defaultProfile(): Profile {
     xp: 0,
     days: {},
     streak: { current: 0, best: 0, last: '' },
-    settings: { boardTheme: 'slate', pieceSet: 'cburnett', sound: true, coordinates: true, autoQueen: false, theme: 'system', dailyGoal: 60 },
+    settings: { boardTheme: 'walnut', pieceSet: 'staunton3d', sound: true, coordinates: true, autoQueen: false, theme: 'system', dailyGoal: 60 },
     puzzles: { rating: 1000, rd: RD_START, history: [], attempts: 0, solved: 0, themes: {}, seen: {}, review: {}, rushBest: 0, bestStreak: 0 },
     lessons: {},
     lines: {},
@@ -131,16 +133,24 @@ export function defaultProfile(): Profile {
     onboarded: false,
     lastVisit: dayKey(),
     updatedAt: 0,
+    look: 1,
   };
 }
 
 /** Fills in fields missing from a stored, imported or synced profile (older versions). */
 export function normalizeProfile(p: Partial<Profile>): Profile {
   const base = defaultProfile();
+  const settings = { ...base.settings, ...p.settings };
+  // Profiles from before the new look had no way to pick pieces: move them to the new defaults.
+  if ((p.look ?? 0) < 1) {
+    if (settings.pieceSet === 'cburnett') settings.pieceSet = 'staunton3d';
+    if (settings.boardTheme === 'slate') settings.boardTheme = 'walnut';
+  }
   return {
     ...base,
     ...p,
-    settings: { ...base.settings, ...p.settings },
+    look: Math.max(p.look ?? 0, 1),
+    settings,
     puzzles: { ...base.puzzles, ...p.puzzles },
     streak: { ...base.streak, ...p.streak },
     // Profiles from before level tracking: do not announce levels reached long ago.

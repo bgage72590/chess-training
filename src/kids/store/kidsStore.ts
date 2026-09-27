@@ -1,4 +1,5 @@
-// Kids data: every kid profile, the family star jar and device settings. Local only, never synced.
+// Kids data: every kid profile, the family star jar and device settings. Kids and the star jar are
+// synced across linked devices (syncKids.ts); the active kid and device settings stay on the device.
 // Key 'tempo.kids.v1' (separate from the grown-up profile). Every storage access is guarded, with
 // an in-memory fallback for private mode or sandboxed frames. Spec section 11.4.
 import { useSyncExternalStore } from 'react';
@@ -22,6 +23,8 @@ export interface KidsState {
   family: { stars: number; parties: number };
   device: { pinSalt?: string; pinHash?: string; voiceURI?: string };
   updatedAt: number;
+  /** Deleted kids (id -> when), so syncing another device does not bring them back. */
+  removed?: Record<string, number>;
 }
 
 export interface KidProfile {
@@ -323,7 +326,10 @@ export function normalizeKids(raw: unknown): KidsState {
   }
   if (typeof dev.voiceURI === 'string') device.voiceURI = dev.voiceURI;
   const activeKid = typeof raw.activeKid === 'string' && kids.some((k) => k.id === raw.activeKid) ? raw.activeKid : null;
-  return { v: 1, activeKid, kids, family: { stars: num(fam.stars, 0, 0), parties: num(fam.parties, 0, 0) }, device, updatedAt: num(raw.updatedAt, 0, 0) };
+  const out: KidsState = { v: 1, activeKid, kids, family: { stars: num(fam.stars, 0, 0), parties: num(fam.parties, 0, 0) }, device, updatedAt: num(raw.updatedAt, 0, 0) };
+  const removed = numMap(raw.removed);
+  if (Object.keys(removed).length) out.removed = removed;
+  return out;
 }
 
 /** Caps the lists that grow (seen ring, days, firsts) before saving. */
@@ -439,6 +445,21 @@ export function getKid(id: string | null | undefined): KidProfile | undefined {
 export function getActiveKid(): KidProfile | undefined {
   return getKid(state.activeKid);
 }
+
+/** Takes merged data from sync: kids, star jar and deletions; this device's own parts stay. */
+export function applySyncedKids(synced: Pick<KidsState, 'kids' | 'family' | 'removed' | 'updatedAt'>) {
+  const next: KidsState = { ...structuredClone(state), ...structuredClone(synced) };
+  if (!next.removed) delete next.removed;
+  if (next.activeKid && !next.kids.some((k) => k.id === next.activeKid)) next.activeKid = null;
+  state = pruneForSave(next);
+  saveFailed = !writeKids(state);
+  emit();
+}
+
+export const subscribeKids = (l: () => void) => {
+  listeners.add(l);
+  return () => void listeners.delete(l);
+};
 
 /** Replaces the whole state (import, delete-all). */
 export function replaceKids(next: KidsState) {

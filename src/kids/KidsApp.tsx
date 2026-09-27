@@ -6,6 +6,7 @@ import './fonts';
 import './kids.css';
 import { useToasts } from '../lib/toast';
 import { setActiveKid, useKids } from './store/kidsStore';
+import { registerKidsSync } from './store/syncKids';
 import { BAND_TUNING } from './curriculum/tuning';
 import { KidContext } from './player/context';
 import { speech } from './player/speech';
@@ -29,6 +30,8 @@ import { StickerBook } from './screens/StickerBook';
 import { Grownups } from './screens/Grownups';
 import { Certificate, Graduation } from './screens/Graduation';
 import { BreakTime } from './screens/BreakTime';
+
+registerKidsSync();
 
 /** Screens that belong to grown-ups: a gate pass lives only while one of these is open. */
 const GROWNUP_SCREENS = ['grownups', 'certificate'];

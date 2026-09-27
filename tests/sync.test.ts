@@ -177,3 +177,41 @@ describe('profile normalization for sync', () => {
     expect(m.xp).toBe(12);
   });
 });
+
+describe('kids sync merge', async () => {
+  const { mergeSyncedKids } = await import('../src/kids/store/syncKids');
+  const { newKid } = await import('../src/kids/store/kidsStore');
+  const kid = (id: string, name: string) => newKid({ id, name, band: 'explorer' as never, start: 'new', now: 1 });
+
+  it('keeps each device\'s kids and progress, and deleted kids stay deleted', () => {
+    const mia = kid('k-mia', 'Mia');
+    const leo = kid('k-leo', 'Leo');
+    const phoneMia = structuredClone(mia);
+    phoneMia.stickers['s-first'] = 10;
+    phoneMia.nodes['w1-a'] = { stars: 3, plays: 2, last: 10, box: 2, due: '2026-09-28', masteredDays: ['2026-09-27'], lastItems: [], losses: 0, ease: 0 };
+    const tabletMia = structuredClone(mia);
+    tabletMia.name = 'Mimi';
+    tabletMia.nodes['w1-a'] = { stars: 1, plays: 5, last: 20, box: 1, due: '2026-09-27', masteredDays: [], lastItems: ['x'], losses: 0, ease: 0 };
+    tabletMia.nodes['w1-b'] = { stars: 2, plays: 1, last: 20, box: 1, due: '2026-09-27', masteredDays: [], lastItems: [], losses: 0, ease: 0 };
+    const phone = { kids: [phoneMia, leo], family: { stars: 5, parties: 0 }, updatedAt: 100 };
+    const tablet = { kids: [tabletMia], family: { stars: 8, parties: 1 }, updatedAt: 200, removed: { 'k-leo': 150 } };
+    const m = mergeSyncedKids(phone, tablet);
+    expect(m.kids.map((k) => k.id)).toEqual(['k-mia']);
+    const mm = m.kids[0];
+    expect(mm.name).toBe('Mimi');
+    expect(mm.stickers['s-first']).toBe(10);
+    expect(mm.nodes['w1-a']).toMatchObject({ stars: 3, plays: 5, last: 20, masteredDays: ['2026-09-27'] });
+    expect(Object.keys(mm.nodes).sort()).toEqual(['w1-a', 'w1-b']);
+    expect(m.family).toEqual({ stars: 8, parties: 1 });
+    expect(JSON.stringify(mergeSyncedKids(m, m))).toBe(JSON.stringify(m));
+  });
+});
+
+describe('new look migration', () => {
+  it('moves old profiles to the walnut board and 3D pieces once', () => {
+    const old = normalizeProfile({ xp: 5, settings: { ...defaultProfile().settings, boardTheme: 'slate', pieceSet: 'cburnett' } });
+    expect(old.settings).toMatchObject({ boardTheme: 'walnut', pieceSet: 'staunton3d' });
+    const chosen = normalizeProfile({ ...old, settings: { ...old.settings, pieceSet: 'cburnett' } });
+    expect(chosen.settings.pieceSet).toBe('cburnett');
+  });
+});

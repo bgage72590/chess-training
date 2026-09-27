@@ -137,7 +137,7 @@ describe('engine score helpers', () => {
 describe('profile', () => {
   it('fills fields missing from older saves without announcing old levels', () => {
     const p = normalizeProfile({ xp: 5000, settings: { sound: false } as never });
-    expect(p.settings.boardTheme).toBe('slate');
+    expect(p.settings.boardTheme).toBe('walnut');
     expect(p.settings.sound).toBe(false);
     expect(p.puzzles.rushBest).toBe(0);
     expect(p.streak.best).toBe(0);

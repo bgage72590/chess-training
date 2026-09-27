@@ -56,6 +56,18 @@ export function SettingsPage() {
               </button>
             ))}
           </div>
+          <div className="play-option">
+            <span className="stat-label">Pieces</span>
+            <Segmented
+              label="Piece style"
+              value={s.pieceSet}
+              options={[
+                { value: 'staunton3d', label: '3D Staunton' },
+                { value: 'cburnett', label: 'Classic' },
+              ]}
+              onChange={(v) => set({ pieceSet: v })}
+            />
+          </div>
           <div className="settings-preview">
             <Board fen={SAMPLE} lastMove={['d1', 'h5']} arrows={[{ from: 'h5', to: 'f7', color: 'red' }]} />
           </div>

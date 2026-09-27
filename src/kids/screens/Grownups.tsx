@@ -307,6 +307,7 @@ function Actions({ kid }: { kid: KidProfile }) {
           onDone={() => {
             updateKids((s) => {
               s.kids = s.kids.filter((k) => k.id !== kid.id);
+              s.removed = { ...s.removed, [kid.id]: Date.now() };
               if (s.activeKid === kid.id) s.activeKid = null;
             });
             toast({ title: 'Player deleted.' }, 2500);
@@ -398,7 +399,10 @@ function Device() {
         <HoldButton
           label="Hold to delete all kids data"
           onDone={() => {
-            replaceKids(defaultKidsState());
+            const now = Date.now();
+            const prev = getKids();
+            const removed = { ...prev.removed, ...Object.fromEntries(prev.kids.map((k) => [k.id, now])) };
+            replaceKids({ ...defaultKidsState(), removed });
             toast({ title: 'All kids data deleted.' }, 2500);
             go.picker();
           }}
