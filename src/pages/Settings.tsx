@@ -9,14 +9,6 @@ import { InstallCard } from '../components/InstallCard';
 import { SyncCard } from '../sync/SyncCard';
 import { navigate } from '../router';
 
-const THEMES: { id: BoardTheme; name: string }[] = [
-  { id: 'slate', name: 'Slate' },
-  { id: 'walnut', name: 'Walnut' },
-  { id: 'tourney', name: 'Tournament' },
-  { id: 'ink', name: 'Ink' },
-  { id: 'rose', name: 'Rosewood' },
-];
-
 const SAMPLE = 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4';
 
 export function SettingsPage() {

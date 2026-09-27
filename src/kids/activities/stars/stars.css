@@ -1,0 +1,30 @@
+/* Star Collector: the collected-star pop (8 sparkles and a burst). */
+.k-star-pop {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  animation: k-star-pop 600ms var(--k-ease-out) forwards;
+  background:
+    radial-gradient(circle at 50% 50%, #fff6c9 0 14%, transparent 15%),
+    conic-gradient(from 0deg, transparent 0 5%, #ffc83d 5% 7%, transparent 7% 17.5%, #ffc83d 17.5% 19.5%, transparent 19.5% 30%, #ffc83d 30% 32%, transparent 32% 42.5%, #ffc83d 42.5% 44.5%, transparent 44.5% 55%, #ffc83d 55% 57%, transparent 57% 67.5%, #ffc83d 67.5% 69.5%, transparent 69.5% 80%, #ffc83d 80% 82%, transparent 82% 92.5%, #ffc83d 92.5% 94.5%, transparent 94.5%);
+  border-radius: 50%;
+  mask: radial-gradient(circle, #000 0 62%, transparent 63%);
+}
+@keyframes k-star-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 1;
+  }
+  60% {
+    transform: scale(1.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+.kids-app[data-motion='reduced'] .k-star-pop {
+  animation: k-fade-out 300ms forwards;
+}
