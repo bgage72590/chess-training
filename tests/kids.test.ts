@@ -47,7 +47,9 @@ import { reviewStars, validateStars } from '../src/kids/activities/stars/logic';
 
 // Source text of every Kids file (Vite raw imports: no Node APIs needed).
 const KIDS_SOURCES = import.meta.glob('../src/kids/**/*.{ts,tsx}', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-const REG: Registry = { isRegistered: (id) => createRegistry(PACKS).isRegistered(id) };
+// Progress rules are checked against the framework's own pack (the activity packs add more nodes).
+const CORE_REG = createRegistry(PACKS.filter((p) => p.id === 'core'));
+const REG: Registry = { isRegistered: (id) => CORE_REG.isRegistered(id) };
 const TODAY = '2026-09-20';
 
 const r = (score: 1 | 2 | 3, extra: Partial<ItemResult> = {}): ItemResult => ({ score, mistakes: 0, hintLevel: 0, ...extra });
