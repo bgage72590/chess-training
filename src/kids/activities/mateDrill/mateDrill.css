@@ -1,0 +1,39 @@
+/* Checkmate drills (Pack C): ladder rungs, the queen's box, the move counter. */
+.k-matedrill {
+  position: relative;
+}
+.k-matedrill-rung,
+.k-matedrill-box {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.k-matedrill-rung {
+  background: repeating-linear-gradient(90deg, transparent 0 18%, rgb(63 134 198 / 0.28) 18% 26%, transparent 26% 74%, rgb(63 134 198 / 0.28) 74% 82%, transparent 82%);
+  border-top: 3px solid rgb(63 134 198 / 0.45);
+  border-bottom: 3px solid rgb(63 134 198 / 0.45);
+}
+.k-matedrill-box {
+  background: rgb(154 127 230 / 0.26);
+  transition: opacity 300ms var(--k-ease-out);
+}
+.k-matedrill-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  z-index: 20;
+  padding: 2px 12px;
+  border-radius: var(--k-r-pill);
+  background: var(--k-card);
+  border: 2px solid var(--k-edge);
+  font-family: var(--k-font-num);
+  font-weight: 600;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  color: var(--k-ink);
+  pointer-events: none;
+}
+.kids-app[data-motion='reduced'] .k-matedrill-box {
+  transition: none;
+}
