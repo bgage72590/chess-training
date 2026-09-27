@@ -1,13 +1,14 @@
 // Lists every line Kids mode can say aloud, for scripts/voice/render.py.
-// Scans src/kids for sentence-like string literals (lines built at run time with ${...}
-// are not recorded; they use the device voice). Output: [{ key, text }] as JSON on stdout.
+// Parses src/kids (oxc parser, via rolldown) and keeps sentence-like string literals (lines
+// built at run time with ${...} are not recorded; they use the device voice).
+// Output: [{ key, text }] as JSON on stdout.
 //   npx tsx scripts/voice/collect.ts > /tmp/lines.json
 import fs from 'node:fs';
 import path from 'node:path';
+import { parseSync } from 'rolldown/experimental';
 import { clipKey, spokenText } from '../../src/kids/lib/clipKey';
 
 const ROOT = path.resolve(import.meta.dirname, '../../src/kids');
-const LITERAL = /(?<![\w$])(['"])((?:\\.|(?!\1).)*?)\1|`((?:\\.|[^`$\\]|\$(?!\{))*)`/gs;
 
 function files(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -24,13 +25,23 @@ function isLine(s: string): boolean {
 }
 
 const lines = new Map<string, string>();
-for (const f of files(ROOT)) {
-  const src = fs.readFileSync(f, 'utf8').replace(/^\s*import .*$/gm, '');
-  for (const m of src.matchAll(LITERAL)) {
-    const raw = (m[2] ?? m[3] ?? '').replace(/\\(['"`])/g, '$1').trim();
-    if (!isLine(raw)) continue;
-    const text = spokenText(raw);
-    lines.set(clipKey(text), text);
-  }
+const add = (raw: string) => {
+  const s = raw.trim();
+  if (!isLine(s)) return;
+  const text = spokenText(s);
+  lines.set(clipKey(text), text);
+};
+
+type Node = { type?: string; [k: string]: unknown };
+function visit(node: unknown) {
+  if (Array.isArray(node)) return node.forEach(visit);
+  if (!node || typeof node !== 'object') return;
+  const n = node as Node;
+  if (n.type === 'ImportDeclaration' || n.type === 'ExportAllDeclaration') return;
+  if (n.type === 'Literal' && typeof n.value === 'string') add(n.value);
+  if (n.type === 'TemplateLiteral' && (n.expressions as unknown[]).length === 0) add(String((n.quasis as { value: { cooked: string } }[])[0].value.cooked ?? ''));
+  for (const [k, v] of Object.entries(n)) if (k !== 'parent' && v && typeof v === 'object') visit(v);
 }
+
+for (const f of files(ROOT)) visit(parseSync(f, fs.readFileSync(f, 'utf8'), { lang: f.endsWith('x') ? 'tsx' : 'ts' }).program);
 process.stdout.write(JSON.stringify([...lines].map(([key, text]) => ({ key, text })), null, 0));
