@@ -4,8 +4,10 @@ public/voice/manifest.json. Two voices can record it:
   kokoro  Kokoro, an open-weight neural voice (Apache-2.0) that runs on this machine.
           pip install kokoro-onnx lameenc; model files from github.com/thewh1teagle/kokoro-onnx/releases
           (model-files-v1.0: kokoro-v1.0.onnx, voices-v1.0.bin) in the --model directory.
-  google  Google Cloud Text-to-Speech (Chirp 3 HD voices). pip install lameenc; the API key is read
-          from the GOOGLE_TTS_API_KEY environment variable (never written anywhere).
+  google  Google Cloud Text-to-Speech (Chirp 3 HD voices). pip install lameenc. The API key comes
+          from the GOOGLE_TTS_API_KEY environment variable, or is added to each request by the
+          environment's credentials (header X-Goog-Api-Key for texttospeech.googleapis.com).
+          It is never written anywhere.
 
   npx tsx scripts/voice/collect.ts > /tmp/lines.json
   python3 scripts/voice/render.py /tmp/lines.json --model DIR                    # Kokoro
@@ -65,11 +67,10 @@ def speak_google(text, use_rate=True):
     if use_rate:
         config['speakingRate'] = SPEED
     body = {'input': {'text': text}, 'voice': {'languageCode': VOICE[:5], 'name': VOICE}, 'audioConfig': config}
-    req = urllib.request.Request(
-        'https://texttospeech.googleapis.com/v1/text:synthesize',
-        data=json.dumps(body).encode(),
-        headers={'Content-Type': 'application/json', 'X-Goog-Api-Key': os.environ['GOOGLE_TTS_API_KEY']},
-    )
+    headers = {'Content-Type': 'application/json'}
+    if os.environ.get('GOOGLE_TTS_API_KEY'):
+        headers['X-Goog-Api-Key'] = os.environ['GOOGLE_TTS_API_KEY']
+    req = urllib.request.Request('https://texttospeech.googleapis.com/v1/text:synthesize', data=json.dumps(body).encode(), headers=headers)
     for attempt in range(7):
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
@@ -82,7 +83,8 @@ def speak_google(text, use_rate=True):
             if e.code in (429, 500, 502, 503, 504) and attempt < 6:
                 time.sleep(2 ** attempt)
                 continue
-            raise RuntimeError(f'Google TTS {e.code}: {msg}') from None
+            hint = ' (no key reached Google: set GOOGLE_TTS_API_KEY or add an X-Goog-Api-Key credential for texttospeech.googleapis.com)' if e.code in (401, 403) or 'API key' in msg else ''
+            raise RuntimeError(f'Google TTS {e.code}: {msg}{hint}') from None
     with wave.open(io.BytesIO(base64.b64decode(data['audioContent']))) as w:
         sr = w.getframerate()
         pcm = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768
@@ -126,8 +128,6 @@ def main():
         OUT = a.out
     if ENGINE == 'kokoro' and not a.model:
         ap.error('--model is required for Kokoro')
-    if ENGINE == 'google' and not os.environ.get('GOOGLE_TTS_API_KEY'):
-        ap.error('set GOOGLE_TTS_API_KEY')
     VERSION = version()
     os.makedirs(OUT, exist_ok=True)
     lines = json.load(open(a.lines))
