@@ -271,14 +271,16 @@ button {
     min-height: 40px;
   }
 }
-@media (min-width: 901px) and (max-height: 760px) and (pointer: fine) {
-  /* Short laptop screens: keep the streak and XP foot above the fold. */
-  .nav-item {
-    min-height: 34px;
-    padding-block: 6px;
+@media (min-width: 901px) and (max-height: 760px) {
+  /* Short laptop screens: nav items keep their 38px (spec 13.3); the labels tighten and the
+     sidebar scrolls (it is overflow-y: auto, spec 7.1) if the foot still does not fit. */
+  .sidebar {
+    gap: 10px;
+    padding-top: 16px;
+    padding-bottom: 12px;
   }
   .nav-group-label {
-    padding-top: 8px;
+    padding-top: 6px;
   }
 }
 .nav-item:hover {
@@ -403,6 +405,8 @@ button {
     height: 24px;
   }
   .topbar .icon-btn {
+    width: 32px;
+    height: 32px;
     background: rgb(255 240 220 / 0.05);
     border-color: var(--line);
     color: var(--ink-2);
@@ -612,6 +616,16 @@ button {
     width: 40px;
     height: 40px;
   }
+  .topbar .icon-btn {
+    /* !important also beats the inline 32px on the shell's Install button (InstallCard.tsx). */
+    width: 40px !important;
+    height: 40px !important;
+  }
+  .topbar {
+    /* Same 54px bar with the 40px touch targets. */
+    padding-block: 7px;
+    padding-top: calc(7px + env(safe-area-inset-top, 0px));
+  }
 }
 .segmented {
   display: inline-flex;
@@ -685,7 +699,8 @@ button {
   height: 6px;
   border-radius: 999px;
   background: var(--surface-sunk);
-  box-shadow: var(--sunk);
+  /* The hairline keeps an empty (0%) track visible on the dark desk, where the sunk shadow is lost. */
+  box-shadow: var(--sunk), inset 0 0 0 1px var(--line);
   overflow: hidden;
 }
 .bar-fill {
@@ -1214,11 +1229,23 @@ button.feedback:hover {
   left: 0;
   right: 0;
   font-family: var(--font-mono);
-  font-size: 8px;
-  letter-spacing: -0.06em;
+  font-size: 9px;
+  line-height: 1;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   text-align: center;
+  white-space: nowrap;
   z-index: 2;
+}
+/* The label is unsigned and at most three characters (GameBits). A mono point is a full digit
+   wide; kerning just the point in keeps "0.3" inside the 14px bar without tracking the digits. */
+.evalbar-dot {
+  margin-inline: -0.15em;
+}
+.evalbar-label.tight {
+  /* Three characters with no point (mate in 10+, e.g. "M12"): rare, so a tighter fit is fine. */
+  font-size: 8px;
+  letter-spacing: -0.04em;
 }
 
 /* ---------- Toasts ---------- */
@@ -1281,12 +1308,17 @@ button.feedback:hover {
   display: flex;
   align-items: center;
   gap: 10px;
+  /* It may shrink inside a caption row (Play: tag, spacer, input, Flip) so the row never
+     overflows the board column; with room to spare the input keeps its full width. */
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .move-input input {
-  /* A definite width that fits the whole hint, 'Type a move: e4, Nf3, O-O' (a percentage width
-     let the caption row shrink it and clip the hint). */
+  /* A definite width that fits the whole hint, 'Type a move: e4, Nf3, O-O'. */
   width: calc(26ch + 24px);
   max-width: 100%;
+  min-width: 0;
+  flex: 0 1 auto;
   height: 34px;
   font-family: var(--font-mono);
   font-size: 0.86rem;
@@ -1358,8 +1390,14 @@ button.feedback:hover {
     background: Canvas;
   }
   .nav-item .icon,
-  .sidebar .icon {
+  .sidebar .icon,
+  .nav-item.active .icon,
+  .nav-item[data-route='kids'] .icon {
     color: CanvasText;
+  }
+  /* Board-theme previews are the only way to tell the swatches apart: keep their colours. */
+  .swatch-squares {
+    forced-color-adjust: none;
   }
   /* Selected states that were conveyed only by fill or shadow. */
   .segmented button.on,

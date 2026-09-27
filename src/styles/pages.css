@@ -14,6 +14,8 @@
   box-shadow: var(--hl-top), var(--shadow-2);
   position: relative;
   overflow: hidden;
+  /* The stats wrap under the text by the hero's own width (tablets, small laptops), not the viewport. */
+  container-type: inline-size;
 }
 .today-hero::after {
   /* A faint chequer in the corner: the one ornament, taken from the board itself. */
@@ -61,6 +63,9 @@
   .today-hero {
     padding: 24px 20px;
   }
+}
+@container (max-width: 800px) {
+  /* Too narrow for text and stats side by side: the stats take their own row under a hairline. */
   .today-stats {
     width: 100%;
     padding: 18px 0 0;
@@ -489,6 +494,10 @@
 }
 .lesson-panel h2 {
   font-size: 1.35rem;
+}
+.page:has(> .lesson-nav) {
+  /* BoardColumn leaves 16px under the board; a 24px gap above the sticky nav scrolled the page 8px. */
+  row-gap: 16px;
 }
 .lesson-nav {
   display: flex;
@@ -973,13 +982,17 @@
   gap: 6px;
   font-size: 0.92rem;
 }
-.tips .rich {
-  /* Reference notes beside the board: a denser serif than body prose so the panel fits short screens. */
-  font-size: 1rem;
-  line-height: 1.45;
-  gap: 4px;
+@media (min-width: 901px) and (max-height: 820px) {
+  /* Short laptop screens only: the drill's Technique notes use a denser serif than body prose
+     (spec .rich is 1.08rem/1.6) so the panel fits beside the board without a page scroll. */
+  .tips .rich {
+    font-size: 1rem;
+    line-height: 1.45;
+    gap: 4px;
+  }
 }
-.panel > .btn-row {
+/* The drill panel only: Take back, Hint and Restart share one row. */
+.panel:has(.tips) > .btn-row {
   column-gap: 6px;
 }
 
@@ -1506,6 +1519,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+@media (max-width: 900px) {
+  /* Equal cards on aligned rows instead of a ragged 3 + 2 wrap. */
+  .theme-swatches {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  }
 }
 .swatch {
   display: flex;

@@ -267,7 +267,7 @@ export function App() {
         </button>
         <MiniStats streak={streak} rating={p.puzzles.rating}>
           <InstallButton compact />
-          <button className="icon-btn" style={{ width: 32, height: 32 }} aria-label="Settings" onClick={() => navigate('settings')}>
+          <button className="icon-btn" aria-label="Settings" onClick={() => navigate('settings')}>
             <Icon name="settings" size={18} />
           </button>
         </MiniStats>
