@@ -3,6 +3,8 @@
 // karaoke highlighting (with a timed fallback when the engine sends no boundary events).
 import { useSyncExternalStore } from 'react';
 import { pronounce } from '../lib/pronounce';
+import { BAND_TUNING } from '../curriculum/tuning';
+import { getKid, updateKid, type KidProfile } from '../store/kidsStore';
 
 interface SpeakOpts {
   rate?: number;
@@ -115,7 +117,11 @@ function run(lines: string[], opts: SpeakOpts, token: number) {
         set({ speaking: false, word: -1 });
       }
     };
-    s.speak(u);
+    try {
+      s.speak(u);
+    } catch {
+      /* a speech error never breaks a screen */
+    }
   });
 }
 
@@ -202,4 +208,27 @@ export function lineId(text: string): string {
   let h = 5381;
   for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) >>> 0;
   return h.toString(36);
+}
+
+/**
+ * Speaks lines the way this kid hears them: the kid's rate (or the band's), the band's pitch, and the
+ * voice mode ('off' never auto-speaks; 'first' auto-speaks a line only the first time). `force` is a
+ * speaker-button tap, which always speaks. Returns the speech token when something was spoken.
+ */
+export function sayAs(kid: KidProfile | null | undefined, lines: string[], opts: { force?: boolean } = {}): number | undefined {
+  const clean = lines.map((l) => l.trim()).filter(Boolean);
+  if (!clean.length) return undefined;
+  const band = kid?.band ?? 'explorer';
+  const t = BAND_TUNING[band];
+  const rate = kid?.settings.rate ?? t.speechRate;
+  const voice = kid?.settings.voice ?? 'auto';
+  if (!opts.force && kid) {
+    if (voice === 'off') return undefined;
+    if (voice === 'first') {
+      const id = lineId(clean.join(' '));
+      if (getKid(kid.id)?.firsts.includes(id)) return undefined;
+      updateKid(kid.id, (d) => void d.firsts.push(id));
+    }
+  }
+  return speech.speak(clean, { rate, pitch: t.pitch });
 }

@@ -16,6 +16,9 @@ export function Intro({ steps, band, rate, onSay, onDone }: { steps: IntroStep[]
   const [last, setLast] = useState<[string, string] | null>(null);
   const [moved, setMoved] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const stepTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const stepStart = useRef(0);
+  const movedRef = useRef(false);
   const done = useRef(false);
   const finish = () => {
     if (done.current) return;
@@ -36,37 +39,56 @@ export function Intro({ steps, band, rate, onSay, onDone }: { steps: IntroStep[]
     if (p) setPos(p);
     setLast(null);
     setMoved(false);
+    movedRef.current = false;
+    stepStart.current = Date.now();
     const speakMs = Math.max(1100, (wordsOf(text) * 1000) / (2.4 * rate));
     const t: ReturnType<typeof setTimeout>[] = [];
     let at = speakMs;
     if (step.move) {
-      const [a, b] = step.move;
-      t.push(
-        setTimeout(() => {
-          setPos((cur) => applyMove(cur, a, b));
-          setLast([a, b]);
-          setMoved(true);
-          kidSound('move');
-          if (step.art?.[b] === 'star') setTimeout(() => kidSound('pop'), 180);
-        }, at),
-      );
+      t.push(setTimeout(() => doMove(step), at));
       at += 900;
     }
     at += step.ms ?? 1800;
     t.push(setTimeout(() => setI((x) => x + 1), at));
     timers.current.push(...t);
+    stepTimers.current = t;
     return () => t.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i]);
+
+  function doMove(st: IntroStep) {
+    if (!st.move || movedRef.current) return;
+    const [a, b] = st.move;
+    movedRef.current = true;
+    setPos((cur) => applyMove(cur, a, b));
+    setLast([a, b]);
+    setMoved(true);
+    kidSound('move');
+    if (st.art?.[b] === 'star') setTimeout(() => kidSound('pop'), 180);
+  }
+
+  // Eager little fingers: a tap on the board speeds Pip up. It plays the step's move right away,
+  // or goes on to the next step (after the last one, straight to "Your turn!").
+  const tapAhead = () => {
+    const st = steps[i];
+    if (!st || done.current || Date.now() - stepStart.current < 500) return;
+    stepTimers.current.forEach(clearTimeout);
+    if (st.move && !movedRef.current) {
+      doMove(st);
+      const t = setTimeout(() => setI((x) => x + 1), 1100);
+      stepTimers.current = [t];
+      timers.current.push(t);
+    } else setI((x) => x + 1);
+  };
 
   const step = steps[Math.min(i, steps.length - 1)];
   const art = { ...(step?.art ?? {}) };
   if (moved && step?.move) delete art[step.move[1]];
   return (
-    <div className="k-intro">
+    <div className="k-intro" onPointerUp={tapAhead}>
       <KidsBoard fen={placementFen(pos)} interactive={false} art={art} arrows={step?.arrows} tones={step?.tones} lastMove={last} label="Pip shows how it works" />
       <div className="k-intro-skip">
-        <BigButton variant="plain" size="small" icon="next" onClick={finish}>
+        <BigButton variant="plain" size="small" icon="next" onClick={finish} onPointerUp={(e: React.PointerEvent) => e.stopPropagation()}>
           Skip
         </BigButton>
       </div>

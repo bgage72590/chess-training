@@ -10,7 +10,7 @@ import { Pip } from '../ui/Pip';
 import { BigButton } from '../ui/BigButton';
 import { Confetti } from '../ui/Confetti';
 import { requireGate } from '../ui/ParentGate';
-import { speech } from '../player/speech';
+import { sayAs } from '../player/speech';
 import { kidSound } from '../lib/kidsSound';
 import { go } from '../routes';
 
@@ -19,7 +19,7 @@ export function Graduation({ kid }: { kid: KidProfile }) {
   const [form, setForm] = useState<'queen' | 'king' | null>(kid.graduated?.form ?? null);
   const [confetti, setConfetti] = useState(0);
   useEffect(() => {
-    if (ready && !kid.graduated) speech.speak(['You made it to the top of Crown Tower!', 'Your pawn can promote. Queen or King?']);
+    if (ready && !kid.graduated) sayAs(kid, ['You made it to the top of Crown Tower!', 'Your pawn can promote. Queen or King?']);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   if (!ready)
@@ -44,7 +44,7 @@ export function Graduation({ kid }: { kid: KidProfile }) {
     kidSound('crown');
     kidSound('fanfare');
     setConfetti(Date.now());
-    speech.speak([`All hail ${kid.name}, the chess ${f}!`]);
+    sayAs(kid, [`All hail ${kid.name || 'you'}, the chess ${f}!`]);
   };
   return (
     <div className={`k-screen k-graduate${form ? ' gold' : ''}`}>
@@ -69,7 +69,7 @@ export function Graduation({ kid }: { kid: KidProfile }) {
             <BigButton variant="go" icon="map" onClick={() => go.map()}>
               Map
             </BigButton>
-            <button type="button" className="k-linkbtn" onClick={() => requireGate('Print the certificate.', () => go.certificate(kid.id))}>
+            <button type="button" className="k-linkbtn" onClick={() => requireGate('Print the certificate.', () => go.certificate(kid.id), { keep: true })}>
               Grown-up: print the certificate
             </button>
           </div>

@@ -25,6 +25,8 @@ export interface ResultsProps {
   bossPassed?: boolean;
   openedRank?: { rank: number; title: string } | null;
   crown?: 'gold' | 'silver' | null;
+  /** A boss below the pass mark: the stars that open the next rank. */
+  need?: { stars: number; rank: number } | null;
   extra?: ReactNode;
   onNext?: () => void;
   nextLabel?: string;
@@ -90,10 +92,21 @@ export function Results(p: ResultsProps) {
             ))}
           </div>
         )}
-        <p className="k-results-recap">{p.recap}</p>
+        {/* The recap lands after the stars fill, so the reveal reads in order. */}
+        <p className={`k-results-recap${phase === 'done' ? ' in' : ' wait'}`} aria-live="polite">
+          {p.recap}
+        </p>
+        {p.need && (
+          <p className={`k-results-need${phase === 'done' ? ' in' : ' wait'}`} aria-label={`Get ${p.need.stars} stars to open Rank ${p.need.rank}`}>
+            {Array.from({ length: p.need.stars }, (_, i) => (
+              <StarShape key={i} filled={i < p.stars} size={26} />
+            ))}
+            <KidsIcon name="lock" size={22} /> opens Rank {p.need.rank}
+          </p>
+        )}
         {p.openedRank && (
-          <p className="k-results-open">
-            <KidsIcon name="lock" size={24} /> Rank {p.openedRank.rank} is open: {p.openedRank.title}!
+          <p className={`k-results-open${phase === 'done' ? ' in' : ' wait'}`}>
+            <KidsIcon name="unlock" size={24} /> Rank {p.openedRank.rank} is open: {p.openedRank.title}!
           </p>
         )}
         {(stickers.length > 0 || p.trophies.length > 0 || p.hats.length > 0) && (

@@ -6,11 +6,9 @@ import { standardScore } from '../types';
 import { applyMove, attacks, starDests, starLava, starSolve } from '../../lib/miniRules';
 import { placementFen } from '../../lib/fen';
 import { KidsBoard, useBounce } from '../../player/KidsBoard';
-import { bossOf, type WorldId } from '../../curriculum/worlds';
+import { dotsFor } from '../../lib/dots';
 import { ruleFor, starScore, PIECE_NAME, type StarItem } from './logic';
 import './stars.css';
-
-const PIECE_WORLD: Record<string, WorldId> = { R: 'w1', B: 'w2', Q: 'w3', K: 'w3', N: 'w4', P: 'w5' };
 
 export function StarCollector({ item, player, onDone, kid }: ActivityProps<StarItem>) {
   const [pieces, setPieces] = useState<Placement>(item.pieces);
@@ -37,12 +35,9 @@ export function StarCollector({ item, player, onDone, kid }: ActivityProps<StarI
   const lavaVisible = player.tuning.lavaVisible === 'always' || lavaSeen;
 
   // Dots: always (Sprout), until the piece's world boss is 3-starred, or only after a mistake.
-  const setting = kid.settings.showDests;
-  const pieceType = Object.values(item.pieces)[0]?.toUpperCase() ?? 'R';
-  const bossId = bossOf(PIECE_WORLD[pieceType] ?? 'w1')?.id;
-  const bossMastered = !!bossId && (kid.nodes[bossId]?.stars ?? 0) >= 3;
   const [now, setNow] = useState(0);
-  const showDots = setting === 'always' || (setting === 'until-mastered' && !bossMastered) || mistakes > 0 || now < dotsUntil;
+  const helped = mistakes > 0 || now < dotsUntil;
+  const showDots = (from: Sq) => helped || dotsFor(kid, pieces[from]);
 
   // Hints from the shortest route from the current position.
   const route = useMemo(() => starSolve(item, pieces, remaining), [item, pieces, remaining]);

@@ -15,8 +15,8 @@ import { BigButton } from '../ui/BigButton';
 import { SpeechBubble } from '../ui/SpeechBubble';
 import { Confetti } from '../ui/Confetti';
 import { requireGate } from '../ui/ParentGate';
-import { speech } from '../player/speech';
-import { startSession } from '../player/useSession';
+import { sayAs, speech } from '../player/speech';
+import { extendSession, markBreak, noteInput, onBreak, sessionOver } from '../player/useSession';
 import { go } from '../routes';
 import { isKidsLocked } from '../lock';
 import { toast } from '../../lib/toast';
@@ -25,7 +25,13 @@ export const rankOf = (kid: KidProfile) => WORLD_BY_ID.get(currentWorld(kid, REG
 
 export function pickKid(kid: KidProfile) {
   setActiveKid(kid.id);
-  startSession(kid.id);
+  noteInput();
+  // A resting kid (or one whose limit ran out) gets Break time, never a fresh session.
+  if (sessionOver(kid)) {
+    markBreak(kid.id);
+    go.map();
+    return;
+  }
   if (!kid.placed && kid.start !== 'new') go.placement();
   else if (!Object.keys(kid.nodes).length) go.play('w1-hello');
   else go.map();
@@ -56,11 +62,40 @@ export function ProfilePicker() {
       <div className="k-screen k-picker k-welcome">
         <div className="k-welcome-card k-card">
           <Pip mood="cheer" size={160} />
-          <SpeechBubble text="Hi! I'm Pip. Let's make your chess buddy!" tail="top" onSpeak={() => speech.speak(["Hi! I'm Pip. Let's make your chess buddy!"])} />
+          <SpeechBubble text="Hi! I'm Pip. Let's make your chess buddy!" tail="top" onSpeak={() => sayAs(null, ["Hi! I'm Pip. Let's make your chess buddy!"], { force: true })} />
           <BigButton variant="primary" icon="plus" onClick={() => go.newKid()} whoosh>
             New player
           </BigButton>
         </div>
+        <PickerCorners />
+      </div>
+    );
+  }
+
+  if (splash && s.kids.length === 1 && onBreak(s.kids[0])) {
+    const k = s.kids[0];
+    return (
+      <div className="k-screen k-picker k-splash k-splash-rest">
+        <div className="k-splash-card">
+          <Pip mood="sleepy" size={150} />
+          <h1 className="k-title k-splash-hi">Hi {k.name || 'friend'}!</h1>
+          <SpeechBubble text="Pip is resting. Come back after a little break!" tail="top" onSpeak={() => sayAs(k, ['Pip is resting.', 'Come back after a little break!'], { force: true })} />
+          <button
+            type="button"
+            className="k-linkbtn"
+            onClick={() =>
+              requireGate('Give 10 more minutes of play.', () => {
+                extendSession(k.id, 10);
+                pickKid(k);
+              })
+            }
+          >
+            Grown-up: 10 more minutes
+          </button>
+        </div>
+        <button type="button" className="k-linkbtn k-splash-other" onClick={() => setSplash(false)}>
+          Someone else is playing
+        </button>
         <PickerCorners />
       </div>
     );
@@ -101,7 +136,7 @@ export function ProfilePicker() {
       </header>
       <div className="k-avatar-grid">
         {s.kids.map((k) => (
-          <AvatarTile key={k.id} kid={k} rank={rankOf(k)} stars={totalStars(k)} onPick={() => pickKid(k)} />
+          <AvatarTile key={k.id} kid={k} rank={rankOf(k)} stars={totalStars(k)} resting={onBreak(k)} onPick={() => pickKid(k)} />
         ))}
         {s.kids.length < MAX_KIDS && (
           <button type="button" className="k-avatar-tile k-avatar-new" onClick={addKid}>
@@ -120,7 +155,7 @@ export function ProfilePicker() {
 function PickerCorners() {
   return (
     <div className="k-corners" onClick={(e) => e.stopPropagation()}>
-      <button type="button" className="k-corner" onClick={() => requireGate('Open the grown-ups area.', () => go.grownups())}>
+      <button type="button" className="k-corner" onClick={() => requireGate('Open the grown-ups area.', () => go.grownups(), { keep: true })}>
         <KidsIcon name="lock" size={20} /> Grown-ups
       </button>
       <button

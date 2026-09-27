@@ -15,7 +15,7 @@ import { PawnBuddy } from '../ui/PawnBuddy';
 import { BuddyFace } from '../ui/BuddyFace';
 import type { BuddyId } from '../curriculum/buddies';
 import { MapBar } from './MapScreen';
-import { speech } from '../player/speech';
+import { sayAs } from '../player/speech';
 import { kidSound } from '../lib/kidsSound';
 import { go } from '../routes';
 
@@ -29,7 +29,7 @@ export function StickerBook({ kid, tab }: { kid: KidProfile; tab: Tab }) {
     kidSound('whoosh');
     setPage((p) => (p + d + PAGES.length) % PAGES.length);
   };
-  const readFact = (def: StickerDef) => speech.speak([def.fact], { rate: kid.settings.rate ?? 0.95 });
+  const readFact = (def: StickerDef) => sayAs(kid, [def.fact], { force: true });
   const pg = PAGES[page];
   const w = WORLDS.find((x) => x.id === pg);
   const pageStickers = pg === 'special' ? [...MOMENT_STICKERS, ...extraEarned(kid)] : STICKERS.filter((s) => s.page === pg && (!s.node || visibleTo(NODE_BY_ID.get(s.node)!, kid.band)));

@@ -11,7 +11,7 @@ import { SpeechBubble } from '../ui/SpeechBubble';
 import { BigButton } from '../ui/BigButton';
 import { KidsIcon } from '../ui/KidsIcon';
 import { speech } from '../player/speech';
-import { startSession } from '../player/useSession';
+import { noteInput } from '../player/useSession';
 import { go } from '../routes';
 
 const LINES = [
@@ -48,7 +48,7 @@ export function NewKid() {
       s.kids.push(kid);
       s.activeKid = kid.id;
     });
-    startSession(kid.id);
+    noteInput();
     speech.cancel();
     if (kid.start === 'new') go.play('w1-hello', true);
     else go.placement(undefined, true);

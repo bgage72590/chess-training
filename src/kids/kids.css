@@ -3885,3 +3885,192 @@
   clip-path: polygon(50% 0, 60% 35%, 95% 20%, 70% 50%, 100% 70%, 62% 68%, 60% 100%, 45% 70%, 10% 90%, 32% 58%, 0 40%, 38% 36%);
   opacity: 0.85;
 }
+
+/* ================= Round 2 polish ================= */
+
+/* Map bar on phones: the chip shrinks (the name ellipsizes, then hides) so every button stays on screen. */
+.k-mapbar > * {
+  flex: none;
+}
+.k-mapbar > .k-mapbar-gap {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.k-mapbar > .k-avatar-chip {
+  flex: 0 1 auto;
+  min-width: 56px;
+  max-width: 40vw;
+}
+.k-avatar-chip-name {
+  min-width: 0;
+}
+@media (max-width: 479px) {
+  .k-mapbar {
+    gap: 8px;
+  }
+  .k-mapbar .k-stars-total {
+    padding: 0 10px;
+  }
+}
+@media (max-width: 419px) {
+  .k-mapbar > .k-avatar-chip {
+    width: 56px;
+    padding: 0;
+    justify-content: center;
+  }
+  .k-mapbar .k-avatar-chip-name {
+    display: none;
+  }
+}
+
+/* Player: Pip's row keeps one height in portrait, so the board never jumps while a kid aims. */
+.k-player-coach {
+  height: 88px;
+}
+.k-player-coach .k-bubble {
+  max-height: 84px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.k-player-coach .k-bubble-text {
+  line-height: 1.25;
+}
+@media (min-width: 700px) and (min-aspect-ratio: 11/10) {
+  .k-player-coach {
+    height: auto;
+  }
+  .k-player-coach .k-bubble {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+/* Portrait: an open sheet pushes the board up instead of covering its bottom rank. */
+.k-player.sheet-open .k-player-body {
+  padding-bottom: calc(var(--sheet-h, 220px) - 8px);
+}
+.k-player.sheet-open .k-player-main {
+  place-items: start center;
+}
+.k-player .k-player-body,
+.k-player .k-player-main > * {
+  transition: padding 220ms var(--k-ease-out), width 220ms var(--k-ease-out);
+}
+/* Landscape: the sheet sits in the tray column, beside the board. */
+@media (min-width: 700px) and (min-aspect-ratio: 11/10) {
+  .k-player.sheet-open .k-player-body {
+    padding-bottom: 0;
+  }
+  .k-player.sheet-open .k-player-main {
+    place-items: center;
+  }
+  .k-player .k-sheet {
+    left: auto;
+    right: var(--k-gutter);
+    top: 50%;
+    bottom: auto;
+    translate: 0 -50%;
+    width: 264px;
+    padding: 0;
+    animation-name: k-sheet-side;
+  }
+  .k-player.left-handed .k-sheet {
+    right: auto;
+    left: var(--k-gutter);
+  }
+  .k-player .k-sheet-card {
+    border-radius: var(--k-r-lg);
+    padding: 18px 16px;
+  }
+  .k-player .k-sheet-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  .k-player .k-sheet-actions .k-btn {
+    width: 100%;
+  }
+}
+@keyframes k-sheet-side {
+  from {
+    transform: translateX(120%);
+  }
+}
+
+/* Dots never point into lava: a dot always means a safe square. */
+.kids-board .sq:has(.k-art-lava) .dest {
+  display: none;
+}
+
+/* Results: the recap and the rank line land after the stars fill. */
+.k-results-recap.wait,
+.k-results-open.wait,
+.k-results-need.wait {
+  visibility: hidden;
+}
+.k-results-recap.in,
+.k-results-open.in,
+.k-results-need.in {
+  animation: k-fade-in 260ms var(--k-ease-out);
+}
+.k-results-need {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--k-r-pill);
+  background: var(--k-card-2);
+  border: 3px dashed var(--k-sun-edge);
+  font-family: var(--k-font-display);
+  font-weight: 600;
+  font-size: calc(var(--k-body) - 2px);
+  color: var(--k-ink);
+  margin: 0;
+}
+.k-peel > span:last-child {
+  font-family: var(--k-font-display);
+  font-size: calc(var(--k-body) - 2px);
+  font-weight: 600;
+}
+
+/* A resting kid on the picker: a sleepy "z z" and a softer tile. */
+.k-avatar-tile {
+  position: relative;
+}
+.k-avatar-tile.resting .k-buddy {
+  filter: saturate(0.7);
+}
+.k-avatar-zz {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  font-family: var(--k-font-display);
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--k-sea-edge);
+  animation: k-zz 2.4s ease-in-out infinite;
+}
+.k-avatar-zz small {
+  font-size: 18px;
+  margin-left: 2px;
+  vertical-align: super;
+}
+@keyframes k-zz {
+  50% {
+    transform: translateY(-5px);
+    opacity: 0.7;
+  }
+}
+.k-splash-rest .k-splash-card {
+  gap: 14px;
+}
+.k-splash-rest .k-bubble,
+.k-break .k-bubble,
+.k-place-card .k-bubble {
+  flex: none;
+  width: min(100%, 460px);
+}
+.k-splash-rest {
+  cursor: default;
+}

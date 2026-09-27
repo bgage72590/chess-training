@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import type { KidProfile } from '../store/kidsStore';
 import { REGISTRY } from '../packs';
 import { WORLDS, nodesOf, type NodeDef, type WorldDef } from '../curriculum/worlds';
-import { bossPassed, canGraduate, crownOf, currentWorld, frontierNode, nextNode, nodeUnlocked, totalStars, visibleTo, warmupPlan, worldPassed, worldUnlocked } from '../store/progress';
+import { activeNodes, bossPassed, earnedStars, canGraduate, crownOf, currentWorld, frontierNode, nextNode, nodeUnlocked, totalStars, visibleTo, warmupPlan, worldPassed, worldUnlocked } from '../store/progress';
 import { NodeBubble } from '../ui/NodeBubble';
 import { WorldBand } from '../ui/WorldBand';
 import { PawnBuddy } from '../ui/PawnBuddy';
@@ -104,7 +104,9 @@ function WorldOnMap({ kid, world, current, hopKey }: { kid: KidProfile; world: W
   const unlocked = worldUnlocked(kid, world.id, REGISTRY);
   const nodes = nodesOf(world.id).filter((n) => visibleTo(n, kid.band));
   const nextWorld = WORLDS[world.rank];
-  const got = nodes.reduce((a, n) => a + (kid.nodes[n.id]?.skipped ? 0 : kid.nodes[n.id]?.stars ?? 0), 0);
+  // Totals count only nodes that can be played now ("Coming soon" nodes wait for their pack).
+  const playable = activeNodes(world.id, kid.band, REGISTRY).filter((n) => !n.bonus);
+  const got = playable.reduce((a, n) => a + earnedStars(kid.nodes[n.id]), 0);
   const rows = nodes.length;
   const pts = nodes.map((_, i) => ({ x: ZIG[i % 4], y: (rows - 1 - i) * 116 + 50 }));
   return (
@@ -113,7 +115,7 @@ function WorldOnMap({ kid, world, current, hopKey }: { kid: KidProfile; world: W
       crown={crownOf(kid, world.id, REGISTRY)}
       locked={!unlocked}
       onOpen={() => go.world(world.id)}
-      starsText={unlocked ? `${got} / ${nodes.filter((n) => !n.bonus).length * 3}` : undefined}
+      starsText={unlocked && playable.length ? `${got} / ${playable.length * 3}` : undefined}
       footer={
         !unlocked && (
           <div className="k-world-lock">

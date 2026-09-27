@@ -1,6 +1,8 @@
 // The parent gate: press and hold for 2 s, then a times question in words (or the 4-digit PIN).
 // A speed bump, not security. Never spoken: speech is cancelled and muted while it is open.
-// A pass lasts 5 minutes, in memory only.
+// A pass is kept (5 minutes, in memory only) just for moving around inside the grown-ups area; KidsApp
+// clears it whenever the route leaves that area. One-off actions (exit, add a player, 10 more minutes)
+// never keep a pass, so a device handed back to a child always asks again.
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { getKids } from '../store/kidsStore';
 import { speech } from '../player/speech';
@@ -11,7 +13,7 @@ const PASS_MS = 5 * 60 * 1000;
 const HOLD_MS = 2000;
 
 let passUntil = 0;
-let request: { reason: string; onPass: () => void; id: number } | null = null;
+let request: { reason: string; onPass: () => void; id: number; keep: boolean } | null = null;
 let seq = 0;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
@@ -20,13 +22,16 @@ export function gatePassed(): boolean {
   return Date.now() < passUntil;
 }
 
-/** Runs `onPass` now if a gate pass is fresh, else opens the gate. */
-export function requireGate(reason: string, onPass: () => void) {
+/**
+ * Runs `onPass` now if a gate pass is fresh (only inside the grown-ups area), else opens the gate.
+ * `keep: true` (entering the grown-ups area or the certificate) keeps a pass after success.
+ */
+export function requireGate(reason: string, onPass: () => void, opts: { keep?: boolean } = {}) {
   if (gatePassed()) {
     onPass();
     return;
   }
-  request = { reason, onPass, id: ++seq };
+  request = { reason, onPass, id: ++seq, keep: !!opts.keep };
   emit();
 }
 
@@ -81,10 +86,10 @@ export function newQuestion(rng = Math.random): { text: string; answer: number }
 export function GateHost() {
   const req = useRequest();
   if (!req) return null;
-  return <ParentGate key={req.id} reason={req.reason} onPass={req.onPass} />;
+  return <ParentGate key={req.id} reason={req.reason} onPass={req.onPass} keep={req.keep} />;
 }
 
-function ParentGate({ reason, onPass }: { reason: string; onPass: () => void }) {
+function ParentGate({ reason, onPass, keep }: { reason: string; onPass: () => void; keep: boolean }) {
   const [step, setStep] = useState<'hold' | 'ask'>('hold');
   const [holding, setHolding] = useState(false);
   const [q, setQ] = useState(newQuestion);
@@ -113,7 +118,7 @@ function ParentGate({ reason, onPass }: { reason: string; onPass: () => void }) 
   useEffect(() => () => stopHold(), []);
 
   const pass = () => {
-    passUntil = Date.now() + PASS_MS;
+    passUntil = keep ? Date.now() + PASS_MS : 0;
     close();
     onPass();
   };

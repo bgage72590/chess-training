@@ -8,6 +8,8 @@ import { standardScore } from '../types';
 import { KidsBoard, useBounce } from '../../player/KidsBoard';
 import { VALUE } from '../../lib/danger';
 import { escapeWay, lineAccepts, load, meetsGoal, play, ruleLine, solutions, uciOf, wrongLine, type EscapeWay, type FindMoveItem } from './logic';
+import { dotsFor } from '../../lib/dots';
+import { fenPlacement } from '../../lib/fen';
 import './findMove.css';
 
 const NAME: Record<string, string> = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
@@ -266,15 +268,15 @@ export function FindMove({ item, player, onDone }: ActivityProps<FindMoveItem>) 
         wobble={shown?.wobble ?? null}
         tones={tones}
         hint={demo ? null : player.hint}
-        showDests={kidDots(player) || mistakes > 0}
+        showDests={(from) => mistakes > 0 || dotsFor(player.kid, pieceOn(boardFen, from))}
         label="Chess board: find the move"
       />
     </div>
   );
 }
 
-function kidDots(player: ActivityProps<unknown>['player']): boolean {
-  const s = player.kid.settings.showDests;
-  return s === 'always' || s === 'until-mastered';
+/** The piece letter on a square of a FEN ('R', 'n', ...), or undefined. */
+function pieceOn(fen: string, sq: Sq): string | undefined {
+  return fenPlacement(fen)[sq]?.toUpperCase();
 }
 

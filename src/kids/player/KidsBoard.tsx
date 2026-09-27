@@ -35,7 +35,8 @@ export interface KidsBoardProps {
   /** The current hint step: its tones, arrows and art are drawn too. */
   hint?: HintStep | null;
   wobble?: Sq | null;
-  showDests?: boolean;
+  /** Move dots: on/off, or per moving piece (its from-square). Dots never sit on lava. */
+  showDests?: boolean | ((from: Sq) => boolean);
   promotion?: 'auto' | 'picker';
   coordinates?: boolean;
   label?: string;
@@ -44,7 +45,7 @@ export interface KidsBoardProps {
 const toSq = (f: number, r: number) => FILES[f] + (r + 1);
 
 export function KidsBoard(props: KidsBoardProps) {
-  const { fen, orientation = 'white', interactive = true, playerColor, freeMoves, area, showDests = true } = props;
+  const { fen, orientation = 'white', interactive = true, playerColor, freeMoves, area } = props;
   const { kid, band, tuning } = useKidCtx();
   const wrap = useRef<HTMLDivElement>(null);
   const [sel, setSel] = useState<Sq | null>(null);
@@ -89,6 +90,9 @@ export function KidsBoard(props: KidsBoardProps) {
   const movable = Object.keys(dests);
   const lone = !!freeMoves && tuning.autoSelectLone && movable.length === 1 ? movable[0] : null;
   const active = kbdFrom ?? sel ?? lone;
+  const showDests = typeof props.showDests === 'function' ? !!active && props.showDests(active) : props.showDests ?? true;
+  /** Where the current press went down (tap-only: a drag-and-release still makes the move). */
+  const downSq = useRef<Sq | null>(null);
 
 
   const doMove = useCallback(
@@ -127,6 +131,7 @@ export function KidsBoard(props: KidsBoardProps) {
   const onPointerDownCapture = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 || promo) return;
     const sq = squareFromPoint(e.clientX, e.clientY);
+    downSq.current = null;
     if (!sq) return;
     setKbdFrom(null);
     if (areaSet && !areaSet.has(sq)) {
@@ -142,12 +147,28 @@ export function KidsBoard(props: KidsBoardProps) {
       return;
     }
     if (dests[sq]) {
+      downSq.current = sq;
       setSel((s) => (s === sq ? null : sq));
       return;
     }
     const from = sel ?? lone;
     if (from && !dests[from]?.includes(sq)) props.onMiss?.(sq, from);
     setSel(null);
+  };
+
+  // Tap-only mode absorbs drags (little fingers wobble), but a real drag from a piece onto one of its
+  // squares still counts: the release finishes the move like a second tap.
+  const onPointerUpCapture = (e: PointerEvent<HTMLDivElement>) => {
+    const from = downSq.current;
+    downSq.current = null;
+    if (!tapOnly || !from || !interactive || promo || e.button !== 0) return;
+    const to = squareFromPoint(e.clientX, e.clientY);
+    if (!to || to === from || (areaSet && !areaSet.has(to))) return;
+    if (dests[from]?.includes(to)) {
+      setSel(null);
+      props.onSquareClick?.(to);
+      doMove(from, to);
+    } else props.onMiss?.(to, from);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -214,7 +235,8 @@ export function KidsBoard(props: KidsBoardProps) {
     const tones = { ...(props.tones ?? {}), ...(props.hint?.tones ?? {}) };
     for (const [sq, t] of Object.entries(tones)) if (t === 'good') add(sq, 'check');
     // Kid-size dots for the auto-selected, tracked or keyboard piece (Board draws its own for drags).
-    if (showDests && active && (lone === active || kbdFrom === active)) for (const d of dests[active] ?? []) if (!layers.get(d)?.includes('dot')) add(d, 'dot');
+    if (showDests && active && (lone === active || kbdFrom === active))
+      for (const d of dests[active] ?? []) if (!layers.get(d)?.includes('dot') && !layers.get(d)?.includes('lava')) add(d, 'dot');
     const out: Record<Sq, ReactNode> = {};
     for (const sq of new Set([...layers.keys(), ...Object.keys(props.overlay ?? {}), ...(cursor ? [cursor] : [])])) {
       out[sq] = (
@@ -245,6 +267,7 @@ export function KidsBoard(props: KidsBoardProps) {
       onPointerMoveCapture={(e) => {
         if (tapOnly) e.stopPropagation();
       }}
+      onPointerUpCapture={onPointerUpCapture}
       onKeyDown={onKeyDown}
       onBlur={() => setCursor(null)}
     >

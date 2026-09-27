@@ -3,9 +3,14 @@ import type { KidProfile } from '../store/kidsStore';
 import { PawnBuddy } from './PawnBuddy';
 import { KidsIcon } from './KidsIcon';
 
-export function AvatarTile({ kid, rank, stars, onPick }: { kid: KidProfile; rank: number; stars: number; onPick(): void }) {
+export function AvatarTile({ kid, rank, stars, onPick, resting = false }: { kid: KidProfile; rank: number; stars: number; onPick(): void; resting?: boolean }) {
   return (
-    <button type="button" className="k-avatar-tile" onClick={onPick} aria-label={`${kid.name || 'Player'}: Rank ${rank}`}>
+    <button type="button" className={`k-avatar-tile${resting ? ' resting' : ''}`} onClick={onPick} aria-label={`${kid.name || 'Player'}: Rank ${rank}${resting ? ', resting' : ''}`}>
+      {resting && (
+        <span className="k-avatar-zz" aria-hidden="true">
+          z<small>z</small>
+        </span>
+      )}
       <PawnBuddy color={kid.avatar.color} face={kid.avatar.face} hat={kid.graduated ? 'crown' : kid.avatar.hat} size={96} />
       <span className="k-avatar-name">{kid.name || 'Player'}</span>
       <span className="k-avatar-meta">

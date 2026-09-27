@@ -1,5 +1,7 @@
-// Break time: shown at an item or results boundary when the session limit is reached.
-import { useEffect } from 'react';
+// Break time: shown at an item or results boundary when the session limit is reached, and again
+// whenever a resting kid is picked or the app is reopened (the break is saved on the kid). "Bye for
+// now!" goes back to the picker; only a grown-up (through the gate) can give 10 more minutes.
+import { useEffect, useRef } from 'react';
 import { dayKey } from '../../lib/srs';
 import type { KidProfile } from '../store/kidsStore';
 import { stickerDef } from '../curriculum/stickers';
@@ -7,24 +9,30 @@ import { Pip } from '../ui/Pip';
 import { BigButton } from '../ui/BigButton';
 import { StickerArt } from '../ui/StickerSlot';
 import { KidsIcon } from '../ui/KidsIcon';
+import { SpeechBubble } from '../ui/SpeechBubble';
 import { requireGate } from '../ui/ParentGate';
-import { extendSession, startSession } from '../player/useSession';
-import { speech } from '../player/speech';
-import { go } from '../routes';
-import { setActiveKid } from '../store/kidsStore';
+import { extendSession } from '../player/useSession';
+import { sayAs, speech } from '../player/speech';
 
-export function BreakTime({ kid, onContinue }: { kid: KidProfile; onContinue(): void }) {
+export function BreakTime({ kid, onBye, onContinue, resting = false }: { kid: KidProfile; onBye(): void; onContinue(): void; resting?: boolean }) {
   const today = kid.days[dayKey()] ?? { minutes: 0, stars: 0 };
   const stickers = (today.stickers ?? []).map((id) => stickerDef(id)).filter((d): d is NonNullable<typeof d> => !!d && !d.id.startsWith('st-garden'));
+  const title = resting ? 'Rest time!' : 'Great playing!';
+  const lines = resting ? ['Pip is still resting.', 'Come back after a little break!'] : ['Your brain grew today.', 'Time for a little break.'];
+  const spoken = [title, ...lines];
+  const kidRef = useRef(kid);
+  kidRef.current = kid;
   useEffect(() => {
-    if (kid.settings.voice !== 'off') speech.speak(['Great playing! Your brain grew today.', 'Time for a little break.']);
-  }, [kid.settings.voice]);
+    sayAs(kidRef.current, spoken);
+    return () => speech.cancel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resting]);
   return (
     <div className="k-overlay k-break-wrap" role="dialog" aria-label="Break time">
       <div className="k-card k-break">
         <Pip mood="sleepy" size={140} />
-        <h2 className="k-title">Great playing!</h2>
-        <p className="k-body">Your brain grew today. Time for a little break.</p>
+        <h2 className="k-title">{title}</h2>
+        <SpeechBubble text={lines.join(' ')} tail="top" onSpeak={() => sayAs(kid, spoken, { force: true })} />
         <div className="k-break-today">
           <span className="k-break-stat">
             <KidsIcon name="star" size={28} fill /> {today.stars} {today.stars === 1 ? 'star' : 'stars'} today
@@ -42,9 +50,7 @@ export function BreakTime({ kid, onContinue }: { kid: KidProfile; onContinue(): 
           icon="home"
           onClick={() => {
             speech.cancel();
-            startSession(null);
-            setActiveKid(null);
-            go.picker();
+            onBye();
           }}
           autoFocus
         >
@@ -55,7 +61,7 @@ export function BreakTime({ kid, onContinue }: { kid: KidProfile; onContinue(): 
           className="k-linkbtn"
           onClick={() =>
             requireGate('Give 10 more minutes of play.', () => {
-              extendSession(10);
+              extendSession(kid.id, 10);
               onContinue();
             })
           }

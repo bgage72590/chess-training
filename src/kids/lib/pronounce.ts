@@ -1,7 +1,5 @@
 // Turns captions into what the speech engine should say: square names, SAN moves and symbols.
 // Applied only to the spoken string, never to the caption (spec 10.1).
-import type { AgeBand } from '../activities/types';
-
 const NUM = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
 const PIECE: Record<string, string> = { K: 'king', Q: 'queen', R: 'rook', B: 'bishop', N: 'knight' };
 const PROMO: Record<string, string> = { Q: 'a queen', R: 'a rook', B: 'a bishop', N: 'a knight' };
@@ -12,7 +10,7 @@ const sayFile = (f: string) => (f === 'a' ? 'ay' : f);
 const saySquare = (f: string, r: string) => `${sayFile(f)} ${NUM[Number(r)]}`;
 
 /** Pronunciation map. 'e4' -> 'e four', 'Qb7#' -> 'queen b seven, checkmate', 'O-O' -> 'castles king side'. */
-export function pronounce(text: string, _band?: AgeBand): string {
+export function pronounce(text: string): string {
   let s = text;
   s = s.replace(/\bO-O-O\b/g, 'castles queen side').replace(/\bO-O\b/g, 'castles king side');
   // SAN moves: optional piece, optional disambiguation, optional capture, square, promotion, check/mate.

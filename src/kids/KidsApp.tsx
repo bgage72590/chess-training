@@ -5,16 +5,16 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import './fonts';
 import './kids.css';
 import { useToasts } from '../lib/toast';
-import { useKids } from './store/kidsStore';
+import { setActiveKid, useKids } from './store/kidsStore';
 import { BAND_TUNING } from './curriculum/tuning';
 import { KidContext } from './player/context';
 import { speech } from './player/speech';
-import { useSessionTracker } from './player/useSession';
+import { breakIsFresh, clearFreshBreak, markBreak, onBreak, sessionOver, useSessionTracker } from './player/useSession';
 import { kidsSound } from './lib/kidsSound';
 import { resolvePieceSet } from './lib/pieceProbe';
 import { isKidsLocked } from './lock';
 import { parseKidsRoute, go } from './routes';
-import { GateHost, gatePassed, requireGate } from './ui/ParentGate';
+import { clearGatePass, GateHost, gatePassed, requireGate } from './ui/ParentGate';
 import { KidsIcon } from './ui/KidsIcon';
 import { Pip } from './ui/Pip';
 import { BigButton } from './ui/BigButton';
@@ -28,6 +28,12 @@ import { Playground } from './screens/Playground';
 import { StickerBook } from './screens/StickerBook';
 import { Grownups } from './screens/Grownups';
 import { Certificate, Graduation } from './screens/Graduation';
+import { BreakTime } from './screens/BreakTime';
+
+/** Screens that belong to grown-ups: a gate pass lives only while one of these is open. */
+const GROWNUP_SCREENS = ['grownups', 'certificate'];
+/** Calm screens between plays, where a reached session limit turns into Break time right away. */
+const BOUNDARY_SCREENS = ['map', 'world', 'stickers', 'warmup', 'graduate'];
 
 /** A locked device lands on the active kid's map once per launch; after that #/kids is the picker. */
 let lockedLandingUsed = false;
@@ -61,6 +67,14 @@ export function KidsApp({ route }: { route: string }) {
     speech.cancel();
     if (r.screen !== 'picker') lockedLandingUsed = true;
   }, [route, r.screen]);
+  // Leaving the grown-ups area ends the gate pass, so a handed-back device asks again.
+  useEffect(() => {
+    if (!GROWNUP_SCREENS.includes(r.screen)) clearGatePass();
+  }, [r.screen]);
+  // A reached session limit (after a reload, say) becomes Break time on the calm screens.
+  useEffect(() => {
+    if (kid && BOUNDARY_SCREENS.includes(r.screen) && sessionOver(kid)) markBreak(kid.id);
+  }, [kid, r.screen]);
   useEffect(() => () => speech.cancel(), []);
   useEffect(() => kidsSound.setEnabled(kid ? kid.settings.sound : true), [kid]);
   useEffect(() => speech.setVoice(s.device.voiceURI), [s.device.voiceURI]);
@@ -73,7 +87,7 @@ export function KidsApp({ route }: { route: string }) {
   }, []);
 
   // With no active kid, only the picker, the new-player wizard and the grown-up pages are open.
-  const needsKid = !['picker', 'new', 'grownups', 'certificate'].includes(r.screen);
+  const needsKid = !['picker', 'new', ...GROWNUP_SCREENS].includes(r.screen);
   useEffect(() => {
     if (needsKid && !kid) go.picker(true);
   }, [needsKid, kid]);
@@ -153,6 +167,18 @@ export function KidsApp({ route }: { route: string }) {
           <span className="k-cloud c3" />
         </div>
         {screen}
+        {kid && needsKid && onBreak(kid) && (
+          <BreakTime
+            kid={kid}
+            resting={!breakIsFresh(kid.id)}
+            onBye={() => {
+              clearFreshBreak();
+              setActiveKid(null);
+              go.picker();
+            }}
+            onContinue={clearFreshBreak}
+          />
+        )}
         <GateHost />
         <KidsToasts />
       </div>
@@ -165,7 +191,7 @@ function Gated({ reason, children }: { reason: string; children: React.ReactNode
   const [, force] = useState(0);
   const ok = gatePassed();
   useEffect(() => {
-    if (!ok) requireGate(reason, () => force((x) => x + 1));
+    if (!ok) requireGate(reason, () => force((x) => x + 1), { keep: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ok]);
   if (ok) return <>{children}</>;

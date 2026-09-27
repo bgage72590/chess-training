@@ -31,7 +31,7 @@ export const nodeOf = (kid: KidProfile, id: string): NodeProgress | undefined =>
 
 /** Played to at least 1 star, tested out, or skipped: the next node may open. */
 export function nodeDone(np: NodeProgress | undefined): boolean {
-  return !!np && (np.stars >= 1 || !!np.tested || !!np.skipped);
+  return !!np && (np.stars >= 1 || !!np.tested || !!np.passed || !!np.skipped);
 }
 
 export const bossPassMark = (band: AgeBand) => BAND_TUNING[band].bossPass;
@@ -40,7 +40,8 @@ export const bossPassMark = (band: AgeBand) => BAND_TUNING[band].bossPass;
 export function bossPassed(kid: KidProfile, node: NodeDef): boolean {
   const np = kid.nodes[node.id];
   if (!np) return false;
-  if (np.tested) return true;
+  // A pass is kept once earned: a test-out (placement or a skip-ahead challenge) never relocks.
+  if (np.tested || np.passed) return true;
   if (node.game) return (np.won?.length ?? 0) > 0;
   return np.stars >= bossPassMark(kid.band);
 }
@@ -52,7 +53,7 @@ export function worldPassed(kid: KidProfile, world: WorldId, reg: Registry): boo
   if (!active.length) return true;
   const boss = bossOf(world);
   if (boss && visibleTo(boss, kid.band) && reg.isRegistered(boss.id)) return bossPassed(kid, boss) || !!kid.nodes[boss.id]?.skipped;
-  return active.every((n) => (kid.nodes[n.id]?.stars ?? 0) >= 1 || kid.nodes[n.id]?.tested);
+  return active.every((n) => (kid.nodes[n.id]?.stars ?? 0) >= 1 || kid.nodes[n.id]?.tested || kid.nodes[n.id]?.passed);
 }
 
 export function worldUnlocked(kid: KidProfile, world: WorldId, reg: Registry): boolean {
@@ -124,9 +125,13 @@ export function crownOf(kid: KidProfile, world: WorldId, reg: Registry): 'gold' 
   return null;
 }
 
+/** Stars the kid earned by playing. Test-out stars (paper planes) and skipped nodes count for nothing:
+ *  placement gives no rewards (spec 3.2), so they never fill totals, hats or the family jar. */
+export const earnedStars = (np: NodeProgress | undefined): number => (!np || np.skipped || np.tested ? 0 : np.stars);
+
 export function totalStars(kid: KidProfile): number {
   let s = 0;
-  for (const np of Object.values(kid.nodes)) s += np.skipped ? 0 : np.stars;
+  for (const np of Object.values(kid.nodes)) s += earnedStars(np);
   return s;
 }
 
@@ -293,7 +298,7 @@ export function recordRun(kid: KidProfile, run: RunSummary, reg: Registry, today
   np.lastItems = [...np.lastItems, ...run.itemIds].slice(-6);
   if (score > np.stars) np.stars = score;
   if (golden) np.golden = true;
-  if (np.tested) delete np.tested; // a real completion replaces the test-out
+  if (np.tested) delete np.tested; // a real completion replaces the paper-plane badge (the pass stays via `passed`)
   if (!outcome && run.results.length && run.results.every((r) => r.mistakes === 0 && r.hintLevel === 0)) np.clean = true;
   else delete np.clean;
   if (score >= 2 && !np.masteredDays.includes(today)) np.masteredDays = [...np.masteredDays, today].slice(-2);
@@ -502,21 +507,30 @@ export function placementStep(s: PlacementState, passed: boolean, cap: number): 
   return n;
 }
 
-/** Marks tested-out worlds (every visible node gets 1 star and `tested`; no stickers) and sets the puzzle rating. */
-export function applyPlacement(kid: KidProfile, testedWorlds: number[], today = dayKey()) {
+/**
+ * Marks tested-out worlds: every visible node keeps a permanent pass (`passed`), and unplayed nodes
+ * also get 1 star and the paper-plane badge (`tested`). No stickers. A node the kid already played
+ * below the pass mark (a stuck boss) keeps its stars but is passed, so the next world really opens.
+ * The puzzle rating only ever goes up here (a single-world challenge never lowers it).
+ */
+export function applyPlacement(kid: KidProfile, testedWorlds: number[], today = dayKey(), opts: { challenge?: boolean } = {}) {
   for (const wi of testedWorlds) {
     const w = WORLDS[wi - 1];
     if (!w) continue;
     for (const n of nodesOf(w.id)) {
       if (!visibleTo(n, kid.band)) continue;
       const np = (kid.nodes[n.id] ??= emptyNode(today));
+      np.passed = true;
       if (np.plays === 0 && np.stars === 0) {
         np.stars = 1;
         np.tested = true;
       }
+      if (np.skipped) delete np.skipped;
     }
   }
-  kid.puzzle.rating = Math.min(850, 600 + 40 * testedWorlds.length);
+  if (testedWorlds.length) kid.puzzle.rating = Math.max(kid.puzzle.rating, Math.min(850, 600 + 40 * testedWorlds.length));
+  if (!opts.challenge) kid.testedOut = testedWorlds.length;
+  else kid.testedOut = Math.max(kid.testedOut ?? 0, testedWorlds.length);
   kid.placed = true;
 }
 

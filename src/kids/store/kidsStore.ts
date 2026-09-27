@@ -46,6 +46,23 @@ export interface KidProfile {
   graduated?: { t: number; form: 'queen' | 'king' };
   /** Whether placement has been offered and finished (or skipped). */
   placed?: boolean;
+  /** How many worlds placement (or a skip-ahead challenge) tested out. Explorer startTier 2 needs > 0. */
+  testedOut?: number;
+  /** The play session (spec 10.5): persisted so a re-pick or a reload never resets the limit. */
+  session?: KidSession;
+}
+
+export interface KidSession {
+  /** When this session started (ms). */
+  start: number;
+  /** Last saved active tick (ms); 30 min away starts a fresh session. */
+  last: number;
+  /** Active minutes played in this session. */
+  min: number;
+  /** Extra minutes a grown-up granted through the gate. */
+  extra: number;
+  /** When Break time was shown (ms). The kid rests until the cooldown ends or a grown-up extends. */
+  breakAt?: number;
 }
 
 export interface DayRecord {
@@ -75,6 +92,8 @@ export interface NodeProgress {
   hintMax?: 0 | 1 | 2 | 3 | 4; // highest hint level at the last play
   /** The last play had no mistakes at all (fast track). */
   clean?: boolean;
+  /** Passed by a test-out (placement or a skip-ahead challenge). Kept forever: a replay never relocks. */
+  passed?: boolean;
   /** Boss opened early by the fast track ("Want to try the boss now?"). */
   fastTrack?: boolean;
   /** A missed warm-up: shows a small practice leaf on the map. */
@@ -191,6 +210,7 @@ function normalizeNode(x: unknown): NodeProgress | null {
   };
   if (x.golden === true) out.golden = true;
   if (x.tested === true) out.tested = true;
+  if (x.passed === true || x.tested === true) out.passed = true;
   if (x.skipped === true) out.skipped = true;
   if (x.leaf === true) out.leaf = true;
   if (x.clean === true) out.clean = true;
@@ -275,6 +295,12 @@ function normalizeKid(x: unknown): KidProfile | null {
     placed: typeof x.placed === 'boolean' ? x.placed : true,
   };
   if (Array.isArray(x.scene)) kid.scene = x.scene.filter(isObj).filter((e) => typeof e.id === 'string').map((e) => ({ id: e.id as string, x: num(e.x, 0), y: num(e.y, 0) }));
+  if (typeof x.testedOut === 'number') kid.testedOut = num(x.testedOut, 0, 0, 8);
+  if (isObj(x.session)) {
+    const se = x.session;
+    kid.session = { start: num(se.start, 0, 0), last: num(se.last, 0, 0), min: num(se.min, 0, 0, 1440), extra: num(se.extra, 0, 0, 1440) };
+    if (typeof se.breakAt === 'number' && Number.isFinite(se.breakAt)) kid.session.breakAt = se.breakAt;
+  }
   if (isObj(x.graduated)) kid.graduated = { t: num(x.graduated.t, Date.now()), form: oneOf(x.graduated.form, ['queen', 'king'] as const, 'queen') };
   return kid;
 }
@@ -327,15 +353,44 @@ function storage(): StorageLike | null {
   }
 }
 
+export const KIDS_BACKUP_KEY = 'tempo.kids.v1.bak';
+let recovered = false;
+
+/** Unreadable data (bad JSON, a newer version, kids that all fail to load) is copied aside before the
+ *  first write replaces it, so one bad write never wipes every child's progress for good. */
+function keepBackup(st: StorageLike | null, raw: string) {
+  recovered = true;
+  try {
+    st?.setItem(KIDS_BACKUP_KEY, raw);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Reads kids data from a storage (null storage or a throwing one gives the default). */
 export function readKids(st: StorageLike | null = storage()): KidsState {
+  let raw: string | null | undefined;
   try {
-    const raw = st?.getItem(KIDS_KEY);
-    return raw ? normalizeKids(JSON.parse(raw)) : defaultKidsState();
+    raw = st?.getItem(KIDS_KEY);
   } catch {
     return defaultKidsState();
   }
+  if (!raw) return defaultKidsState();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    keepBackup(st, raw);
+    return defaultKidsState();
+  }
+  const out = normalizeKids(parsed);
+  const hadKids = isObj(parsed) && Array.isArray(parsed.kids) && parsed.kids.length > 0;
+  if (!isObj(parsed) || parsed.v !== 1 || (hadKids && !out.kids.length)) keepBackup(st, raw);
+  return out;
 }
+
+/** Saved data could not be read and a copy was kept under KIDS_BACKUP_KEY. */
+export const kidsRecovered = () => recovered;
 
 /** Writes kids data; returns false when storage is unavailable (the in-memory copy stays). */
 export function writeKids(s: KidsState, st: StorageLike | null = storage()): boolean {
@@ -352,6 +407,19 @@ let state: KidsState = readKids();
 let saveFailed = false;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
+
+// Another tab saved: take its data, so two open tabs do not overwrite each other's progress.
+if (typeof window !== 'undefined') {
+  try {
+    window.addEventListener('storage', (e) => {
+      if (e.key !== KIDS_KEY || e.newValue == null) return;
+      state = readKids();
+      emit();
+    });
+  } catch {
+    /* ignore */
+  }
+}
 
 function commit(next: KidsState) {
   next.updatedAt = Date.now();

@@ -8,7 +8,7 @@ import { SKILLS } from '../curriculum/skills';
 import { WORLDS, WORLD_BY_ID } from '../curriculum/worlds';
 import { BUDDIES, type BuddyId } from '../curriculum/buddies';
 import { REGISTRY } from '../packs';
-import { defaultKidsState, defaultSettings, getKids, normalizeKids, replaceKids, updateKid, updateKids, useKids, useSaveFailed, type KidProfile, type KidSettings } from '../store/kidsStore';
+import { defaultKidsState, defaultSettings, getKids, normalizeKids, replaceKids, updateKid, updateKids, useKids, useSaveFailed, kidsRecovered, type KidProfile, type KidSettings } from '../store/kidsStore';
 import { applyPlacement, canDo, canGraduate, currentWorld, minutesLast7, neededHelp, totalStars } from '../store/progress';
 import { isKidsLocked, setKidsLocked } from '../lock';
 import { hashPin, newSalt, pinSupported, clearGatePass } from '../ui/ParentGate';
@@ -35,6 +35,7 @@ export function Grownups({ kidId }: { kidId?: string }) {
         </button>
       </header>
       {saveFailed && <p className="k-gu-warn">Progress won&rsquo;t be saved on this device (storage is blocked).</p>}
+      {kidsRecovered() && <p className="k-gu-warn">Saved Kids data could not be read, so Kids mode started fresh. A copy of the old data was kept on this device (tempo.kids.v1.bak).</p>}
       {s.kids.length > 0 && (
         <nav className="k-gu-kids" aria-label="Choose a kid">
           {s.kids.map((k) => (

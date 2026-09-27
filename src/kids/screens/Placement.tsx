@@ -1,18 +1,18 @@
 // "Show Pip what you know!": world checkpoints (3 items each). 2 of 3 tests a world out; 2 misses
 // stops. Never called a test; no score display, just a 3-dot path per world.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ItemResult } from '../activities/types';
 import { CHECKPOINTS, REGISTRY } from '../packs';
 import { WORLDS } from '../curriculum/worlds';
 import { BAND_TUNING } from '../curriculum/tuning';
-import { applyPlacement, worldPassed, placementItemPass, placementStart, placementStep, placementWorldPassed, type PlacementState } from '../store/progress';
-import { updateKid, type KidProfile } from '../store/kidsStore';
+import { applyPlacement, worldPassed, worldUnlocked, placementItemPass, placementStart, placementStep, placementWorldPassed, type PlacementState } from '../store/progress';
+import { getKid, updateKid, type KidProfile } from '../store/kidsStore';
 import { ActivityPlayer } from '../player/ActivityPlayer';
 import { Pip } from '../ui/Pip';
 import { PawnBuddy } from '../ui/PawnBuddy';
 import { BigButton } from '../ui/BigButton';
 import { SpeechBubble } from '../ui/SpeechBubble';
-import { speech } from '../player/speech';
+import { sayAs, speech } from '../player/speech';
 import { go } from '../routes';
 
 export function Placement({ kid, single }: { kid: KidProfile; single?: number }) {
@@ -31,7 +31,7 @@ export function Placement({ kid, single }: { kid: KidProfile; single?: number })
     setDots(results.map((r) => (placementItemPass(r) ? 'pass' : 'miss')));
     if (single) {
       const tested = passed ? Array.from({ length: single - 1 }, (_, i) => i + 1).filter((w) => !worldPassed(kid, WORLDS[w - 1].id, REGISTRY)) : [];
-      if (passed) updateKid(kid.id, (d) => applyPlacement(d, tested));
+      if (passed) updateKid(kid.id, (d) => applyPlacement(d, tested, undefined, { challenge: true }));
       setSinglePassed(passed);
       setState({ ...state, done: true, startWorld: single, tested });
       return;
@@ -68,13 +68,27 @@ export function Placement({ kid, single }: { kid: KidProfile; single?: number })
     [dots, state.world],
   );
 
+  // The last card is read aloud too (a Sprout who "knows the moves" may not read yet).
+  const sw = WORLDS[Math.min(8, state.startWorld) - 1];
+  const opened = !!single && singlePassed && worldUnlocked(getKid(kid.id) ?? kid, sw.id, REGISTRY);
+  const doneText = !state.done ? '' : single ? (opened ? `Rank ${sw.rank}: ${sw.title} is open!` : singlePassed ? 'Great playing! Keep going on the map.' : 'Good try! Keep playing to get there.') : `You start at Rank ${sw.rank}: ${sw.title}!`;
+  useEffect(() => {
+    if (doneText) sayAs(getKid(kid.id) ?? kid, [doneText]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doneText]);
+  const introLine = "Let's play a few quick games so I know where your adventure starts.";
+  useEffect(() => {
+    if (intro) sayAs(kid, [introLine]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intro]);
+
   if (intro)
     return (
       <div className="k-screen k-placement k-center">
         <div className="k-card k-place-card">
           <Pip mood="cheer" size={140} />
           <h1 className="k-title">Show Pip what you know!</h1>
-          <SpeechBubble text="Let's play a few quick games so I know where your adventure starts." tail="top" onSpeak={() => speech.speak(["Let's play a few quick games so I know where your adventure starts."])} />
+          <SpeechBubble text={introLine} tail="top" onSpeak={() => sayAs(kid, [introLine], { force: true })} />
           <BigButton variant="go" icon="play" onClick={() => setIntro(false)} whoosh autoFocus>
             Let&rsquo;s go!
           </BigButton>
@@ -86,13 +100,12 @@ export function Placement({ kid, single }: { kid: KidProfile; single?: number })
     );
 
   if (state.done) {
-    const sw = WORLDS[Math.min(8, state.startWorld) - 1];
-    const text = single ? (singlePassed ? `Rank ${sw.rank}: ${sw.title} is open!` : 'Good try! Keep playing to get there.') : `You start at Rank ${sw.rank}: ${sw.title}!`;
     return (
       <div className="k-screen k-placement k-center">
         <div className="k-card k-place-card">
           <PawnBuddy color={kid.avatar.color} face={kid.avatar.face} hat={kid.avatar.hat} size={120} className="k-hop-up" />
-          <h1 className="k-title">{text}</h1>
+          <h1 className="k-title">{single ? (opened ? 'Hooray!' : singlePassed ? 'Great playing!' : 'Good try!') : 'All set!'}</h1>
+          <SpeechBubble text={doneText} tail="top" onSpeak={() => sayAs(kid, [doneText], { force: true })} />
           <BigButton
             variant="primary"
             icon="map"

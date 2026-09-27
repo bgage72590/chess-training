@@ -34,6 +34,12 @@ const P: Record<string, ReactNode> = {
       <path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3" />
     </>
   ),
+  unlock: (
+    <>
+      <rect x="5" y="11" width="14" height="10" rx="2.5" />
+      <path d="M8.5 11V8a3.5 3.5 0 0 1 6.6-1.6" />
+    </>
+  ),
   door: (
     <>
       <path d="M6.5 21V4.5h10V21M3.5 21h17" />
@@ -167,7 +173,7 @@ const P: Record<string, ReactNode> = {
 };
 
 export type KidsIconName =
-  | 'play' | 'again' | 'home' | 'x' | 'bulb' | 'speaker' | 'lock' | 'door' | 'map' | 'book' | 'trophy' | 'gift'
+  | 'play' | 'again' | 'home' | 'x' | 'bulb' | 'speaker' | 'lock' | 'unlock' | 'door' | 'map' | 'book' | 'trophy' | 'gift'
   | 'star' | 'crown' | 'castle' | 'flag' | 'rock' | 'flame' | 'candy' | 'road' | 'eye' | 'puzzle' | 'swords'
   | 'shield' | 'leaf' | 'plane' | 'cloud' | 'clock' | 'heart' | 'check' | 'dots' | 'plus'
   | 'back' | 'next' | 'moon' | 'sun' | 'trash' | 'print' | 'download' | 'upload' | 'gear' | 'chart' | 'user' | 'mute';

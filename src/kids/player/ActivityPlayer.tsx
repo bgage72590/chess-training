@@ -9,14 +9,14 @@ import { NODE_BY_ID, WORLDS } from '../curriculum/worlds';
 import { stickerDef, TROPHY_BY_ID } from '../curriculum/stickers';
 import { ACTIVITIES, REGISTRY } from '../packs';
 import { awardTo, getKid, updateKid, updateKids, type KidProfile } from '../store/kidsStore';
-import { acceptEase, acceptFastTrack, fastTrackOffer, addFamilyStars, bossOffers, nextNode, nodeScore, recordRun, recordWarmup, skipNode, activeNodes, type RunOutcome } from '../store/progress';
+import { acceptEase, acceptFastTrack, fastTrackOffer, addFamilyStars, bossOffers, bossPassed, bossPassMark, nextNode, nodeScore, recordRun, recordWarmup, skipNode, activeNodes, type RunOutcome } from '../store/progress';
 import { hashSeed, mulberry32 } from '../lib/rng';
 import { kidSound, type KidSound } from '../lib/kidsSound';
 import { toast } from '../../lib/toast';
 import { engine } from '../../engine/engine';
 import { RunPicker, type RunItem } from './run';
 import { lineId, speech } from './speech';
-import { sessionOver } from './useSession';
+import { markBreak, onBreak, sessionOver } from './useSession';
 import { useKidCtx } from './context';
 import { Intro, PiecePick } from './Intro';
 import { Results } from './Results';
@@ -28,7 +28,6 @@ import { Confetti } from '../ui/Confetti';
 import { KidsIcon } from '../ui/KidsIcon';
 import type { PipState } from '../ui/ProgressPips';
 import type { PipMood } from '../ui/Pip';
-import { BreakTime } from '../screens/BreakTime';
 import { go } from '../routes';
 
 export interface PlanItem {
@@ -84,7 +83,8 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       set && mode !== 'warmup'
         ? new RunPicker(set, band, {
             itemsPerRun: tuning.itemsPerRun,
-            startTier: band === 'explorer' && kid.start !== 'new' ? 2 : tuning.startTier,
+            // Explorer: tier 1, or tier 2 once placement really tested out a world (spec 3.3).
+            startTier: band === 'explorer' && (kid.testedOut ?? 0) > 0 ? 2 : tuning.startTier,
             rng: rngRef.current,
             lastItems: np?.lastItems,
             game: isGame,
@@ -222,9 +222,10 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
   );
 
   const nextItem = useCallback(() => {
-    if (sessionOver(getKid(kid.id)) && results.current.length > 0 && mode !== 'placement') {
+    if (sessionOver(getKid(kid.id)) && mode !== 'placement') {
       pendingAfterBreak.current = () => nextItem();
       setPhase('break');
+      markBreak(kid.id);
       return;
     }
     if (mode === 'warmup') {
@@ -316,6 +317,9 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
 
   // ---------- finishing ----------
   function finishRun() {
+    // Pip's old instruction goes; the results recap replaces it once the stars have filled.
+    setCoach({ text: '' });
+    speech.cancel();
     if (mode === 'node' && props.nodeId) {
       let out: RunOutcome | null = null;
       updateKids((s) => {
@@ -339,8 +343,19 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
     if (sessionOver(getKid(kid.id)) && mode !== 'placement') {
       pendingAfterBreak.current = () => setPhase('results');
       setPhase('break');
+      markBreak(kid.id);
     } else setPhase('results');
   }
+
+  // Break time itself is drawn by KidsApp (so a re-pick or a reload shows it too). When a grown-up
+  // gives more minutes, the break ends and the run carries on where it stopped.
+  useEffect(() => {
+    if (phase !== 'break' || onBreak(getKid(kid.id))) return;
+    const f = pendingAfterBreak.current;
+    pendingAfterBreak.current = null;
+    if (f) f();
+    else setPhase('item');
+  }, [phase, kid]);
 
   // ---------- the API activities see ----------
   const player: PlayerApi = {
@@ -362,7 +377,9 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
         kidSound('sparkle');
       }
       if (tuning.hintOfferOnly && n >= 3) setPulse(true);
-      say([text ?? "Hmm, let's try another way!", ...(hintLine ? [hintLine] : [])], 'oops');
+      const oops = text ?? "Hmm, let's try another way!";
+      // Sprouts hear and see one short line at a time: the new hint replaces the "oops" line.
+      say(band === 'sprout' && hintLine ? hintLine : [oops, ...(hintLine ? [hintLine] : [])], 'oops');
       if (n >= 3 && !easierOffered.current && mode !== 'placement' && !isGame) {
         easierOffered.current = true;
         setTimeout(() => setOffer('easier'), 900);
@@ -473,7 +490,9 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
     const nextN = nextNode(k, REGISTRY);
     const opened = outcome.worldOpened ? WORLDS.find((w) => w.id === outcome.worldOpened) : null;
     const lowest = node && offers.practice ? activeNodes(node.world, k.band, REGISTRY).filter((n) => !n.boss && !n.bonus).sort((a, b) => (k.nodes[a.id]?.stars ?? 0) - (k.nodes[b.id]?.stars ?? 0))[0] : undefined;
-    const recap = recapFor(outcome, node?.title ?? '', band, isGame);
+    const below = !!node?.boss && !isGame && !bossPassed(k, node) && !k.nodes[node.id]?.skipped;
+    const nextWorld = node ? WORLDS[WORLDS.findIndex((w) => w.id === node.world) + 1] : undefined;
+    const recap = below && nextWorld ? belowPassRecap(outcome.score, bossPassMark(band), nextWorld.rank, band) : recapFor(outcome, node?.title ?? '', band, isGame);
     const fast = node ? fastTrackOffer(k, node.id, REGISTRY) : null;
     return (
       <Results
@@ -488,6 +507,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
         bossPassed={outcome.bossPassedNow}
         openedRank={opened ? { rank: opened.rank, title: opened.title } : null}
         crown={outcome.crown}
+        need={below && nextWorld ? { stars: bossPassMark(band), rank: nextWorld.rank } : null}
         onSpeak={(t) => say(t)}
         extra={
           (offers.practice || offers.skip || offers.easeOffer || fast) && (
@@ -546,6 +566,16 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
 
   // ---------- render ----------
   const Comp = current?.act.Component;
+  // Portrait: while a sheet is open the board moves up and shrinks to stay clear of it, so the hinted
+  // piece on the bottom rank stays visible. (Landscape puts the sheet in the tray column.)
+  const [sheetH, setSheetH] = useState(0);
+  const sheetOpen = offer != null || confirmLeave;
+  const sheetRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return setSheetH(0);
+    const measure = () => setSheetH(Math.ceil(el.getBoundingClientRect().height));
+    measure();
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(measure).observe(el);
+  }, []);
   const chipNode =
     chip || par ? (
       <>
@@ -570,7 +600,11 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
     ) : null;
 
   return (
-    <div className={`k-player${kid.settings.leftHanded ? ' left-handed' : ''} mode-${mode}`} onPointerDown={() => itemLive && resetIdle()}>
+    <div
+      className={`k-player${kid.settings.leftHanded ? ' left-handed' : ''} mode-${mode}${sheetOpen ? ' sheet-open' : ''}`}
+      style={sheetOpen && sheetH ? { ['--sheet-h' as string]: `${sheetH}px` } : undefined}
+      onPointerDown={() => itemLive && resetIdle()}
+    >
       <TopBar
         onExit={onX}
         pips={pips}
@@ -613,7 +647,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       <Confetti run={confetti} />
 
       {offer === 'easier' && (
-        <div className="k-sheet" role="dialog" aria-label="Want an easier one?">
+        <div className="k-sheet" ref={sheetRef} role="dialog" aria-label="Want an easier one?">
           <div className="k-sheet-card">
             <p className="k-sheet-title">That one is tricky! What would you like?</p>
             <div className="k-sheet-actions">
@@ -633,7 +667,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
         </div>
       )}
       {offer === 'super' && (
-        <div className="k-sheet" role="dialog" aria-label="Super Star?">
+        <div className="k-sheet" ref={sheetRef} role="dialog" aria-label="Super Star?">
           <div className="k-sheet-card">
             <p className="k-sheet-title">Super Star? Win a golden star!</p>
             <div className="k-sheet-actions">
@@ -665,9 +699,9 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
         </div>
       )}
       {confirmLeave && (
-        <div className="k-sheet" role="dialog" aria-label="Leave?">
+        <div className="k-sheet" ref={sheetRef} role="dialog" aria-label="Leave?">
           <div className="k-sheet-card">
-            <p className="k-sheet-title">Leave? Your stars are saved.</p>
+            <p className="k-sheet-title">{mode === 'placement' ? 'Stop showing Pip? You can try again later.' : mode === 'node' && results.current.length ? 'Leave this game? You can play it again later.' : 'Leave now?'}</p>
             <div className="k-sheet-actions">
               <BigButton variant="go" icon="play" onClick={() => setConfirmLeave(false)} autoFocus>
                 Stay
@@ -680,19 +714,16 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
         </div>
       )}
       {phase === 'results' && renderResults()}
-      {phase === 'break' && (
-        <BreakTime
-          kid={getKid(kid.id) ?? kid}
-          onContinue={() => {
-            const f = pendingAfterBreak.current;
-            pendingAfterBreak.current = null;
-            setPhase('item');
-            f?.();
-          }}
-        />
-      )}
     </div>
   );
+}
+
+/** A non-game boss below the pass mark: say what opens the next rank, from the first attempt. */
+function belowPassRecap(score: number, need: number, rank: number, band: AgeBand): string {
+  const got = score === 1 ? 'one star' : score === 2 ? 'two stars' : 'three stars';
+  const want = need === 1 ? 'one star' : need === 2 ? 'two stars' : 'three stars';
+  if (band === 'champion') return `${score} of ${need} stars. Get ${need} to open Rank ${rank}.`;
+  return `You got ${got}! Get ${want} to open Rank ${rank}. Try again?`;
 }
 
 function recapFor(o: RunOutcome, title: string, band: AgeBand, game: boolean): string {
