@@ -71,11 +71,13 @@ sound settings, and can lock the device to Kids mode.
 
 Pip's lines are pre-recorded with a natural neural voice, so they sound the same on every device;
 lines made up on the fly fall back to the device's most natural voice. To re-record after changing
-the Kids copy (needs `pip install kokoro-onnx lameenc` and the Kokoro model files, see the script):
+the Kids copy, with Kokoro (runs locally: `pip install kokoro-onnx lameenc` and the model files) or
+Google Cloud Text-to-Speech (a key in `GOOGLE_TTS_API_KEY`); details in `scripts/voice/render.py`:
 
 ```
 npx tsx scripts/voice/collect.ts > /tmp/lines.json
-python3 scripts/voice/render.py /tmp/lines.json --model /path/to/kokoro
+python3 scripts/voice/render.py /tmp/lines.json --model /path/to/kokoro      # or: --engine google
+python3 scripts/voice/try_voices.py /tmp/voices --engine google Leda Aoede   # audition voices
 ```
 
 ## Getting started
@@ -132,4 +134,4 @@ tests/          Vitest suites
 - Rules and move generation: [chess.js](https://github.com/jhlywa/chess.js) (BSD-2-Clause).
 - Pieces: "cburnett" set by Colin M.L. Burnett (GPLv2+ / GFDL / BSD), as distributed with lichess chessground. The app icon uses its knight. The 3D Staunton set and the walnut and marble boards are rendered for this app by `scripts/pieces` and `scripts/boards`.
 - Fonts (self-hosted via Fontsource, OFL): Newsreader, Source Sans 3 and IBM Plex Mono; Fredoka and Andika in Kids mode.
-- Pip's voice: recorded with [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0), voice `af_heart`, via [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) (MIT).
+- Pip's voice: recorded with [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0), voice `af_heart`, via [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) (MIT), or with Google Cloud Text-to-Speech.
