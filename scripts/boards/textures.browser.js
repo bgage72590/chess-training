@@ -79,7 +79,9 @@
   function wood(p, n, f, u, v) {
     // Grain lines wander slowly along the board and a little across it.
     const warp = f(u * 0.55, v * 2.2, 4) - 0.5;
-    const t = v * p.rings + warp * p.warp + (f(u * 2.2, v * 0.7 + 9.1, 3) - 0.5) * 0.9;
+    // Low-frequency warp across the grain makes the ring spacing irregular (wide and tight bands).
+    const spread = p.spread ? (f(u * 0.22 + 31, v * 0.9 - 17, 3) - 0.5) * p.spread : 0;
+    const t = v * p.rings + spread + warp * p.warp + (f(u * 2.2, v * 0.7 + 9.1, 3) - 0.5) * 0.9;
     const g = t - Math.floor(t);
     // Latewood: a thin darker band at the end of each growth ring, fading into earlywood.
     const late = smooth(0.62, 0.9, g) * (1 - smooth(0.9, 1.0, g));
@@ -100,33 +102,67 @@
     return c;
   }
 
-  /** Polished marble: cloudy base, domain-warped veins, faint speckle. */
-  function marble(p, n, f, u, v) {
-    const qx = f(u * 0.9, v * 0.9, 5);
-    const qy = f(u * 0.9 + 5.2, v * 0.9 + 1.3, 5);
-    const cloud = f(u * 0.7 + qx * 2.2, v * 0.7 + qy * 2.2, 5);
-    let c = mix3(p.base, p.cloud, smooth(0.3, 0.75, cloud));
-    // Veins: level lines of a domain-warped FBM, stretched along the vein direction so they
-    // run long and meander rather than loop. Their width follows the field's slope, so they
-    // swell and thin like real veins.
-    const a = u * p.dir[0] + v * p.dir[1];
-    const b = -u * p.dir[1] + v * p.dir[0];
-    const wx = f(a * 0.45 + 1, b * 0.9, 4);
-    const wy = f(a * 0.45 + 7, b * 0.9 + 3, 4);
-    const r1 = f(a * 0.3 + wx * 1.4, b * p.freq + wy * 1.4, 5);
-    const d1 = Math.abs(r1 - 0.5);
-    const vein1 = 1 - smooth(0, p.width, d1);
-    const halo = 1 - smooth(0, p.width * 7, d1);
-    const r2 = f(a * 0.5 - wy * 1.2 + 40, b * p.freq * 1.8 + wx * 1.2, 5);
-    const d2 = Math.abs(r2 - 0.52);
-    const vein2 = (1 - smooth(0, p.width * 0.55, d2)) * smooth(0.4, 0.65, f(u * 1.2 + 20, v * 1.2, 3));
-    const fade = 0.5 + 0.5 * smooth(0.3, 0.7, f(u * 0.8 - 30, v * 0.8 + 12, 3));
-    c = mix3(c, p.vein, clamp(halo * 0.16 * fade, 0, 1));
-    c = mix3(c, p.vein, clamp(vein1 * p.veinAmt * fade, 0, 1));
-    c = mix3(c, p.vein2 ?? p.vein, clamp(vein2 * p.veinAmt * 0.7, 0, 1));
+  /**
+   * Polished marble: a cloudy, domain-warped body with long veins and a sparse network of
+   * hairline cracks. `a` runs along the stone's vein direction, `b` across it.
+   *
+   * Veins are level lines of a "phase" field: b * freq plus turbulence. The linear term keeps
+   * the lines long and running with the grain of the stone (few closed loops), and every
+   * distance is divided by the field's gradient (finite differences), so a vein keeps its width
+   * wherever the field is flat instead of swelling into blobs.
+   */
+  function marble(p, n, f, u, v, a, b) {
+    const qx = f(u * 0.8, v * 0.8, 5);
+    const qy = f(u * 0.8 + 5.2, v * 0.8 + 1.3, 5);
+    const cloud = f(u * 0.6 + qx * 2.4, v * 0.6 + qy * 2.4, 6);
+    let c = mix3(p.base, p.cloud, smooth(0.28, 0.78, cloud));
+    // Lighter drifts of clouding, stretched a little along the veins.
+    const drift = f(a * 0.5 + qy * 1.5 + 30, b * 1.4 + qx * 1.5 - 7, 5);
+    c = mix3(c, p.drift, smooth(0.5, 0.78, drift) * p.driftAmt);
+
+    const e = 1 / 300;
+    const veinLayer = (L) => {
+      const ph = (aa, bb) => {
+        const t = f(aa * L.turbA + L.seed, bb * L.turbB + L.seed * 0.37, 5);
+        const w = f(aa * 0.35 + L.seed * 1.7, bb * 0.35, 3);
+        return bb * L.freq + (t - 0.5) * L.turb + (w - 0.5) * L.bend;
+      };
+      const p0 = ph(a, b);
+      const ga = (ph(a + e, b) - p0) / e;
+      const gb = (ph(a, b + e) - p0) / e;
+      const g = Math.max(Math.hypot(ga, gb), 0.25);
+      const d = Math.abs(p0 - Math.round(p0 + L.phase) + L.phase) / g; // in square units
+      // Vein strength varies along its length (so veins fade in and out and seem to branch).
+      const s = smooth(L.maskLo, L.maskHi, f(a * L.maskScale + L.seed * 3.1, b * L.maskScale * 1.6 - L.seed, 4));
+      const core = (1 - smooth(L.width * 0.35, L.width, d)) * s;
+      const halo = Math.exp(-d / L.halo) * s;
+      return [core, halo];
+    };
+    let core = 0;
+    let halo = 0;
+    for (const L of p.veins) {
+      const [cL, hL] = veinLayer(L);
+      core = Math.max(core, cL * L.amt);
+      halo = Math.max(halo, hL * L.amt);
+    }
+    c = mix3(c, p.halo, clamp(halo * p.haloAmt, 0, 1));
+    c = mix3(c, p.vein, clamp(core * p.veinAmt, 0, 1));
+    // Hairline cracks: a finer, more turbulent vein layer crossing the main ones at an angle,
+    // present only in patches, thin and faint.
+    if (p.crackAmt) {
+      const ca = a * 0.5 - b * 0.866;
+      const cb = a * 0.866 + b * 0.5;
+      const cf = (aa, bb) => bb * 2.6 + (f(aa * 1.2 + 70, bb * 2 - 40, 6) - 0.5) * 3.4;
+      const c0 = cf(ca, cb);
+      const g = Math.max(Math.hypot((cf(ca + e, cb) - c0) / e, (cf(ca, cb + e) - c0) / e), 0.5);
+      const d = Math.abs(c0 - Math.round(c0)) / g;
+      const m = smooth(0.5, 0.72, f(u * 1.3 - 60, v * 1.3 + 25, 4));
+      const crack = (1 - smooth(0.0012, 0.0035, d)) * m;
+      c = mix3(c, p.crack, clamp(crack * p.crackAmt, 0, 1));
+    }
     // Crystalline speckle.
-    const s = n(u * 90 + 3, v * 90 - 8);
-    const k = 1 + (s - 0.5) * p.speckle;
+    const sp = n(u * 90 + 3, v * 90 - 8);
+    const k = 1 + (sp - 0.5) * p.speckle;
     return [c[0] * k, c[1] * k, c[2] * k];
   }
 
@@ -140,9 +176,12 @@
         line: hex('#c29762'),
         pore: hex('#b98d5a'),
         rings: 11,
+        ringVar: 0.25,
+        spread: 4,
+        tintVar: 0.028,
         warp: 3.2,
         pores: 70,
-        lineAmt: 0.55,
+        lineAmt: 0.38,
         poreAmt: 0.35,
         curl: 38,
         curlAmt: 0.014,
@@ -154,6 +193,9 @@
         line: hex('#4a2c17'),
         pore: hex('#3d2312'),
         rings: 8,
+        ringVar: 0.2,
+        spread: 3,
+        tintVar: 0.02,
         warp: 3.8,
         pores: 55,
         lineAmt: 0.6,
@@ -168,28 +210,44 @@
     marble: {
       seed: 4242,
       light: {
+        // Carrara-like: warm white with soft grey clouding and grey veins.
         kind: 'marble',
-        base: hex('#efebe3'),
-        cloud: hex('#ddd6ca'),
-        vein: hex('#8e908e'),
-        vein2: hex('#b5b1a9'),
-        dir: [0.8, 0.6],
-        freq: 1.1,
-        width: 0.012,
-        veinAmt: 0.55,
-        speckle: 0.035,
+        angle: 0.62,
+        base: hex('#f1eee8'),
+        cloud: hex('#e0dbd1'),
+        drift: hex('#d4d0c8'),
+        driftAmt: 0.35,
+        vein: hex('#7f8486'),
+        halo: hex('#c4c3be'),
+        haloAmt: 0.42,
+        veinAmt: 0.62,
+        veins: [
+          { seed: 3, freq: 0.9, turb: 2.2, turbA: 0.45, turbB: 0.3, bend: 1.6, phase: 0, width: 0.011, halo: 0.03, maskScale: 0.6, maskLo: 0.3, maskHi: 0.6, amt: 1 },
+          { seed: 11, freq: 1.7, turb: 2.6, turbA: 0.7, turbB: 0.4, bend: 1.2, phase: 0.5, width: 0.006, halo: 0.014, maskScale: 0.9, maskLo: 0.45, maskHi: 0.7, amt: 0.6 },
+        ],
+        crack: hex('#9a9c9a'),
+        crackAmt: 0.35,
+        speckle: 0.03,
       },
       dark: {
+        // Verde antico: deep green body with lighter green clouding and pale veins set into it.
         kind: 'marble',
-        base: hex('#6b8076'),
-        cloud: hex('#4d5f57'),
-        vein: hex('#dfe5df'),
-        vein2: hex('#a4b4aa'),
-        dir: [0.6, -0.8],
-        freq: 1.2,
-        width: 0.011,
-        veinAmt: 0.55,
-        speckle: 0.06,
+        angle: -0.9,
+        base: hex('#527264'),
+        cloud: hex('#35503f'),
+        drift: hex('#739a87'),
+        driftAmt: 0.45,
+        vein: hex('#d5e0d8'),
+        halo: hex('#2a4035'),
+        haloAmt: 0.35,
+        veinAmt: 0.5,
+        veins: [
+          { seed: 5, freq: 0.8, turb: 2.4, turbA: 0.45, turbB: 0.3, bend: 1.6, phase: 0, width: 0.01, halo: 0.03, maskScale: 0.6, maskLo: 0.3, maskHi: 0.6, amt: 1 },
+          { seed: 17, freq: 1.6, turb: 2.6, turbA: 0.7, turbB: 0.4, bend: 1.2, phase: 0.5, width: 0.0055, halo: 0.014, maskScale: 0.9, maskLo: 0.45, maskHi: 0.7, amt: 0.65 },
+        ],
+        crack: hex('#a9bcb0'),
+        crackAmt: 0.22,
+        speckle: 0.05,
       },
       seam: 0.28,
       bevel: 0.14,
@@ -226,18 +284,24 @@
           const across = (row + (light ? 0 : 1)) % 2 === 0;
           angle = (across ? 0 : Math.PI / 2) + (rnd() - 0.5) * 0.07;
         } else {
-          angle = rnd() * Math.PI * 2;
+          // Cut from one slab: every tile's veins follow the stone's direction, give or take 25deg.
+          angle = mat.angle + (rnd() - 0.5) * 2 * (25 * Math.PI / 180);
         }
         const ca = Math.cos(angle);
         const sa = Math.sin(angle);
         const tone = 1 + (rnd() - 0.5) * 2 * theme.varyPiece;
+        // Per piece: ring spacing and a slightly warmer or cooler cast, as in a real inlay.
+        const sqMat = mat.ringVar ? { ...mat, rings: mat.rings * (1 + (rnd() - 0.5) * 2 * mat.ringVar) } : mat;
+        const w = mat.tintVar ? (rnd() - 0.4) * 2 * mat.tintVar : 0;
+        const tint = [1 + w, 1 + w * 0.15, 1 - w * 1.4];
         for (let py = 0; py < sq; py++) {
           for (let px = 0; px < sq; px++) {
             const lx = (px + 0.5) / sq - 0.5;
             const ly = (py + 0.5) / sq - 0.5;
             const u = lx * ca - ly * sa + ox;
             const v = lx * sa + ly * ca + oy;
-            let c = mat.kind === 'wood' ? wood(mat, noise, fbm, u, v) : marble(mat, noise, fbm, u, v);
+            let c = mat.kind === 'wood' ? wood(sqMat, noise, fbm, u, v) : marble(mat, noise, fbm, u, v, u, v);
+            c = [c[0] * tint[0], c[1] * tint[1], c[2] * tint[2]];
             // Satin sheen: a broad soft light from the top-left across the whole board.
             const gx = (col * sq + px) / S;
             const gy = (row * sq + py) / S;

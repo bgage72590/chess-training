@@ -12,8 +12,9 @@ import { BOARD_THEMES } from '../../../src/chess/themes';
 
 const params = new URLSearchParams(location.search);
 document.documentElement.dataset.theme = params.get('theme') === 'dark' ? 'dark' : 'light';
-const cols = Number(params.get('cols') || 3);
+const cols = Number(params.get('cols') || 4);
 const only = params.get('only');
+const pieceSet = params.get('pieces') || undefined;
 
 // Black to move, in check from the bishop on b5.
 const CHECK = 'rnbqkbnr/ppp1pppp/8/1B1p4/4P3/8/PPPP1PPP/RNBQK1NR b KQkq - 1 2';
@@ -24,6 +25,7 @@ function Row({ theme }) {
     <>
       <figure className="lab-cell">
         <Board
+          pieceSet={pieceSet}
           fen={CHECK}
           lastMove={['f1', 'b5']}
           boardTheme={theme.id}
@@ -34,12 +36,18 @@ function Row({ theme }) {
         />
         <figcaption>{theme.name}: check, last move, arrows</figcaption>
       </figure>
-      <figure className="lab-cell lab-select">
-        <Board fen={OPEN} interactive lastMove={['b1', 'c3']} boardTheme={theme.id} />
-        <figcaption>{theme.name}: selected piece and targets</figcaption>
+      {/* shots.cjs clicks data-select on these: f3's targets are dark squares (one capture), c3's light. */}
+      <figure className="lab-cell lab-select" data-select="f3">
+        <Board fen={OPEN} interactive lastMove={['b1', 'c3']} boardTheme={theme.id} pieceSet={pieceSet} />
+        <figcaption>{theme.name}: selected, targets on dark squares</figcaption>
+      </figure>
+      <figure className="lab-cell lab-select" data-select="c3">
+        <Board fen={OPEN} interactive lastMove={['e7', 'e5']} boardTheme={theme.id} pieceSet={pieceSet} />
+        <figcaption>{theme.name}: selected, targets on light squares</figcaption>
       </figure>
       <figure className="lab-cell">
         <Board
+          pieceSet={pieceSet}
           fen={OPEN}
           orientation="black"
           boardTheme={theme.id}

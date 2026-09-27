@@ -10,10 +10,15 @@
   --coord-on-dark: #f1f4f7;
   --coord-shadow-light: 0 1px 0 rgb(255 255 255 / 0.45);
   --coord-shadow-dark: 0 1px 1px rgb(0 0 0 / 0.22);
+  /* Last move is always a gold/yellow wash; the selected square a different hue (per theme)
+     with a ring, so "my selection" and "their last move" never look alike. */
   --hl-last: rgb(247 206 96 / 0.5);
-  --hl-select: rgb(247 206 96 / 0.78);
+  --hl-select: rgb(84 176 150 / 0.5);
+  --hl-select-ring: rgb(44 132 108 / 0.9);
   --dest-dot: rgb(20 29 39 / 0.3);
+  --dest-rim: transparent;
   --dest-hover: rgb(20 29 39 / 0.14);
+  --tone-a: 0.5;
   /* Frame: a thin bevelled band drawn with box-shadows outside the board's box. */
   --frame: #465b6d;
   --frame-hi: #6a8193;
@@ -92,7 +97,7 @@
 }
 .sq.selected::before {
   background: var(--hl-select);
-  box-shadow: inset 0 0 0 max(2px, 0.4cqw) var(--hl-select-ring, rgb(255 255 255 / 0.35));
+  box-shadow: inset 0 0 0 max(2px, 0.42cqw) var(--hl-select-ring);
 }
 .sq.dark.selected::before {
   background: var(--hl-select-dark, var(--hl-select));
@@ -118,16 +123,16 @@
   }
 }
 .sq.tone-good::before {
-  background: rgb(52 176 110 / 0.5);
-  box-shadow: inset 0 0 0 max(2px, 0.45cqw) rgb(40 150 90 / 0.75);
+  background: rgb(52 176 110 / var(--tone-a));
+  box-shadow: inset 0 0 0 max(2px, 0.45cqw) rgb(40 150 90 / 0.8);
 }
 .sq.tone-bad::before {
-  background: rgb(222 64 52 / 0.5);
-  box-shadow: inset 0 0 0 max(2px, 0.45cqw) rgb(196 44 36 / 0.75);
+  background: rgb(222 64 52 / var(--tone-a));
+  box-shadow: inset 0 0 0 max(2px, 0.45cqw) rgb(196 44 36 / 0.8);
 }
 .sq.tone-hint::before {
-  background: rgb(64 138 224 / 0.4);
-  box-shadow: inset 0 0 0 max(2px, 0.45cqw) rgb(50 118 206 / 0.8);
+  background: rgb(64 138 224 / calc(var(--tone-a) * 0.8));
+  box-shadow: inset 0 0 0 max(2px, 0.45cqw) rgb(50 118 206 / 0.85);
 }
 .sq.tone-focus::before {
   box-shadow: inset 0 0 0 max(3px, 0.6cqw) var(--arrow-yellow);
@@ -136,17 +141,31 @@
 /* ---------- Move targets ---------- */
 .dest {
   --dot: var(--dest-dot);
+  --rim: var(--dest-rim);
   position: absolute;
   inset: 0;
   z-index: 3;
   pointer-events: none;
-  background: radial-gradient(circle closest-side, var(--dot) 0 30%, transparent calc(30% + 1px));
+  /* A dot with an optional thin rim (textured themes) that separates it from the grain. */
+  background: radial-gradient(
+    circle closest-side,
+    var(--dot) 0 29%,
+    var(--rim) calc(29% + 0.5px) 33%,
+    transparent calc(33% + 1px)
+  );
 }
 .sq.dark > .dest {
   --dot: var(--dest-dot-dark, var(--dest-dot));
+  --rim: var(--dest-rim-dark, var(--dest-rim));
 }
 .dest.capture {
-  background: radial-gradient(circle closest-side, transparent 0 78%, var(--dot) calc(78% + 1px) 97%, transparent calc(97% + 1px));
+  background: radial-gradient(
+    circle closest-side,
+    transparent 0 72%,
+    var(--rim) calc(72% + 0.5px) 75%,
+    var(--dot) calc(75% + 0.5px) 97%,
+    transparent calc(97% + 1px)
+  );
 }
 @media (hover: hover) {
   .sq:hover > .dest {
@@ -162,11 +181,18 @@
   height: 12.5%;
   z-index: 3;
   pointer-events: none;
-  box-shadow: inset 0 0 0 max(2px, 0.45cqw) rgb(255 255 255 / 0.55);
+  /* A white ring with a thin dark line inside it: reads on light and dark squares alike. */
+  --ring: max(2px, 0.45cqw);
+  box-shadow:
+    inset 0 0 0 var(--ring) rgb(255 255 255 / 0.6),
+    inset 0 0 0 calc(var(--ring) + 1px) rgb(0 0 0 / 0.18);
 }
 .drag-hover.is-dest {
+  --ring: max(2.5px, 0.55cqw);
   background: var(--dest-hover);
-  box-shadow: inset 0 0 0 max(2px, 0.5cqw) rgb(255 255 255 / 0.8);
+  box-shadow:
+    inset 0 0 0 var(--ring) rgb(255 255 255 / 0.92),
+    inset 0 0 0 calc(var(--ring) + 1.5px) rgb(0 0 0 / 0.38);
 }
 
 /* ---------- Coordinates: small, soft, engraved into the squares ---------- */
@@ -174,7 +200,7 @@
   position: absolute;
   font-family: var(--font-body);
   font-weight: 700;
-  font-size: clamp(8px, 2.05cqw, 13px);
+  font-size: clamp(9.5px, 2.3cqw, 13px);
   line-height: 1;
   letter-spacing: 0.02em;
   pointer-events: none;
@@ -214,14 +240,20 @@
 .pieces-cburnett .piece {
   filter: drop-shadow(0 max(1px, 0.18cqw) max(1px, 0.2cqw) rgb(0 0 0 / 0.28));
 }
-.piece.dragging,
-.pieces-cburnett .piece.dragging {
+/* On the textured boards, light 3D pieces on light maple or cream stone need a hint of an edge
+   to keep their silhouette: a faint, tight shadow in the board's own dark tone. */
+.board-walnut.pieces-staunton3d .piece {
+  filter: drop-shadow(0 0 max(0.6px, 0.12cqw) rgb(52 28 8 / 0.5));
+}
+.board-marble.pieces-staunton3d .piece {
+  filter: drop-shadow(0 0 max(0.6px, 0.12cqw) rgb(20 34 28 / 0.5));
+}
+.board .piece.dragging {
   transition: none;
   z-index: 20;
   filter: drop-shadow(0 max(5px, 1.1cqw) max(4px, 0.9cqw) rgb(0 0 0 / 0.34)) drop-shadow(0 1px 2px rgb(0 0 0 / 0.2));
 }
-.piece.ghost,
-.pieces-cburnett .piece.ghost {
+.board .piece.ghost {
   opacity: 0.28;
   filter: none;
   transition: none;
@@ -285,19 +317,23 @@
 }
 
 /* ---------- Themes ----------
-   Dark squares use --hl-*-dark when a theme sets it, else the plain highlight. */
+   Dark squares use --hl-*-dark / --dest-*-dark when a theme sets them, else the plain value. */
 .board-slate,
 .board-ink,
 .board-rose {
-  /* Gold washes out on these muted dark squares: use a deeper tone there. */
-  --hl-last-dark: rgb(226 176 72 / 0.72);
-  --hl-select-dark: rgb(226 176 72 / 0.88);
+  /* Gold washes out on these muted dark squares: a slightly denser tone there, close enough in
+     value to the light-square wash that the two squares of a move read as one pair. */
+  --hl-last: rgb(244 198 84 / 0.52);
+  --hl-last-dark: rgb(232 184 70 / 0.56);
 }
 .board-slate {
   --sq-light: #e2e8ec;
   --sq-dark: #86a0b3;
   --coord-on-light: #62798c;
   --coord-on-dark: #f1f4f7;
+  --hl-select: rgb(72 178 150 / 0.5);
+  --hl-select-dark: rgb(84 196 160 / 0.6);
+  --hl-select-ring: rgb(36 128 104 / 0.9);
   --frame: #465b6d;
   --frame-hi: #6a8193;
   --frame-lo: #2d3c49;
@@ -305,14 +341,16 @@
 .board-tourney {
   --hl-last: rgb(255 246 64 / 0.46);
   --hl-last-dark: rgb(222 214 60 / 0.62);
-  --hl-select: rgb(255 246 64 / 0.7);
-  --hl-select-dark: rgb(222 214 60 / 0.82);
+  --hl-select: rgb(84 160 214 / 0.46);
+  --hl-select-dark: rgb(96 176 226 / 0.58);
+  --hl-select-ring: rgb(40 110 170 / 0.9);
   --sq-light: #eeeed2;
   --sq-dark: #769656;
   --coord-on-light: #688748;
   --coord-on-dark: #f3f4df;
   --dest-dot: rgb(24 44 12 / 0.3);
   --dest-dot-dark: rgb(16 34 6 / 0.36);
+  --arrow-green: #13b566;
   --frame: #4b6237;
   --frame-hi: #6c8753;
   --frame-lo: #334425;
@@ -322,6 +360,9 @@
   --sq-dark: #55637a;
   --coord-on-light: #55637a;
   --coord-on-dark: #dde2ea;
+  --hl-select: rgb(80 186 150 / 0.5);
+  --hl-select-dark: rgb(92 200 160 / 0.56);
+  --hl-select-ring: rgb(40 140 108 / 0.9);
   --dest-dot: rgb(12 18 30 / 0.34);
   --dest-dot-dark: rgb(8 12 22 / 0.45);
   --frame: #2b3342;
@@ -333,58 +374,83 @@
   --sq-dark: #b7847a;
   --coord-on-light: #9f6f67;
   --coord-on-dark: #fbf0ea;
-  --dest-dot: rgb(60 22 16 / 0.28);
+  --hl-select: rgb(96 170 140 / 0.5);
+  --hl-select-dark: rgb(110 186 150 / 0.58);
+  --hl-select-ring: rgb(52 124 98 / 0.9);
+  --dest-dot: rgb(60 22 16 / 0.3);
   --frame: #74493f;
   --frame-hi: #9a6b60;
   --frame-lo: #51302a;
 }
 
+/* Textured themes: tones let the material show through; the ring carries the colour. Move dots
+   are dark on the light squares and light on the dark ones (at least 3:1 against the average
+   square), each with a thin contrasting rim that separates it from the grain. */
+.board-walnut,
+.board-marble {
+  --tone-a: 0.28;
+  --coord-shadow-light: 0 1px 0 rgb(255 250 240 / 0.6);
+  --coord-shadow-dark: 0 -1px 0 rgb(0 0 0 / 0.35);
+}
+
 /* Walnut: maple and walnut inlay, satin finish, in a dark walnut frame. */
 .board-walnut {
-  --sq-light: #e6cb9a;
-  --sq-dark: #7d5130;
-  --coord-on-light: rgb(112 72 36 / 0.85);
-  --coord-on-dark: rgb(250 232 206 / 0.88);
-  --coord-shadow-light: 0 1px 0 rgb(255 244 222 / 0.55);
-  --coord-shadow-dark: 0 -1px 0 rgb(0 0 0 / 0.35);
-  --hl-last: rgb(222 206 70 / 0.44);
-  --hl-last-dark: rgb(228 204 72 / 0.5);
-  --hl-select: rgb(158 196 58 / 0.55);
-  --hl-select-dark: rgb(150 190 54 / 0.62);
-  --dest-dot: rgb(44 24 8 / 0.36);
-  --dest-dot-dark: rgb(26 12 2 / 0.5);
+  --sq-light: #e0bf8a;
+  --sq-dark: #73492a;
+  --coord-on-light: rgb(96 60 28 / 0.95);
+  --coord-on-dark: rgb(252 236 212 / 0.92);
+  --hl-last: rgb(240 196 72 / 0.5);
+  --hl-last-dark: rgb(246 204 84 / 0.5);
+  --hl-select: rgb(120 180 110 / 0.5);
+  --hl-select-dark: rgb(150 206 130 / 0.52);
+  --hl-select-ring: rgb(70 136 64 / 0.95);
+  --dest-dot: rgb(52 30 12 / 0.54);
+  --dest-rim: rgb(255 244 222 / 0.45);
+  --dest-dot-dark: rgb(255 238 206 / 0.58);
+  --dest-rim-dark: rgb(30 16 4 / 0.4);
   --dest-hover: rgb(44 24 8 / 0.14);
   --frame: #4b2d18;
   --frame-hi: #7a5030;
   --frame-lo: #2c190c;
   --frame-seam: rgb(20 10 2 / 0.55);
 }
-.board-walnut .squares {
-  background: var(--sq-dark) url('../assets/boards/walnut.webp') 0 0 / 100% 100% no-repeat;
-}
 
-/* Marble: cream and verde marble tiles, polished, in a dark green stone frame. */
+/* Marble: Carrara-white and verde tiles, polished, in a dark green stone frame. */
 .board-marble {
-  --sq-light: #ece7de;
-  --sq-dark: #5d7469;
-  --coord-on-light: rgb(76 94 86 / 0.85);
-  --coord-on-dark: rgb(240 244 238 / 0.9);
-  --coord-shadow-light: 0 1px 0 rgb(255 255 255 / 0.7);
-  --coord-shadow-dark: 0 -1px 0 rgb(0 0 0 / 0.3);
-  --hl-last: rgb(236 196 92 / 0.46);
-  --hl-last-dark: rgb(228 186 80 / 0.6);
-  --hl-select: rgb(236 190 72 / 0.66);
-  --hl-select-dark: rgb(230 182 64 / 0.78);
-  --dest-dot: rgb(16 36 28 / 0.36);
-  --dest-dot-dark: rgb(8 22 16 / 0.48);
+  --sq-light: #e8e4dc;
+  --sq-dark: #496858;
+  --coord-on-light: rgb(58 80 70 / 0.95);
+  --coord-on-dark: rgb(240 246 240 / 0.92);
+  --hl-last: rgb(240 196 76 / 0.5);
+  --hl-last-dark: rgb(255 214 90 / 0.66);
+  --hl-select: rgb(92 150 222 / 0.46);
+  --hl-select-dark: rgb(120 172 240 / 0.52);
+  --hl-select-ring: rgb(48 104 184 / 0.95);
+  --dest-dot: rgb(16 36 28 / 0.5);
+  --dest-rim: rgb(255 255 255 / 0.5);
+  --dest-dot-dark: rgb(242 250 244 / 0.62);
+  --dest-rim-dark: rgb(10 24 18 / 0.4);
   --dest-hover: rgb(16 36 28 / 0.14);
-  --frame: #34443c;
-  --frame-hi: #5b6f65;
-  --frame-lo: #1f2a25;
+  --arrow-green: #16c46e;
+  --frame: #2e4238;
+  --frame-hi: #557062;
+  --frame-lo: #1b2821;
   --frame-seam: rgb(8 16 12 / 0.5);
 }
-.board-marble .squares {
+
+/* The generated board images, also used by the Settings swatches (.swatch.board-<id>, which
+   shows the top-left 2x2 squares). One url() per image, so single-file builds inline it once. */
+.board-walnut .squares,
+.swatch.board-walnut .swatch-squares {
+  background: var(--sq-dark) url('../assets/boards/walnut.webp') 0 0 / 100% 100% no-repeat;
+}
+.board-marble .squares,
+.swatch.board-marble .swatch-squares {
   background: var(--sq-dark) url('../assets/boards/marble.webp') 0 0 / 100% 100% no-repeat;
+}
+.swatch.board-walnut .swatch-squares,
+.swatch.board-marble .swatch-squares {
+  background-size: 400% 400%;
 }
 .board-walnut .sq,
 .board-marble .sq {

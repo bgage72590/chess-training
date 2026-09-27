@@ -2,13 +2,14 @@
 // an opening lesson with arrows), then contact sheets per theme for review.
 //
 //   npm run build && npx vite preview --port 4182 &
-//   BASE=http://localhost:4182/ node scripts/boards/app-shots.cjs <outDir> [theme ...]
+//   BASE=http://localhost:4182/ [PIECES=staunton3d] node scripts/boards/app-shots.cjs <outDir> [theme ...]
 const path = require('node:path');
 const fs = require('node:fs');
 const { launch, open, run } = require('../dev/harness.cjs');
 
 const [outDir = '/tmp/boards', ...only] = process.argv.slice(2);
 const THEMES = only.length ? only : ['slate', 'walnut', 'marble', 'tourney', 'ink', 'rose'];
+const PIECES = process.env.PIECES || 'cburnett';
 const VIEWS = [
   { width: 1440, height: 900 },
   { width: 390, height: 844 },
@@ -35,9 +36,9 @@ run(async () => {
     sheets[theme] = [];
     for (const scheme of ['light', 'dark']) {
       for (const view of VIEWS) {
-        const init = (t) => localStorage.setItem('tempo.profile.v1', JSON.stringify({ v: 1, onboarded: true, xp: 0, settings: { sound: false, boardTheme: t, pieceSet: 'cburnett' } }));
+        const init = ([t, p]) => localStorage.setItem('tempo.profile.v1', JSON.stringify({ v: 1, onboarded: true, xp: 0, settings: { sound: false, boardTheme: t, pieceSet: p } }));
         const s = await open({ browser, ...view, colorScheme: scheme });
-        await s.page.addInitScript(init, theme);
+        await s.page.addInitScript(init, [theme, PIECES]);
         const shot = async (name) => {
           const file = path.join(outDir, `${theme}-${name}-${scheme}-${view.width}.png`);
           await s.page.screenshot({ path: file });
