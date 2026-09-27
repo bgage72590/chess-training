@@ -16,6 +16,10 @@
     </style>
   </head>
   <body>
+    <script>
+      // Fail fast (instead of timing out) when the module does not load.
+      addEventListener('error', (e) => (window.__result = window.__result || { error: String(e.message) }));
+    </script>
     <script type="module">
       // Driven by render-3d.cjs: renders the 12 sprites and leaves the result on window.__result.
       import { renderAll } from './staunton3d.js';
