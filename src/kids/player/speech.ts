@@ -109,7 +109,9 @@ const recordedOn = () => !voiceURI && !!manifest;
 let prefetched = false;
 function prefetchClips() {
   if (prefetched || !manifest || typeof navigator === 'undefined' || !navigator.serviceWorker?.controller) return;
-  if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
+  // About 20 MB in all: not on metered or cellular connections (clips still load as they are used).
+  const conn = (navigator as Navigator & { connection?: { saveData?: boolean; type?: string } }).connection;
+  if (conn?.saveData || conn?.type === 'cellular') return;
   prefetched = true;
   const keys = Object.keys(manifest.clips);
   let i = 0;
