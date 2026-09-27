@@ -2,13 +2,13 @@
 // A pack's only shared-file edit is its import line and its entry in PACKS (spec 11.2).
 import type { ActivityDef, KidsPack, LevelSet, PlaygroundEntry } from './activities/types';
 import { corePack, CHECKPOINTS as CORE_CHECKPOINTS } from './content/core';
-// PACK A: import { movementPack } from './content/movement';
+import { movementPack } from './content/movement';
 // PACK B: import { minigamesPack } from './content/minigames';
 // PACK C: import { rulesPack } from './content/rules';
 // PACK D: import { buddiesPack } from './content/games';
 // PACK E: import { tacticsPack } from './content/tactics';
 
-export const PACKS: KidsPack[] = [corePack /* , movementPack, minigamesPack, rulesPack, buddiesPack, tacticsPack */];
+export const PACKS: KidsPack[] = [corePack, movementPack /* , minigamesPack, rulesPack, buddiesPack, tacticsPack */];
 
 export interface KidsRegistry {
   packs: KidsPack[];

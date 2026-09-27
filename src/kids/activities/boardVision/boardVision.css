@@ -1,0 +1,175 @@
+/* Pack A (Board Explorer, Paint, Gobble, Magic Memory): small extras on top of kids.css tokens. */
+.k-bv {
+  position: relative;
+}
+
+/* Counter and timer badges sit on the board frame's top corner. */
+.k-bv-count,
+.k-bv-timer {
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  z-index: 12;
+  min-width: 44px;
+  padding: 4px 10px;
+  border-radius: var(--k-r-pill);
+  background: var(--k-card);
+  color: var(--k-ink);
+  border: 3px solid var(--k-sun-edge);
+  box-shadow: var(--k-press-down);
+  font-family: var(--k-font-num);
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+}
+.k-bv-timer.low {
+  border-color: var(--k-coral-edge);
+  color: var(--k-oops-ink);
+}
+
+/* Tray piece pictures. */
+.k-bv-tray-pc {
+  display: inline-grid;
+  place-items: center;
+}
+.k-bv-tray-img {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  vertical-align: middle;
+}
+
+/* Gobble: the candy jar, capture poof, guard eyes and solo capture badges. */
+.k-gb-jar {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 32px;
+  font-family: var(--k-font-num);
+}
+.k-gb-jar:empty::before {
+  content: '';
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px dashed var(--k-cream-edge);
+}
+.k-gb-candy {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  animation: k-gb-drop 360ms var(--k-ease-spring);
+}
+.k-gb-candy-pc {
+  width: 28px;
+  height: 28px;
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+.k-gb-candy-v {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--k-coral-edge);
+}
+.k-gb-total {
+  font-weight: 700;
+  margin-left: 4px;
+}
+@keyframes k-gb-drop {
+  from {
+    transform: translateY(-18px);
+    opacity: 0;
+  }
+}
+.k-gb-poof {
+  position: absolute;
+  inset: 8%;
+  z-index: 7;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--k-cloud) 0 40%, var(--k-cloud-shade) 41% 60%, transparent 61%);
+  animation: k-gb-poof 520ms var(--k-ease-out) forwards;
+}
+@keyframes k-gb-poof {
+  from {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+.k-gb-eyes {
+  position: absolute;
+  right: -2%;
+  top: -2%;
+  width: 44%;
+  height: 44%;
+  z-index: 8;
+  pointer-events: none;
+  animation: k-pop 200ms var(--k-ease-spring);
+}
+.k-gb-eyes svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.k-gb-badge {
+  position: absolute;
+  right: 2%;
+  bottom: 2%;
+  z-index: 8;
+  min-width: 36%;
+  height: 36%;
+  display: grid;
+  place-items: center;
+  border-radius: var(--k-r-pill);
+  background: var(--k-sun);
+  color: #1f2a44;
+  border: 2px solid var(--k-sun-edge);
+  font-family: var(--k-font-num);
+  font-weight: 700;
+  font-size: clamp(10px, 3cqw, 18px);
+  pointer-events: none;
+}
+.k-gb-badge.king {
+  background: var(--k-coral);
+  border-color: var(--k-coral-edge);
+}
+
+/* Magic Memory: the cloak sweep. */
+.k-mm-cloak {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  border-radius: 18px;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 0 20%, var(--k-berry) 35% 65%, transparent 80%);
+  background-size: 300% 100%;
+  animation: k-mm-sweep 700ms var(--k-ease-out) forwards;
+}
+@keyframes k-mm-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+.kids-app[data-motion='reduced'] .k-gb-poof,
+.kids-app[data-motion='reduced'] .k-mm-cloak {
+  animation: k-fade-out 300ms forwards;
+}
+.kids-app[data-motion='reduced'] .k-gb-candy,
+.kids-app[data-motion='reduced'] .k-gb-eyes {
+  animation: none;
+}
