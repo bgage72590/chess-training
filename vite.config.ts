@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { viteSingleFile } from 'vite-plugin-singlefile';
@@ -44,18 +44,27 @@ function serviceWorker(): Plugin {
   };
 }
 
-/** The build shown in Settings (date and commit), so it is easy to tell which version is running. */
-function buildLabel() {
-  let sha = process.env.GITHUB_SHA?.slice(0, 7) ?? '';
-  if (!sha) {
-    try {
-      sha = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-    } catch {
-      /* not a git checkout */
-    }
+/** What the app is built from. A commit that touches none of it (Pip's clips, docs, tests)
+ *  builds the same app, so installed copies are not updated for it. */
+const APP_INPUTS = ['--', 'src', 'public', 'index.html', 'package.json', 'package-lock.json', 'vite.config.ts', ':(exclude)public/voice'];
+
+const git = (args: string[]) => {
+  try {
+    return execFileSync('git', args, { stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, TZ: 'UTC' } }).toString().trim();
+  } catch {
+    return '';
   }
-  const date = new Date().toISOString().slice(0, 16).replace('T', ' ');
-  return sha ? `${date} UTC · ${sha}` : `${date} UTC`;
+};
+
+/**
+ * The version shown in Settings: the date and commit of the last change to the app itself (the
+ * deploy checks out the history for this), so it is easy to tell which version is running and
+ * the same app always builds the same files.
+ */
+function buildLabel(mode: string) {
+  const last = git(['log', '-1', '--format=%cd · %h', '--date=format-local:%Y-%m-%d %H:%M UTC', ...APP_INPUTS]) || 'development';
+  const changed = git(['status', '--porcelain', ...APP_INPUTS]) ? ' + local changes' : '';
+  return `${last}${changed}${mode === 'single' ? ' · claude.ai copy' : ''}`;
 }
 
 // `--mode single` inlines all JS/CSS into index.html (the Stockfish worker and wasm stay
@@ -63,7 +72,7 @@ function buildLabel() {
 // The normal build is the installable app: manifest, icons and an offline service worker.
 export default defineConfig(({ mode }) => ({
   base: './',
-  define: { __BUILD__: JSON.stringify(buildLabel()) },
+  define: { __BUILD__: JSON.stringify(buildLabel(mode)) },
   plugins: [react(), ...(mode === 'single' ? [viteSingleFile({ removeViteModuleLoader: true })] : [serviceWorker()])],
   build: {
     outDir: mode === 'single' ? 'dist-single' : 'dist',

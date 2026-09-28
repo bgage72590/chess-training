@@ -1,8 +1,8 @@
-import { lazy, Suspense, useEffect, type ReactNode } from 'react';
+import { Component, lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { navigate, routeParts, useRoute } from './router';
 import { Icon } from './components/Icon';
 import { getProfile, levelFromXp, liveStreak, updateProfile, useProfile } from './store/profile';
-import { useToasts, toast } from './lib/toast';
+import { dismiss, useToasts, toast } from './lib/toast';
 import { ACHIEVEMENTS } from './lib/achievements';
 import { dueLines, dueReviewPuzzles } from './lib/due';
 import { Button, ProgressBar } from './components/ui';
@@ -94,6 +94,31 @@ function BrandMark() {
   );
 }
 
+/** Kids mode loads separately: when its files cannot be fetched, say so instead of a blank screen. */
+class KidsLoadFailed extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="page">
+        <div className="empty">
+          <h3>Kids mode could not load</h3>
+          <p style={{ marginTop: 6 }}>Check the internet connection, then try again.</p>
+          <div className="btn-row" style={{ justifyContent: 'center', marginTop: 14 }}>
+            <Button variant="primary" icon="refresh" onClick={() => location.reload()}>
+              Try again
+            </Button>
+            <Button onClick={() => navigate('home')}>Back to Tempo</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
 function Toasts() {
   const toasts = useToasts();
   return (
@@ -112,6 +137,11 @@ function Toasts() {
               </Button>
             )}
           </div>
+          {t.closable && (
+            <button type="button" className="toast-close" aria-label="Close" onClick={() => dismiss(t.id)}>
+              <Icon name="x" size={16} />
+            </button>
+          )}
         </div>
       ))}
     </div>
@@ -233,9 +263,11 @@ export function App() {
   if (section === 'kids') {
     return (
       <>
-        <Suspense fallback={<div className="kids-loading" aria-busy="true" style={{ position: 'fixed', inset: 0, background: '#fffaf0' }} />}>
-          <KidsApp route={route} />
-        </Suspense>
+        <KidsLoadFailed>
+          <Suspense fallback={<div className="kids-loading" aria-busy="true" style={{ position: 'fixed', inset: 0, background: '#fffaf0' }} />}>
+            <KidsApp route={route} />
+          </Suspense>
+        </KidsLoadFailed>
         <Toasts />
       </>
     );

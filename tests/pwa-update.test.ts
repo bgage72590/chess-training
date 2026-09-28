@@ -5,7 +5,7 @@ import { toast } from '../src/lib/toast';
 vi.mock('../src/lib/toast', () => ({ toast: vi.fn() }));
 
 /** Runs the service worker template with a fake Cache Storage and network; `files` is its file list. */
-function worker(net: (req: Request | { url: string; mode: string }, init?: RequestInit) => Promise<Response>, files: string[]) {
+function worker(net: (req: Request | string) => Promise<Response>, files: string[]) {
   const stores = new Map<string, Map<string, Response>>();
   const added: Request[] = [];
   const caches = {
@@ -45,54 +45,56 @@ function worker(net: (req: Request | { url: string; mode: string }, init?: Reque
   };
   const navigate = (url: string): Promise<Response> => {
     let answer: Promise<Response> | undefined;
-    on.fetch({ request: { url, mode: 'navigate', method: 'GET' }, respondWith: (p: Promise<Response>) => (answer = p), waitUntil: () => undefined });
+    const request = Object.defineProperty(new Request(url), 'mode', { value: 'navigate' });
+    on.fetch({ request, respondWith: (p: Promise<Response>) => (answer = p), waitUntil: () => undefined });
     return answer ?? Promise.reject(new Error('not answered'));
   };
   return { install, navigate, added };
 }
 
 describe('the service worker gets new versions past the HTTP cache', () => {
-  it('installs every file fresh from the network, not from the HTTP cache', async () => {
+  it('installs every file checked with the server, not straight from the HTTP cache', async () => {
     const sw = worker(async () => new Response('net'), ['./', './assets/index-abc.js', './engine/stockfish.js']);
     await sw.install();
     expect(sw.added.map((r) => r.url)).toEqual(['https://app.test/', 'https://app.test/assets/index-abc.js', 'https://app.test/engine/stockfish.js']);
-    expect(sw.added.every((r) => r.cache === 'reload')).toBe(true);
+    expect(sw.added.every((r) => r.cache === 'no-cache')).toBe(true);
   });
 
   it('asks the network for the page with revalidation, and serves the cached page offline', async () => {
     let online = true;
-    const asked: (RequestInit | undefined)[] = [];
-    const sw = worker(async (_req, init) => {
-      asked.push(init);
+    const asked: string[] = [];
+    const sw = worker(async (req) => {
+      asked.push((req as Request).cache);
       if (!online) throw new TypeError('Failed to fetch');
       return new Response('fresh page');
     }, ['./']);
     await sw.install();
     expect(await (await sw.navigate('https://app.test/#/play')).text()).toBe('fresh page');
-    expect(asked).toEqual([{ cache: 'no-cache' }]);
+    expect(asked).toEqual(['no-cache']);
     online = false;
     expect(await (await sw.navigate('https://app.test/#/play')).text()).toBe('cached https://app.test/');
   });
 });
 
 describe('an open app picks up a new version', () => {
-  const SCRIPT = 'https://app.test/assets/index-old.js';
-  let win: EventTarget & { location: { hash: string; reload: () => void } };
-  let doc: EventTarget & { visibilityState: string };
-  let cached: Set<string>;
+  const OLD = 'https://app.test/assets/index-old.js';
+  const NEW = 'https://app.test/assets/index-new.js';
+  let win: EventTarget & { location: { hash: string; href: string; origin: string; reload: () => void } };
+  let doc: EventTarget & { visibilityState: string; querySelectorAll: () => unknown[] };
+  let caches: Map<string, Set<string>>;
   let store: Map<string, string>;
 
   beforeEach(async () => {
     vi.useFakeTimers();
     vi.mocked(toast).mockClear();
-    win = Object.assign(new EventTarget(), { location: { hash: '#/play', reload: vi.fn() } });
-    doc = Object.assign(new EventTarget(), { visibilityState: 'visible' });
-    cached = new Set();
+    win = Object.assign(new EventTarget(), { location: { hash: '#/play', href: 'https://app.test/#/play', origin: 'https://app.test', reload: vi.fn() } });
+    doc = Object.assign(new EventTarget(), { visibilityState: 'visible', querySelectorAll: () => [] });
+    caches = new Map();
     store = new Map();
     vi.stubGlobal('window', win);
     vi.stubGlobal('location', win.location);
     vi.stubGlobal('document', doc);
-    vi.stubGlobal('caches', { match: async (u: string) => (cached.has(u) ? new Response('') : undefined) });
+    vi.stubGlobal('caches', { match: async (u: string) => ([...caches.values()].some((c) => c.has(u)) ? new Response('') : undefined) });
     vi.stubGlobal('sessionStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) });
     const { __resetUpdateForTests } = await import('../src/pwa/update');
     __resetUpdateForTests();
@@ -102,70 +104,89 @@ describe('an open app picks up a new version', () => {
     vi.unstubAllGlobals();
   });
 
-  const container = (controlled: boolean) => Object.assign(new EventTarget(), { controller: controlled ? {} : null }) as unknown as ServiceWorkerContainer;
+  /** A service worker container; `release()` plays a new worker taking over the way browsers do it. */
+  function browser(controlled: boolean) {
+    const sw = Object.assign(new EventTarget(), { controller: (controlled ? { state: 'activated' } : null) as unknown });
+    const release = async (from: string | null, to: string) => {
+      // The page gets its new controller while the worker is still activating, before its activate
+      // step removes the other versions' caches.
+      const worker = Object.assign(new EventTarget(), { state: 'activating' });
+      caches.set(to, new Set([to]));
+      sw.controller = worker;
+      sw.dispatchEvent(new Event('controllerchange'));
+      await vi.advanceTimersByTimeAsync(0);
+      if (from) caches.delete(from);
+      worker.state = 'activated';
+      worker.dispatchEvent(new Event('statechange'));
+      await vi.advanceTimersByTimeAsync(0);
+    };
+    return { sw: sw as unknown as ServiceWorkerContainer, release };
+  }
   const reg = () => ({ update: vi.fn(() => Promise.resolve()) }) as unknown as ServiceWorkerRegistration & { update: ReturnType<typeof vi.fn> };
-  const settle = () => vi.advanceTimersByTimeAsync(0);
 
-  it('the first worker taking over a new visitor is not an update', async () => {
+  it('an older page offers to reload once the new version is active, and reloads at the next screen', async () => {
     const { watchForUpdates } = await import('../src/pwa/update');
-    const sw = container(false);
-    watchForUpdates(reg(), SCRIPT, sw);
-    sw.dispatchEvent(new Event('controllerchange'));
-    await settle();
-    expect(toast).not.toHaveBeenCalled();
-    // A later release reaches that same page.
-    sw.dispatchEvent(new Event('controllerchange'));
-    await settle();
+    const { navigate } = await import('../src/router');
+    caches.set(OLD, new Set([OLD]));
+    const { sw, release } = browser(true);
+    watchForUpdates(reg(), OLD, sw);
+    await release(OLD, NEW);
     expect(toast).toHaveBeenCalledTimes(1);
-  });
-
-  it('an older page offers to reload and reloads at the next change of screen, once', async () => {
-    const { watchForUpdates } = await import('../src/pwa/update');
-    const sw = container(true);
-    watchForUpdates(reg(), SCRIPT, sw);
-    sw.dispatchEvent(new Event('controllerchange'));
-    sw.dispatchEvent(new Event('controllerchange'));
-    await settle();
-    expect(toast).toHaveBeenCalledTimes(1);
-    const notice = vi.mocked(toast).mock.calls[0][0];
-    expect(notice.action?.label).toBe('Reload now');
-    expect(win.location.reload).not.toHaveBeenCalled();
-    win.dispatchEvent(new Event('hashchange'));
+    const notice = vi.mocked(toast).mock.calls[0];
+    expect(notice[0]).toMatchObject({ title: 'A new version of Tempo is ready', closable: true, action: { label: 'Reload now' } });
+    expect(notice[1]).toBe(0); // stays until closed
+    expect(win.location.reload).not.toHaveBeenCalled(); // not in the middle of a game
+    navigate('puzzles'); // the app's own navigation (pushState), no hashchange
     expect(win.location.reload).toHaveBeenCalledTimes(1);
-    win.dispatchEvent(new Event('hashchange'));
+    navigate('learn');
     expect(win.location.reload).toHaveBeenCalledTimes(1);
-    notice.action?.run();
+    notice[0].action?.run();
     expect(win.location.reload).toHaveBeenCalledTimes(2);
+    // A second release before the reload does not stack notices.
+    await release(NEW, 'https://app.test/assets/index-newer.js');
+    expect(toast).toHaveBeenCalledTimes(1);
   });
 
   it('a page opened after the release is already current: no notice, no reload', async () => {
     const { watchForUpdates } = await import('../src/pwa/update');
-    cached.add(SCRIPT);
-    const sw = container(true);
-    watchForUpdates(reg(), SCRIPT, sw);
-    sw.dispatchEvent(new Event('controllerchange'));
-    await settle();
-    win.dispatchEvent(new Event('hashchange'));
+    const { navigate } = await import('../src/router');
+    caches.set(OLD, new Set([OLD]));
+    const { sw, release } = browser(true);
+    watchForUpdates(reg(), NEW, sw); // this page runs the new version's script
+    await release(OLD, NEW);
+    navigate('puzzles');
+    expect(toast).not.toHaveBeenCalled();
+    expect(win.location.reload).not.toHaveBeenCalled();
+  });
+
+  it('the first worker taking over a new visitor is not an update', async () => {
+    const { watchForUpdates } = await import('../src/pwa/update');
+    const { navigate } = await import('../src/router');
+    const { sw, release } = browser(false);
+    watchForUpdates(reg(), NEW, sw);
+    await release(null, NEW);
+    navigate('puzzles');
     expect(toast).not.toHaveBeenCalled();
     expect(win.location.reload).not.toHaveBeenCalled();
   });
 
   it('Kids mode reloads at the next screen without a notice', async () => {
     const { watchForUpdates } = await import('../src/pwa/update');
+    const { navigate } = await import('../src/router');
     win.location.hash = '#/kids/map';
-    const sw = container(true);
-    watchForUpdates(reg(), SCRIPT, sw);
-    sw.dispatchEvent(new Event('controllerchange'));
-    await settle();
+    caches.set(OLD, new Set([OLD]));
+    const { sw, release } = browser(true);
+    watchForUpdates(reg(), OLD, sw);
+    await release(OLD, NEW);
     expect(toast).not.toHaveBeenCalled();
-    win.dispatchEvent(new Event('hashchange'));
+    navigate('kids/world/w1');
     expect(win.location.reload).toHaveBeenCalledTimes(1);
   });
 
   it('checks for a new version when the app is shown again, at most once a minute', async () => {
     const { watchForUpdates } = await import('../src/pwa/update');
     const r = reg();
-    watchForUpdates(r, SCRIPT, container(true));
+    watchForUpdates(r, OLD, browser(true).sw);
     doc.dispatchEvent(new Event('visibilitychange'));
     expect(r.update).not.toHaveBeenCalled(); // just loaded
     await vi.advanceTimersByTimeAsync(61_000);

@@ -27,22 +27,25 @@ async function ranged(req, res) {
   });
 }
 
-/** A request that skips the browser's HTTP cache (GitHub Pages lets it keep files for 10 minutes). */
+/** Fetches `req` checking with the server first: GitHub Pages lets the browser's HTTP cache keep
+ *  files for 10 minutes, and an unchanged file costs a short "not modified" answer. */
 const revalidate = (req) => {
+  let fresh = req;
   try {
-    return fetch(req, { cache: 'no-cache' });
+    fresh = new Request(req, { cache: 'no-cache' });
   } catch {
-    return fetch(req);
+    /* keep the request as it is */
   }
+  return fetch(fresh);
 };
 
 self.addEventListener('install', (event) => {
-  // `reload`: a copy of the page or an unhashed file the HTTP cache still holds from the last
-  // version would pair the new files with old ones offline.
+  // Checked with the server: a copy of the page or an unhashed file the HTTP cache still holds
+  // from the last version would pair the new files with old ones offline.
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) => cache.addAll(FILES.map((f) => new Request(scoped(f), { cache: 'reload' }))))
+      .then((cache) => cache.addAll(FILES.map((f) => new Request(scoped(f), { cache: 'no-cache' }))))
       .then(() => self.skipWaiting()),
   );
 });

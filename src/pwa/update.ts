@@ -4,6 +4,7 @@
 // a page that is older, the page reloads at the next change of screen, never in the middle of a
 // game or a puzzle, or at once from the notice.
 import { toast } from '../lib/toast';
+import { onNextRouteChange } from '../router';
 
 /** Checks for a new version at most this often (ms). */
 const CHECK_GAP = 60_000;
@@ -15,35 +16,50 @@ let pending = false;
 export function updateTookOver() {
   if (pending) return;
   pending = true;
-  window.addEventListener('hashchange', () => location.reload(), { once: true });
+  onNextRouteChange(() => location.reload());
   // Kids mode only reloads at the next screen: its notices are for the kids.
-  if (!location.hash.startsWith('#/kids')) {
-    toast({ title: 'A new version of Tempo is ready', body: 'It opens when you go to another screen.', icon: 'refresh', action: { label: 'Reload now', run: () => location.reload() } }, 15000);
-  }
+  if (location.hash.startsWith('#/kids')) return;
+  toast({ title: 'A new version of Tempo is ready', body: 'It opens when you go to another screen.', icon: 'refresh', action: { label: 'Reload now', run: () => location.reload() }, closable: true }, 0);
 }
 
-/** Whether this page's own code belongs to the version the service worker now serves. */
-async function pageIsCurrent(script: string): Promise<boolean> {
-  try {
-    return !!(await caches.match(script));
-  } catch {
-    return false;
-  }
+/** Resolves once `w` has finished activating: from then on the caches hold only its version. */
+function activated(w: ServiceWorker | null): Promise<void> {
+  return new Promise((done) => {
+    const settled = () => !w || w.state === 'activated' || w.state === 'redundant';
+    if (settled()) return done();
+    const check = () => {
+      if (!settled()) return;
+      w!.removeEventListener('statechange', check);
+      done();
+    };
+    w!.addEventListener('statechange', check);
+    setTimeout(done, 10_000);
+  });
+}
+
+/** This page's own scripts and style sheets. */
+function pageFiles(script: string): string[] {
+  const loaded = [...document.querySelectorAll<HTMLScriptElement | HTMLLinkElement>('script[src], link[rel="stylesheet"][href]')].map((e) => (e instanceof HTMLScriptElement ? e.src : e.href));
+  return [...new Set([script, ...loaded])].filter((u) => new URL(u, location.href).origin === location.origin);
 }
 
 /**
- * Watches `reg` for new versions. `script` is this page's main script: after a new worker takes
- * over, the caches hold only the new version's files, so a page whose script is among them (it was
- * opened after the release) is already current and does not reload.
+ * Whether this page belongs to the version the service worker now serves. The worker's activation
+ * removes the other versions' caches, so after it every file of a current page is cached, and an
+ * older page misses at least one (its scripts and style sheets are named by their content).
  */
+async function pageIsCurrent(sw: ServiceWorkerContainer, script: string): Promise<boolean> {
+  await activated(sw.controller);
+  try {
+    return (await Promise.all(pageFiles(script).map((f) => caches.match(f)))).every(Boolean);
+  } catch {
+    return true;
+  }
+}
+
+/** Watches `reg` for new versions; `script` is this page's main script. */
 export function watchForUpdates(reg: ServiceWorkerRegistration, script = import.meta.url, sw: ServiceWorkerContainer = navigator.serviceWorker) {
-  // The first worker taking over a page is not an update.
-  let controlled = !!sw.controller;
-  sw.addEventListener('controllerchange', () => {
-    const wasControlled = controlled;
-    controlled = true;
-    if (wasControlled) void pageIsCurrent(script).then((current) => current || updateTookOver());
-  });
+  sw.addEventListener('controllerchange', () => void pageIsCurrent(sw, script).then((current) => current || updateTookOver()));
   let last = Date.now();
   const check = () => {
     if (document.visibilityState !== 'visible' || Date.now() - last < CHECK_GAP) return;

@@ -45,8 +45,8 @@ function detectHow(): InstallState['how'] {
 
 /** Call once at start-up, before the browser may fire its install prompt. */
 export function setupInstall() {
+  if (import.meta.env.PROD && import.meta.env.MODE !== 'single') recoverFromMissingFiles();
   if (import.meta.env.PROD && import.meta.env.MODE !== 'single' && 'serviceWorker' in navigator) {
-    recoverFromMissingFiles();
     window.addEventListener('load', () => void navigator.serviceWorker.register('./sw.js').then((reg) => watchForUpdates(reg)).catch(() => undefined));
   }
   window.addEventListener('beforeinstallprompt', (e) => {

@@ -34,6 +34,15 @@ export function navigate(to: string, opts: { replace?: boolean } = {}) {
   scrollToTop();
 }
 
+/** Runs `fn` once at the next change of screen, when the address already shows the new route. */
+export function onNextRouteChange(fn: () => void) {
+  const once = () => {
+    listeners.delete(once);
+    fn();
+  };
+  listeners.add(once);
+}
+
 /** Scrolls the page to the top; also for a new view inside the same route (a lesson step, a game). */
 export function scrollToTop() {
   try {

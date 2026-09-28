@@ -1320,6 +1320,22 @@ button.feedback:hover {
 .toast-action {
   margin-top: 8px;
 }
+.toast-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin: -6px -8px 0 auto;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.toast-close:hover {
+  color: var(--ink);
+}
 @media (max-width: 900px) {
   /* Under the top bar: at the bottom they would cover the result a move just revealed. */
   .toasts {
