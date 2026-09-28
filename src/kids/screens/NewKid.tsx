@@ -12,6 +12,7 @@ import { BigButton } from '../ui/BigButton';
 import { KidsIcon } from '../ui/KidsIcon';
 import { speech } from '../player/speech';
 import { noteInput } from '../player/useSession';
+import { markOpened } from '../lib/unlockSeen';
 import { go } from '../routes';
 
 /** Ages said as words (each has a recording). */
@@ -32,6 +33,8 @@ export function NewKid() {
   const [color, setColor] = useState<AvatarColor>('sun');
   const [face, setFace] = useState<FaceId>('smile');
   const [token, setToken] = useState<number | undefined>();
+  // Which way the last step change went (0 until the first one), so the step slides in from that side.
+  const [dir, setDir] = useState<-1 | 0 | 1>(0);
 
   const band: AgeBand = age ? bandOfAge(age) : 'explorer';
   const talk = (t: string) => setToken(speech.speak([t], { rate: 0.95, pitch: 1.05 }));
@@ -40,8 +43,8 @@ export function NewKid() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
-  const next = () => setStep((s) => s + 1);
-  const back = () => (step === 0 ? go.picker() : setStep((s) => s - 1));
+  const next = () => (setDir(1), setStep((s) => s + 1));
+  const back = () => (step === 0 ? go.picker() : (setDir(-1), setStep((s) => s - 1)));
   const canNext = step === 0 ? true : step === 1 ? age != null : step === 2 ? start != null : true;
 
   const finish = () => {
@@ -52,6 +55,8 @@ export function NewKid() {
       s.activeKid = kid.id;
     });
     noteInput();
+    // What is open on day one is not "new" on the map, so the first unlock the kid earns is celebrated.
+    markOpened(kid.id, ['w1', 'w1-hello']);
     speech.cancel();
     if (kid.start === 'new') go.play('w1-hello', true);
     else go.placement(undefined, true);
@@ -75,7 +80,7 @@ export function NewKid() {
         <SpeechBubble text={LINES[step]} token={token} onSpeak={() => talk(LINES[step])} />
       </div>
 
-      <div className="k-newkid-body">
+      <div className={`k-newkid-body${dir ? ' k-stepbody' : ''}`} key={step} style={dir ? { ['--sx' as string]: dir } : undefined}>
         {step === 0 && (
           <div className="k-name-step">
             <label className="k-field">

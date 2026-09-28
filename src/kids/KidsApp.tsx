@@ -1,9 +1,10 @@
 // Kids mode: "Pip's Chess Quest", a separate full-screen app at #/kids/... (lazy-loaded chunk).
 // Parses kids routes, keeps a kid active, sets band / bedtime / motion attributes, cancels speech
 // on every route change, and hosts the parent gate.
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import './fonts';
 import './kids.css';
+import './motion-nav.css';
 import { useToasts } from '../lib/toast';
 import { setActiveKid, useKids } from './store/kidsStore';
 import { registerKidsSync } from './store/syncKids';
@@ -13,6 +14,7 @@ import { speech } from './player/speech';
 import { breakIsFresh, clearFreshBreak, markBreak, onBreak, sessionOver, useSessionTracker } from './player/useSession';
 import { kidsSound } from './lib/kidsSound';
 import { resolvePieceSet } from './lib/pieceProbe';
+import { RouteTrail } from './lib/navMotion';
 import { isKidsLocked } from './lock';
 import { parseKidsRoute, go } from './routes';
 import { clearGatePass, GateHost, gatePassed, requireGate } from './ui/ParentGate';
@@ -62,6 +64,9 @@ export function KidsApp({ route }: { route: string }) {
   const motionPref = useMedia('(prefers-reduced-motion: reduce)');
   const night = kid ? kid.settings.bedtime === 'on' || (kid.settings.bedtime === 'system' && darkPref) : darkPref;
   const reduced = motionPref || kid?.settings.reducedMotion === 'on';
+  const [trail] = useState(() => new RouteTrail());
+  // The loading cover (App.tsx) is still on screen while this first renders: fade out of its cream.
+  const [veil] = useState(() => !!document.querySelector('.kids-loading'));
 
   useSessionTracker(kid?.id ?? null);
 
@@ -151,14 +156,26 @@ export function KidsApp({ route }: { route: string }) {
         break;
     }
 
+  // How the screen arrives (see motion-nav.css). The same answer on every render of one screen, and
+  // none for the first one shown, so the app never animates in on its first paint.
+  const nav = screen ? trail.step(r) : null;
+  // A new screen starts at the top (the app is the scroller). Pinned bars inside the sliding screen
+  // then sit where they belong for the whole move.
+  const appEl = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (appEl.current) appEl.current.scrollTop = 0;
+  }, [nav?.key]);
+
   return (
     <KidContext.Provider value={ctx}>
       <div
+        ref={appEl}
         className={`kids-app pieces-${pieceSet}`}
         data-band={band}
         data-night={night ? '1' : '0'}
         data-motion={reduced ? 'reduced' : 'full'}
         data-screen={r.screen}
+        data-veil={veil ? '1' : undefined}
         style={{ ['--k-btn-h' as string]: `${tuning.buttonPx}px` }}
         onPointerDownCapture={() => {
           speech.unlock();
@@ -170,7 +187,11 @@ export function KidsApp({ route }: { route: string }) {
           <span className="k-cloud c2" />
           <span className="k-cloud c3" />
         </div>
-        {screen}
+        {nav && (
+          <div key={nav.key} className="k-route" data-nav={nav.dir ?? undefined}>
+            {screen}
+          </div>
+        )}
         {kid && needsKid && onBreak(kid) && (
           <BreakTime
             kid={kid}

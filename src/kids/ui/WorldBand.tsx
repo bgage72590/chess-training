@@ -93,6 +93,7 @@ export function WorldBand({
   onOpen,
   footer,
   starsText,
+  opening,
 }: {
   world: WorldDef;
   crown: 'gold' | 'silver' | null;
@@ -101,9 +102,11 @@ export function WorldBand({
   onOpen?: () => void;
   footer?: ReactNode;
   starsText?: string;
+  /** Just opened: the path wakes up and the header sparkles (see motion-nav.css). */
+  opening?: boolean;
 }) {
   return (
-    <section className={`k-world${locked ? ' locked' : ''}`} style={{ ['--wbg' as string]: world.bg, ['--acc' as string]: world.accent }} aria-label={`Rank ${world.rank}: ${world.title}`} id={`k-world-${world.id}`}>
+    <section className={`k-world${locked ? ' locked' : ''}${opening ? ' opening' : ''}`} style={{ ['--wbg' as string]: world.bg, ['--acc' as string]: world.accent }} aria-label={`Rank ${world.rank}: ${world.title}`} id={`k-world-${world.id}`}>
       <header className="k-world-head">
         <svg className="k-world-scene" viewBox="0 0 300 72" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
           <Scene scene={world.scene} accent={world.accent} />
@@ -116,8 +119,23 @@ export function WorldBand({
         <span className={`k-crown-slot ${crown ?? 'none'}`} aria-label={crown ? `${crown} crown` : 'No crown yet'}>
           <KidsIcon name="crown" size={30} fill={!!crown} />
         </span>
+        {opening && (
+          <span className="k-node-burst k-world-burst" aria-hidden="true">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <i key={i} style={{ ['--i' as string]: i }} />
+            ))}
+          </span>
+        )}
       </header>
-      <div className="k-world-path">{children}</div>
+      <div className="k-world-path">
+        {!locked && (
+          <span className="k-world-sky" aria-hidden="true">
+            <i />
+            <i />
+          </span>
+        )}
+        {children}
+      </div>
       {footer}
     </section>
   );
