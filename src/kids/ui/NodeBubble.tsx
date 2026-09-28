@@ -19,6 +19,7 @@ export function NodeBubble({
   current,
   accent,
   onPress,
+  fresh,
   children,
 }: {
   node: NodeDef;
@@ -27,12 +28,14 @@ export function NodeBubble({
   current?: boolean;
   accent: string;
   onPress?: () => void;
+  /** Just opened: sparkles burst from the stone (the map pops the whole node, see motion-nav.css). */
+  fresh?: boolean;
   children?: React.ReactNode;
 }) {
   const shape = node.final ? 'tower' : node.boss ? 'castle' : node.bonus ? 'flower' : 'round';
   const label = `${node.title}${state === 'locked' ? ', locked' : state === 'soon' ? ', coming soon' : np?.stars ? `, ${np.stars} stars` : ''}`;
   return (
-    <div className={`k-node ${shape} ${state}${current ? ' current' : ''}${np?.skipped ? ' skipped' : ''}`} style={{ ['--acc' as string]: accent }}>
+    <div className={`k-node ${shape} ${state}${current ? ' current' : ''}${np?.skipped ? ' skipped' : ''}${fresh ? ' fresh' : ''}`} style={{ ['--acc' as string]: accent }}>
       <button type="button" className="k-node-btn" onClick={onPress} disabled={state !== 'open'} aria-label={label}>
         {shape === 'castle' || shape === 'tower' ? (
           <svg className="k-node-shape" viewBox="0 0 100 100" aria-hidden="true">
@@ -63,6 +66,13 @@ export function NodeBubble({
         {state === 'soon' && (
           <span className="k-node-cloud" aria-hidden="true">
             <KidsIcon name="cloud" size={44} fill />
+          </span>
+        )}
+        {fresh && (
+          <span className="k-node-burst" aria-hidden="true">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <i key={i} style={{ ['--i' as string]: i }} />
+            ))}
           </span>
         )}
       </button>

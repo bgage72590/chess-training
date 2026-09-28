@@ -24,9 +24,11 @@ const PAGES: (WorldId | 'special')[] = [...WORLDS.map((w) => w.id), 'special'];
 
 export function StickerBook({ kid, tab }: { kid: KidProfile; tab: Tab }) {
   const [page, setPage] = useState(0);
+  const [flipDir, setFlipDir] = useState(1);
   const t: Tab = tab === 'scene' ? 'stickers' : tab;
   const flip = (d: number) => {
     kidSound('whoosh');
+    setFlipDir(d);
     setPage((p) => (p + d + PAGES.length) % PAGES.length);
   };
   const readFact = (def: StickerDef) => sayAs(kid, [def.fact], { force: true });
@@ -62,7 +64,7 @@ export function StickerBook({ kid, tab }: { kid: KidProfile; tab: Tab }) {
               <KidsIcon name="next" size={28} />
             </button>
           </div>
-          <div className="k-sticker-grid" key={page}>
+          <div className="k-sticker-grid" key={page} style={{ ['--sx' as string]: flipDir }}>
             {pageStickers.map((s) => (
               <StickerSlot key={s.id} def={s} earned={!!kid.stickers[s.id]} onTap={() => readFact(s)} hint={s.node && !REGISTRY.isRegistered(s.node) ? 'Coming soon' : undefined} />
             ))}

@@ -1,0 +1,374 @@
+/* Kids mode motion: screen transitions, the map's polish and press feedback.
+   Everything here moves only under data-motion='full' (KidsApp sets it from the device setting and the
+   kid's Reduced motion setting). Under 'reduced' kids.css already turns every animation into a
+   short fade, and the extras below are hidden. Only transform, translate, scale and opacity move,
+   apart from one small clip (the path drawing itself). */
+
+/* ================= Screen transitions ================= */
+/* KidsApp wraps the current screen in .k-route. It is exactly the app's height (the app is the
+   scroller, as before), so screens size themselves as they always did. Only the new screen
+   animates, and it is fully interactive from the first frame. */
+.k-route {
+  height: 100%;
+}
+@media print {
+  .k-route {
+    height: auto;
+    animation: none !important;
+  }
+}
+.kids-app[data-motion='full'] .k-route[data-nav='forward'] {
+  animation: k-nav-forward 300ms var(--k-ease-out) backwards;
+}
+.kids-app[data-motion='full'] .k-route[data-nav='back'] {
+  animation: k-nav-back 300ms var(--k-ease-out) backwards;
+}
+.kids-app[data-motion='full'] .k-route[data-nav='dive'] {
+  animation: k-nav-dive 320ms var(--k-ease-out) backwards;
+}
+.kids-app[data-motion='full'] .k-route[data-nav='surface'] {
+  animation: k-nav-surface 320ms var(--k-ease-out) backwards;
+}
+@keyframes k-nav-forward {
+  from {
+    opacity: 0;
+    transform: translateX(min(9vw, 40px));
+  }
+}
+@keyframes k-nav-back {
+  from {
+    opacity: 0;
+    transform: translateX(max(-9vw, -40px));
+  }
+}
+@keyframes k-nav-dive {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+@keyframes k-nav-surface {
+  from {
+    opacity: 0;
+    transform: scale(1.05);
+  }
+}
+
+/* The first draw after the loading cover: fade out of its cream instead of cutting to the sky. */
+.kids-app[data-motion='full'][data-veil]::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #fffaf0;
+  pointer-events: none;
+  animation: k-veil-out 320ms ease-out 40ms both;
+}
+@keyframes k-veil-out {
+  from {
+    opacity: 1;
+    visibility: visible;
+  }
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* New player: each step slides in from the side it came from. */
+.kids-app[data-motion='full'] .k-stepbody {
+  animation: k-step-in 300ms var(--k-ease-out) backwards;
+}
+@keyframes k-step-in {
+  from {
+    opacity: 0;
+    translate: calc(var(--sx, 1) * 28px) 0;
+  }
+}
+
+/* ================= Press feedback ================= */
+/* A squish on press and a springy return. The button's own press (kids.css) still moves it down;
+   this adds the squash on top with the separate scale property. :where keeps these rules light, so
+   a later one can override an earlier one. */
+.kids-app[data-motion='full'] :where(.k-btn, .k-round, .k-pillbtn, .k-avatar-chip, .k-avatar-tile, .k-tile, .k-exp-card, .k-age, .k-tab, .k-chipbtn, .k-facebtn:not(.locked), .k-swatch, .k-node-btn, .k-playbtn, .k-world-title, .k-sticker:not(.missing), .k-corner, .k-card-tap) {
+  transform-origin: 50% 90%;
+  transition: transform 420ms var(--k-ease-spring), scale 420ms var(--k-ease-spring), box-shadow 220ms var(--k-ease-out);
+}
+.kids-app[data-motion='full'] :where(.k-btn, .k-round, .k-pillbtn, .k-avatar-chip, .k-avatar-tile, .k-tile, .k-exp-card, .k-age, .k-tab, .k-chipbtn, .k-facebtn:not(.locked), .k-swatch, .k-node-btn, .k-playbtn, .k-world-title, .k-sticker:not(.missing), .k-corner, .k-card-tap):active:not(:disabled) {
+  scale: 1.03 0.94;
+  transition-duration: 60ms;
+  transition-timing-function: var(--k-ease-out);
+}
+.kids-app[data-motion='full'] :where(.k-node-btn, .k-round, .k-swatch, .k-age):active:not(:disabled) {
+  scale: 0.92;
+}
+.k-card-tap {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.k-card-tap:active {
+  transform: translateY(3px);
+}
+
+/* ================= Staggered entrance ================= */
+/* Cards, tiles and stickers rise in one after another. --n is the place in the row of the first ten. */
+.kids-app[data-motion='full'] :is(.k-avatar-grid, .k-tiles, .k-node-cards, .k-sticker-grid, .k-shelf, .k-exp, .k-wardrobe) > * {
+  animation: k-rise 460ms var(--k-ease-spring) calc(60ms + var(--n, 0) * 50ms) backwards;
+}
+:is(.k-avatar-grid, .k-tiles, .k-node-cards, .k-sticker-grid, .k-shelf, .k-exp, .k-wardrobe) > :nth-child(2) {
+  --n: 1;
+}
+:is(.k-avatar-grid, .k-tiles, .k-node-cards, .k-sticker-grid, .k-shelf, .k-exp, .k-wardrobe) > :nth-child(3) {
+  --n: 2;
+}
+:is(.k-avatar-grid, .k-tiles, .k-node-cards, .k-sticker-grid, .k-shelf, .k-exp, .k-wardrobe) > :nth-child(4) {
+  --n: 3;
+}
+:is(.k-avatar-grid, .k-tiles, .k-node-cards, .k-sticker-grid, .k-shelf, .k-exp, .k-wardrobe) > :nth-child(5) {
+  --n: 4;
+}
+:is(.k-avatar-grid, .k-tiles, .k-node-cards, .k-sticker-grid, .k-shelf, .k-exp, .k-wardrobe) > :nth-child(6) {
+  --n: 5;
+}
+:is(.k-avatar-grid, .k-tiles, .k-node-cards, .k-sticker-grid, .k-shelf, .k-exp, .k-wardrobe) > :nth-child(7) {
+  --n: 6;
+}
+:is(.k-avatar-grid, .k-tiles, .k-node-cards, .k-sticker-grid, .k-shelf, .k-exp, .k-wardrobe) > :nth-child(8) {
+  --n: 7;
+}
+:is(.k-avatar-grid, .k-tiles, .k-node-cards, .k-sticker-grid, .k-shelf, .k-exp, .k-wardrobe) > :nth-child(9) {
+  --n: 8;
+}
+:is(.k-avatar-grid, .k-tiles, .k-node-cards, .k-sticker-grid, .k-shelf, .k-exp, .k-wardrobe) > :nth-child(n + 10) {
+  --n: 9;
+}
+@keyframes k-rise {
+  from {
+    opacity: 0;
+    translate: 0 18px;
+    scale: 0.94;
+  }
+}
+/* A sticker page flip: the stickers come from the side the page turns to (kids.css slides the whole
+   grid, which would stack with this). */
+.kids-app[data-motion='full'] .k-sticker-grid {
+  animation: none;
+}
+.kids-app[data-motion='full'] .k-sticker-grid > * {
+  animation-name: k-rise-side;
+}
+@keyframes k-rise-side {
+  from {
+    opacity: 0;
+    translate: calc(var(--sx, 1) * 22px) 0;
+    scale: 0.94;
+  }
+}
+
+/* ================= Map ================= */
+/* Clouds drifting slowly behind the stones, two speeds apart. Chromium also shifts them a little as
+   the map scrolls (scroll-driven animation); elsewhere they just drift. */
+.k-world-sky {
+  display: none;
+}
+.kids-app[data-motion='full']:not([data-night='1']) .k-world-sky {
+  display: block;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* clip, not hidden: hidden would make this the scroller the scroll-driven shift below looks at */
+  overflow: clip;
+  pointer-events: none;
+}
+.k-world-sky i {
+  position: absolute;
+  left: -90px;
+  width: 72px;
+  height: 22px;
+  border-radius: 22px;
+  background: #fff;
+  opacity: 0.55;
+  animation: k-sky-drift 80s linear infinite;
+}
+.k-world-sky i::before,
+.k-world-sky i::after {
+  content: '';
+  position: absolute;
+  background: #fff;
+  border-radius: 50%;
+}
+.k-world-sky i::before {
+  width: 30px;
+  height: 30px;
+  left: 10px;
+  top: -16px;
+}
+.k-world-sky i::after {
+  width: 24px;
+  height: 24px;
+  left: 36px;
+  top: -10px;
+}
+.k-world-sky i:nth-child(1) {
+  top: 12%;
+  --para: 22;
+}
+.k-world-sky i:nth-child(2) {
+  top: 56%;
+  width: 52px;
+  height: 16px;
+  opacity: 0.4;
+  scale: 0.8;
+  animation-duration: 130s;
+  animation-delay: -70s;
+  --para: 9;
+}
+@keyframes k-sky-drift {
+  to {
+    translate: calc(min(100vw, 560px) + 180px) 0;
+  }
+}
+@supports (animation-timeline: view()) {
+  .k-world-sky i {
+    animation: k-sky-drift 80s linear infinite, k-sky-para linear both;
+    animation-duration: 80s, auto;
+    animation-timeline: auto, view();
+  }
+  .k-world-sky i:nth-child(2) {
+    animation-duration: 130s, auto;
+    animation-delay: -70s, 0s;
+  }
+}
+@keyframes k-sky-para {
+  from {
+    transform: translateY(calc(var(--para) * 1px));
+  }
+  to {
+    transform: translateY(calc(var(--para) * -1px));
+  }
+}
+
+/* The path draws itself from the last stone up to a newly opened one, glows for a moment, then
+   settles back into the ordinary dotted trail. */
+.k-trail-draw {
+  display: none;
+}
+.kids-app[data-motion='full'] .k-trail-draw {
+  display: block;
+  position: absolute;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  animation: k-trail-draw var(--dd, 650ms) var(--k-ease-out) var(--dt, 350ms) backwards, k-trail-out 600ms ease-out calc(var(--dt, 350ms) + var(--dd, 650ms) + 700ms) forwards;
+}
+.k-trail-draw svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.k-trail-draw polyline {
+  stroke: color-mix(in srgb, var(--acc) 55%, #1f2a44);
+  stroke-width: 6;
+  stroke-dasharray: 2 12;
+  stroke-linecap: round;
+}
+@keyframes k-trail-draw {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+@keyframes k-trail-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* A newly opened stone waits until the path reaches it, then bounces in with a small sparkle burst. */
+.kids-app[data-motion='full'] .k-path-node.fresh {
+  transform-origin: 50% 40px;
+  animation: k-node-unlock 800ms var(--k-ease-spring) var(--ud, 900ms) backwards;
+}
+@keyframes k-node-unlock {
+  0% {
+    opacity: 0;
+    scale: 0.5;
+  }
+  35% {
+    opacity: 1;
+    scale: 1.22;
+  }
+  60% {
+    scale: 0.94;
+  }
+  80% {
+    scale: 1.04;
+  }
+  100% {
+    opacity: 1;
+    scale: 1;
+  }
+}
+/* The Pawn Buddy hops onto it once it has landed. */
+.kids-app[data-motion='full'] .k-path-node.fresh .k-node-buddy {
+  animation-delay: calc(var(--ud, 900ms) + 350ms);
+  animation-fill-mode: backwards;
+}
+.k-node-burst {
+  display: none;
+}
+.kids-app[data-motion='full'] .k-node-burst {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+.k-node-burst i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  background: var(--k-sun);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  opacity: 0;
+  rotate: calc(var(--i) * 60deg);
+  animation: k-node-spark 800ms var(--k-ease-out) calc(var(--ud, 900ms) + 120ms) forwards;
+}
+.k-node-burst i:nth-child(even) {
+  background: var(--k-coral);
+}
+@keyframes k-node-spark {
+  0% {
+    opacity: 1;
+    transform: translateY(-30px) scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-74px) scale(1.1);
+  }
+}
+/* A newly opened rank: its path wakes up from the dimmed look and its header sparkles. */
+.k-world.opening {
+  --ud: 450ms;
+}
+.k-world-burst {
+  inset: 0;
+}
+.kids-app[data-motion='full'] .k-world.opening .k-path {
+  animation: k-world-wake 700ms var(--k-ease-out) 300ms backwards;
+}
+@keyframes k-world-wake {
+  from {
+    opacity: 0.55;
+  }
+}
+/* Pip's buddy on the current stone breathes up and down a little faster than the shared bob. */
+.kids-app[data-motion='full'] .k-node-buddy .k-bob {
+  animation-duration: 3.6s;
+}

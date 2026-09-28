@@ -1,6 +1,6 @@
 // The map: an island of 8 ranks (Rank 1 at the bottom). The Pawn Buddy stands on the current
 // node; a big sticky PLAY runs the warm-up (if due) and then the next node.
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { updateKid, type KidProfile } from '../store/kidsStore';
 import { speech } from '../player/speech';
 import { REGISTRY } from '../packs';
@@ -16,11 +16,17 @@ import { Pip } from '../ui/Pip';
 import { StarRow } from '../ui/StarRow';
 import { useIsLandscape } from '../ui/useLayout';
 import { go } from '../routes';
+import { markOpened, newlyOpened, openIds } from '../lib/unlockSeen';
 
 /** Kids who already did (or skipped) today's warm-up in this session. */
 export const warmupDone = new Set<string>();
 
 const ZIG = [50, 74, 50, 26];
+
+/** The path draws itself, then the new stone pops (ms after the map appears). */
+const DRAW_AT = 350;
+const DRAW_MS = 650;
+const POP_AT = DRAW_AT + DRAW_MS - 100;
 
 export function MapScreen({ kid }: { kid: KidProfile }) {
   const landscape = useIsLandscape();
@@ -31,10 +37,15 @@ export function MapScreen({ kid }: { kid: KidProfile }) {
   const playgroundOpen = kid.start === 'games' || worldPassed(kid, 'w5', REGISTRY);
   const graduate = canGraduate(kid, REGISTRY) && !kid.graduated;
   const [hopKey] = useState(() => Date.now());
+  // What opened since the map was last drawn gets a one-time unlock animation. Worked out once per
+  // visit; the played ones are not new to the kid, so only worlds and unplayed nodes count.
+  const [fresh] = useState(() => new Set(newlyOpened(kid.id, openIds(kid, REGISTRY)).filter((id) => !kid.nodes[id]?.plays && !kid.nodes[id]?.tested)));
+  useEffect(() => markOpened(kid.id, openIds(kid, REGISTRY)), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useLayoutEffect(() => {
     const el = scroller.current?.querySelector('.k-node.current') ?? scroller.current?.querySelector(`#k-world-${currentWorld(kid, REGISTRY)}`);
-    el?.scrollIntoView({ block: 'center' });
+    // Instant: the map's own smooth scrolling would whoosh down from Rank 8 on every visit.
+    el?.scrollIntoView({ block: 'center', behavior: 'instant' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -59,7 +70,7 @@ export function MapScreen({ kid }: { kid: KidProfile }) {
             </div>
           )}
           {[...WORLDS].reverse().map((w) => (
-            <WorldOnMap key={w.id} kid={kid} world={w} current={frontier?.id} hopKey={hopKey} />
+            <WorldOnMap key={w.id} kid={kid} world={w} current={frontier?.id} hopKey={hopKey} fresh={fresh} />
           ))}
           <div className="k-map-shore" aria-hidden="true" />
         </div>
@@ -115,7 +126,7 @@ export function MapBar({ kid, stars, playgroundOpen, back }: { kid: KidProfile; 
   );
 }
 
-function WorldOnMap({ kid, world, current, hopKey }: { kid: KidProfile; world: WorldDef; current?: string; hopKey: number }) {
+function WorldOnMap({ kid, world, current, hopKey, fresh }: { kid: KidProfile; world: WorldDef; current?: string; hopKey: number; fresh: Set<string> }) {
   const unlocked = worldUnlocked(kid, world.id, REGISTRY);
   const nodes = nodesOf(world.id).filter((n) => visibleTo(n, kid.band));
   const nextWorld = WORLDS[world.rank];
@@ -129,6 +140,7 @@ function WorldOnMap({ kid, world, current, hopKey }: { kid: KidProfile; world: W
       world={world}
       crown={crownOf(kid, world.id, REGISTRY)}
       locked={!unlocked}
+      opening={fresh.has(world.id)}
       onOpen={() => go.world(world.id)}
       starsText={unlocked && playable.length ? `${got} / ${playable.length * 3}` : undefined}
       footer={
@@ -146,25 +158,47 @@ function WorldOnMap({ kid, world, current, hopKey }: { kid: KidProfile; world: W
         <svg className="k-trail" viewBox={`0 0 100 ${rows * 116}`} preserveAspectRatio="none" aria-hidden="true">
           <polyline points={pts.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" vectorEffect="non-scaling-stroke" />
         </svg>
+        {nodes.map((n, i) =>
+          fresh.has(n.id) && i > 0 ? (
+            <span key={`draw-${n.id}`} className="k-trail-draw" style={{ top: pts[i].y, height: pts[i - 1].y - pts[i].y, ['--dt' as string]: `${DRAW_AT}ms`, ['--dd' as string]: `${DRAW_MS}ms` }} aria-hidden="true">
+              <svg viewBox={`0 0 100 ${pts[i - 1].y - pts[i].y}`} preserveAspectRatio="none">
+                <polyline points={`${pts[i - 1].x},${pts[i - 1].y - pts[i].y} ${pts[i].x},0`} fill="none" vectorEffect="non-scaling-stroke" />
+              </svg>
+            </span>
+          ) : null,
+        )}
         {nodes.map((n, i) => (
-          <MapNode key={n.id} kid={kid} node={n} world={world} next={nextWorld} x={pts[i].x} y={pts[i].y - 50} current={current === n.id} hopKey={hopKey} worldUnlocked={unlocked} />
+          <MapNode
+            key={n.id}
+            kid={kid}
+            node={n}
+            world={world}
+            next={nextWorld}
+            x={pts[i].x}
+            y={pts[i].y - 50}
+            current={current === n.id}
+            hopKey={hopKey}
+            worldUnlocked={unlocked}
+            fresh={fresh.has(n.id) ? (i > 0 ? POP_AT : DRAW_AT) : undefined}
+          />
         ))}
       </div>
     </WorldBand>
   );
 }
 
-function MapNode({ kid, node, world, next, x, y, current, hopKey, worldUnlocked: wu }: { kid: KidProfile; node: NodeDef; world: WorldDef; next?: WorldDef; x: number; y: number; current: boolean; hopKey: number; worldUnlocked: boolean }) {
+function MapNode({ kid, node, world, next, x, y, current, hopKey, worldUnlocked: wu, fresh }: { kid: KidProfile; node: NodeDef; world: WorldDef; next?: WorldDef; x: number; y: number; current: boolean; hopKey: number; worldUnlocked: boolean; fresh?: number }) {
   const registered = REGISTRY.isRegistered(node.id);
   const open = registered && wu && nodeUnlocked(kid, node.id, REGISTRY);
   const state = !registered ? 'soon' : open ? 'open' : 'locked';
   const np = kid.nodes[node.id];
+  const isFresh = state === 'open' && fresh != null;
   return (
-    <div className="k-path-node" style={{ left: `${x}%`, top: y }}>
-      <NodeBubble node={node} np={np} state={state} current={current} accent={world.accent} onPress={() => go.play(node.id)}>
+    <div className={`k-path-node${isFresh ? ' fresh' : ''}`} style={{ left: `${x}%`, top: y, ...(isFresh && { ['--ud' as string]: `${fresh}ms` }) }}>
+      <NodeBubble node={node} np={np} state={state} current={current} accent={world.accent} fresh={isFresh} onPress={() => go.play(node.id)}>
         {current && (
           <span className="k-node-buddy" key={hopKey}>
-            <PawnBuddy color={kid.avatar.color} face={kid.avatar.face} hat={kid.avatar.hat} size={46} />
+            <PawnBuddy color={kid.avatar.color} face={kid.avatar.face} hat={kid.avatar.hat} size={46} className="k-bob" />
           </span>
         )}
       </NodeBubble>
