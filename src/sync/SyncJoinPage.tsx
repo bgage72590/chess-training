@@ -1,12 +1,14 @@
+import { useState } from 'react';
 import { navigate } from '../router';
 import { Button, PageHeader } from '../components/ui';
-import { toast } from '../lib/toast';
 import { formatSyncCode, normalizeSyncCode } from './code';
-import { sync, syncAvailable, useSync } from './index';
+import { syncAvailable, useSync } from './index';
+import { linkDevice } from './SyncCard';
 
 /** Opened from a sync link (#/sync/CODE): offers to link this device. */
 export function SyncJoinPage({ code: raw }: { code?: string }) {
   const s = useSync();
+  const [busy, setBusy] = useState(false);
   const code = normalizeSyncCode(raw ?? '');
   if (!syncAvailable || !code) {
     return (
@@ -35,12 +37,11 @@ export function SyncJoinPage({ code: raw }: { code?: string }) {
           <Button
             variant="primary"
             icon="check"
-            onClick={() =>
-              void sync.link(code).then(() => {
-                toast({ title: 'Device linked', body: 'Your progress is synced.', icon: 'check', tone: 'good' });
-                navigate('home', { replace: true });
-              })
-            }
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              void linkDevice(code, true).then((linked) => (linked ? navigate('home', { replace: true }) : setBusy(false)));
+            }}
           >
             Link this device
           </Button>

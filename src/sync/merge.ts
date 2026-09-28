@@ -1,10 +1,12 @@
 // Merging two copies of a learner's profile (e.g. this device and the synced copy).
-// The merge keeps progress made on either side: per-day logs, lessons, opening cards,
-// drills, puzzles, games and achievements are combined item by item, and totals are
-// recomputed from the merged parts. Settings follow the copy that changed last.
-// It is pure, idempotent (merge(x, x) equals x) and symmetric apart from settings ties.
-import { daysBetween } from '../lib/srs';
-import type { DayLog, GameRecord, Profile, PuzzleProgress } from '../store/profile';
+// The merge keeps progress made on either side: lessons, opening cards, drills, puzzles, games
+// and achievements are combined item by item, and the counters (XP, day logs, puzzle counts)
+// add up what each device did (tally.ts). Settings follow the copy that changed them last. A
+// reset wins over progress made before it, on any copy.
+// It is pure, idempotent (merge(x, x) equals x) and symmetric apart from ties on timestamps.
+import { dayKey, daysBetween } from '../lib/srs';
+import { counters, defaultProfile, emptyDay, levelFromXp, type DayLog, type GameRecord, type Profile, type PuzzleProgress } from '../store/profile';
+import { filterTally, mergeTallied, type Counts } from './tally';
 
 type Rec<T> = Record<string, T>;
 
@@ -15,11 +17,18 @@ function mergeRecord<T>(a: Rec<T> = {}, b: Rec<T> = {}, pick: (x: T, y: T) => T)
   return out;
 }
 
-const maxDay = (x: DayLog, y: DayLog): DayLog => {
-  const out = { ...x };
-  for (const k of Object.keys(y) as (keyof DayLog)[]) out[k] = Math.max(x[k] ?? 0, y[k] ?? 0);
-  return out;
-};
+/** The day of a 'YYYY-MM-DD.field' counter key ('' for the all-time counters). */
+const dayOf = (key: string) => (key.includes('.') ? key.slice(0, key.indexOf('.')) : '');
+
+/** Day logs rebuilt from merged counters. */
+function daysFrom(counts: Counts): Rec<DayLog> {
+  const days: Rec<DayLog> = {};
+  for (const [k, v] of Object.entries(counts)) {
+    const day = dayOf(k);
+    if (day) ((days[day] ??= emptyDay()) as unknown as Rec<number>)[k.slice(day.length + 1)] = v;
+  }
+  return days;
+}
 
 /** Streak facts rebuilt from the days with activity (YYYY-MM-DD keys). */
 function streakFromDays(days: Rec<DayLog>): { current: number; best: number; last: string } {
@@ -33,7 +42,9 @@ function streakFromDays(days: Rec<DayLog>): { current: number; best: number; las
   return { current: run, best, last: keys[keys.length - 1] ?? '' };
 }
 
-function mergePuzzles(a: PuzzleProgress, b: PuzzleProgress): PuzzleProgress {
+/** Everything but the counts (merged with the other counters). `preferB` breaks a tie between
+ *  ratings that no rated attempt dates (e.g. picked at onboarding). */
+function mergePuzzles(a: PuzzleProgress, b: PuzzleProgress, preferB: boolean): Omit<PuzzleProgress, 'attempts' | 'solved'> {
   // Rating history: union of entries, oldest first, the newest 500 kept.
   const seenEntries = new Set<string>();
   const history = [...a.history, ...b.history]
@@ -46,7 +57,7 @@ function mergePuzzles(a: PuzzleProgress, b: PuzzleProgress): PuzzleProgress {
     })
     .slice(-500);
   const lastT = (p: PuzzleProgress) => p.history[p.history.length - 1]?.t ?? 0;
-  const rated = lastT(a) >= lastT(b) ? a : b;
+  const rated = lastT(a) > lastT(b) ? a : lastT(b) > lastT(a) || preferB ? b : a;
 
   const seen = mergeRecord(a.seen, b.seen, (x, y) => (y.t > x.t ? y : x));
   // A puzzle's review card follows whichever side attempted it last (it may have been
@@ -62,8 +73,6 @@ function mergePuzzles(a: PuzzleProgress, b: PuzzleProgress): PuzzleProgress {
     rating: rated.rating,
     rd: rated.rd,
     history,
-    attempts: Math.max(a.attempts, b.attempts),
-    solved: Math.max(a.solved, b.solved),
     themes: mergeRecord(a.themes, b.themes, (x, y) => ({ ok: Math.max(x.ok, y.ok), fail: Math.max(x.fail, y.fail) })),
     seen,
     review,
@@ -82,10 +91,62 @@ function mergeGames(a: GameRecord[], b: GameRecord[]): GameRecord[] {
   return [...byId.values()].sort((x, y) => y.t - x.t).slice(0, 30);
 }
 
+/** What a copy that missed a reset at `at` keeps: progress stamped after it, and the days after
+ *  its day. What carries no time (theme counts, vision scores, bests) starts again; settings stay.
+ *  With `at` = now it is the reset itself. */
+export function sinceReset(p: Profile, at: number): Profile {
+  const day = dayKey(at);
+  const since = <T>(r: Rec<T>, t: (x: T) => number | undefined): Rec<T> => Object.fromEntries(Object.entries(r).filter(([, x]) => (t(x) ?? 0) >= at));
+  const base = defaultProfile();
+  const days = Object.fromEntries(Object.entries(p.days).filter(([k]) => k > day));
+  const xp = Object.values(days).reduce((s, d) => s + d.xp, 0);
+  const history = p.puzzles.history.filter((h) => h.t >= at);
+  const seen = since(p.puzzles.seen, (s) => s.t);
+  const out: Profile = {
+    ...base,
+    created: p.created,
+    xp,
+    days,
+    settings: p.settings,
+    puzzles: {
+      ...base.puzzles,
+      rating: history.length ? history[history.length - 1].r : base.puzzles.rating,
+      rd: history.length ? p.puzzles.rd : base.puzzles.rd,
+      history,
+      attempts: Object.keys(seen).length,
+      solved: Object.values(seen).filter((s) => s.ok).length,
+      seen,
+      review: Object.fromEntries(Object.entries(p.puzzles.review).filter(([id]) => id in seen)),
+    },
+    lessons: since(p.lessons, (l) => l.t),
+    lines: since(p.lines, (l) => l.t),
+    drills: since(p.drills, (d) => d.t),
+    games: p.games.filter((g) => g.t >= at),
+    achievements: since(p.achievements, (t) => t),
+    levelSeen: levelFromXp(xp).level,
+    lastVisit: p.lastVisit,
+    updatedAt: p.updatedAt,
+    look: p.look,
+    resetAt: at,
+  };
+  if (p.settingsAt) out.settingsAt = p.settingsAt;
+  const tally = filterTally(p.tally, (k) => dayOf(k) > day);
+  if (tally) out.tally = tally;
+  return out;
+}
+
+/** A device joining a copy keeps its progress and the copy keeps its own: a reset made on either
+ *  side before they were linked applies to neither. */
+export const joiningCopy = (local: Profile, remote: Profile): Profile => ({ ...local, resetAt: remote.resetAt });
+
 export function mergeProfiles(a: Profile, b: Profile): Profile {
+  const resetAt = Math.max(a.resetAt ?? 0, b.resetAt ?? 0);
+  if ((a.resetAt ?? 0) < resetAt) a = sinceReset(a, resetAt);
+  if ((b.resetAt ?? 0) < resetAt) b = sinceReset(b, resetAt);
   const newer = b.updatedAt > a.updatedAt ? b : a;
   const settingsFrom = (b.settingsAt ?? 0) > (a.settingsAt ?? 0) ? b : a;
-  const days = mergeRecord(a.days, b.days, maxDay);
+  const { counts, tally } = mergeTallied(counters(a), a.tally, counters(b), b.tally);
+  const days = daysFrom(counts);
   const sumXp = Object.values(days).reduce((s, d) => s + d.xp, 0);
   // Every activity logs its day, so the streak can be rebuilt from the merged days.
   const rebuilt = streakFromDays(days);
@@ -96,12 +157,13 @@ export function mergeProfiles(a: Profile, b: Profile): Profile {
     ...newer,
     v: 1,
     created: Math.min(a.created, b.created),
-    xp: Math.max(a.xp, b.xp, sumXp),
+    // XP is logged with its day; a copy's own total only matters for data older than that.
+    xp: Math.max(sumXp, a.xp, b.xp),
     days,
     streak,
     settings: settingsFrom.settings,
     settingsAt: Math.max(a.settingsAt ?? 0, b.settingsAt ?? 0) || undefined,
-    puzzles: mergePuzzles(a.puzzles, b.puzzles),
+    puzzles: { ...mergePuzzles(a.puzzles, b.puzzles, newer === b), attempts: counts.attempts, solved: counts.solved },
     lessons: mergeRecord(a.lessons, b.lessons, (x, y) => ({ done: x.done || y.done, t: Math.max(x.t, y.t), score: Math.max(x.score, y.score) })),
     lines: mergeRecord(a.lines, b.lines, (x, y) => (y.t > x.t ? y : x)),
     drills: mergeRecord(a.drills, b.drills, (x, y) => ({
@@ -117,5 +179,7 @@ export function mergeProfiles(a: Profile, b: Profile): Profile {
     onboarded: a.onboarded || b.onboarded,
     lastVisit: a.lastVisit > b.lastVisit ? a.lastVisit : b.lastVisit,
     updatedAt: Math.max(a.updatedAt, b.updatedAt),
+    tally,
+    resetAt: resetAt || undefined,
   };
 }

@@ -10,6 +10,8 @@ import { BUDDIES, type BuddyId } from '../curriculum/buddies';
 import { REGISTRY } from '../packs';
 import { defaultKidsState, defaultSettings, getKids, normalizeKids, replaceKids, updateKid, updateKids, useKids, useSaveFailed, kidsRecovered, type KidProfile, type KidSettings } from '../store/kidsStore';
 import { applyPlacement, canDo, canGraduate, currentWorld, minutesLast7, neededHelp, totalStars } from '../store/progress';
+import { kidSinceReset } from '../store/syncKids';
+import { syncAvailable, useSync } from '../../sync';
 import { isKidsLocked, setKidsLocked } from '../lock';
 import { hashPin, newSalt, pinSupported, clearGatePass } from '../ui/ParentGate';
 import { PawnBuddy } from '../ui/PawnBuddy';
@@ -298,6 +300,7 @@ function HoldButton({ label, onDone, ms = 1500 }: { label: string; onDone(): voi
 
 function Actions({ kid }: { kid: KidProfile }) {
   const [startWorld, setStartWorld] = useState(1);
+  const linked = syncAvailable && !!useSync().code;
   return (
     <Section title="Actions" icon="flag">
       <div className="k-gu-row">
@@ -330,18 +333,9 @@ function Actions({ kid }: { kid: KidProfile }) {
         <HoldButton
           label="Hold to reset progress"
           onDone={() => {
-            updateKid(kid.id, (d) => {
-              d.nodes = {};
-              d.stickers = {};
-              d.trophies = {};
-              d.wardrobe = [];
-              d.garden = 0;
-              d.days = {};
-              d.bests = {};
-              d.bots = {};
-              d.graduated = undefined;
-              d.avatar.hat = null;
-            });
+            // Clears progress, puzzle rating and test-outs; keeps settings, placement and the session
+            // limit. The reset time syncs, so linked devices drop older progress too.
+            updateKids((s) => void (s.kids = s.kids.map((k) => (k.id === kid.id ? kidSinceReset(k, Date.now()) : k))));
             toast({ title: `${kid.name}'s progress was reset.` }, 2500);
           }}
         />
@@ -358,12 +352,14 @@ function Actions({ kid }: { kid: KidProfile }) {
           }}
         />
       </div>
+      {linked && <p className="k-gu-fine">Sync is on: resetting or deleting a player also applies on your linked devices.</p>}
     </Section>
   );
 }
 
 function Device() {
   const s = useKids();
+  const linked = syncAvailable && !!useSync().code;
   const [pin, setPin] = useState('');
   const [locked, setLocked] = useState(isKidsLocked());
   const file = useRef<HTMLInputElement>(null);
@@ -466,7 +462,14 @@ function Device() {
           <KidsIcon name="door" size={18} /> Exit to Tempo
         </button>
       </div>
-      <p className="k-gu-fine">Kids data stays on this device. It is never synced or sent anywhere. The gate is a speed bump for little hands, not a lock.</p>
+      <p className="k-gu-fine">
+        {linked
+          ? "Kids' names, settings and progress are shared with your linked devices through your sync code. The PIN and the Kids-mode lock stay on this device."
+          : syncAvailable
+            ? "Kids data stays on this device unless you turn on sync in Tempo's Settings; then kids' names, settings and progress are shared with your linked devices."
+            : 'Kids data stays on this device. It is never synced or sent anywhere.'}{' '}
+        The gate is a speed bump for little hands, not a lock.
+      </p>
     </section>
   );
 }
