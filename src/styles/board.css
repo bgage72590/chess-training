@@ -239,7 +239,7 @@
 /* The computer's pieces glide like a hand moving them; the user's own moves stay snappy. */
 .board.opp-w .piece[class*='pc-w'],
 .board.opp-b .piece[class*='pc-b'] {
-  transition-duration: 340ms;
+  transition-duration: var(--opp-glide, 340ms);
   transition-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
 }
 /* The flat set sits on the board with a faint contact shadow. */

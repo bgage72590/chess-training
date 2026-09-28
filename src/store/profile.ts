@@ -11,6 +11,10 @@ export type BoardTheme = 'slate' | 'walnut' | 'marble' | 'tourney' | 'ink' | 'ro
 /** Piece artwork: the classic flat set, or rendered 3D Staunton pieces. */
 export type PieceSet = 'cburnett' | 'staunton3d';
 
+/** How quickly the computer answers your moves (see lib/replyPace.ts). */
+export type ReplySpeed = 'relaxed' | 'standard' | 'quick';
+const REPLY_SPEEDS: readonly ReplySpeed[] = ['relaxed', 'standard', 'quick'];
+
 export interface Settings {
   boardTheme: BoardTheme;
   pieceSet: PieceSet;
@@ -22,6 +26,8 @@ export interface Settings {
   theme: 'system' | 'light' | 'dark';
   /** Daily XP goal. */
   dailyGoal: number;
+  /** How long the computer waits before it answers, and how slowly its pieces move. */
+  replySpeed: ReplySpeed;
 }
 
 export interface DayLog {
@@ -130,7 +136,7 @@ export function defaultProfile(): Profile {
     xp: 0,
     days: {},
     streak: { current: 0, best: 0, last: '' },
-    settings: { boardTheme: 'walnut', pieceSet: 'staunton3d', sound: true, volume: 0.8, coordinates: true, autoQueen: false, theme: 'system', dailyGoal: 60 },
+    settings: { boardTheme: 'walnut', pieceSet: 'staunton3d', sound: true, volume: 0.8, coordinates: true, autoQueen: false, theme: 'system', dailyGoal: 60, replySpeed: 'relaxed' },
     puzzles: { rating: 1000, rd: RD_START, history: [], attempts: 0, solved: 0, themes: {}, seen: {}, review: {}, rushBest: 0, bestStreak: 0 },
     lessons: {},
     lines: {},
@@ -150,6 +156,7 @@ export function defaultProfile(): Profile {
 export function normalizeProfile(p: Partial<Profile>): Profile {
   const base = defaultProfile();
   const settings = { ...base.settings, ...p.settings };
+  if (!REPLY_SPEEDS.includes(settings.replySpeed)) settings.replySpeed = base.settings.replySpeed;
   // Profiles from before the new look had no way to pick pieces: move them to the new defaults.
   if ((p.look ?? 0) < 1) {
     if (settings.pieceSet === 'cburnett') settings.pieceSet = 'staunton3d';

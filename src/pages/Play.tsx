@@ -3,9 +3,10 @@ import { Chess, type Move } from 'chess.js';
 import { engine, scoreToCp, useEngineStatus, whitePov, type Score, type SearchOptions } from '../engine/engine';
 import { Board, playMoveSound } from '../chess/Board';
 import { colorName, drawReason, nullMoveFen, other, parseUci, playUci, pvToSan, START_FEN, takeBackTo, turnOf, uciOf } from '../chess/utils';
-import { logActivity, playerWon, updateProfile, type GameRecord } from '../store/profile';
+import { logActivity, playerWon, updateProfile, useProfile, type GameRecord } from '../store/profile';
 import { winFor } from '../lib/analysis';
 import { thinkTimeMs, waitUntil } from '../lib/thinkTime';
+import { REPLY_SPEED_LABELS, replySpeed, type ReplySpeed } from '../lib/replyPace';
 import { navigate, scrollToTop } from '../router';
 import { BoardColumn } from '../components/BoardColumn';
 import { Button, Feedback, PageHeader, Pill, Segmented } from '../components/ui';
@@ -93,6 +94,7 @@ interface CoachNote {
 
 export function PlayPage() {
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
+  const replySetting = useProfile().settings.replySpeed;
   const [phase, setPhase] = useState<Phase>('setup');
   const [color, setColor] = useState<'w' | 'b'>('w');
   const [moves, setMoves] = useState<Move[]>([]);
@@ -180,7 +182,7 @@ export function PlayPage() {
       uci = r.best;
     }
     // Take a human amount of time over the move, not the instant the engine answers.
-    await waitUntil(startedAt, thinkTimeMs({ fen: f, moveNumber: Math.floor(ms.length / 2), afterCapture: !!ms[ms.length - 1]?.captured }));
+    await waitUntil(startedAt, thinkTimeMs({ fen: f, moveNumber: Math.floor(ms.length / 2), afterCapture: !!ms[ms.length - 1]?.captured, speed: replySpeed() }));
     if (game !== gameRef.current) return; // a new game started (or this one ended) meanwhile
     const played = uci ? playUci(f, uci) : null;
     setThinking(false);
@@ -342,6 +344,15 @@ export function PlayPage() {
                   { value: 'random', label: 'Random' },
                   { value: 'b', label: 'Black' },
                 ]}
+              />
+            </div>
+            <div className="play-option">
+              <span className="stat-label">Computer reply speed</span>
+              <Segmented
+                label="Computer reply speed"
+                value={replySetting}
+                onChange={(v) => updateProfile((d) => void (d.settings.replySpeed = v))}
+                options={(Object.keys(REPLY_SPEED_LABELS) as ReplySpeed[]).map((v) => ({ value: v, label: REPLY_SPEED_LABELS[v] }))}
               />
             </div>
             <label className="switch">

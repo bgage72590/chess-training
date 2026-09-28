@@ -6,6 +6,7 @@ import type { Puzzle } from '../data/puzzles';
 import type { Arrow } from '../content/types';
 import { sound } from '../chess/sound';
 import { useTimeouts } from '../lib/hooks';
+import { paceMs } from '../lib/replyPace';
 import { BoardColumn } from './BoardColumn';
 import { MoveInput } from './MoveInput';
 import { Feedback } from './ui';
@@ -46,6 +47,8 @@ export interface SolverApi {
 const MOVE_DELAY = 420;
 
 export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, children }: Props) {
+  // The computer's replies wait at the user's reply speed; the timed Rush keeps them short.
+  const pace = (ms: number) => (strict ? ms : paceMs(ms));
   const moves = useMemo(() => puzzle.moves.split(' '), [puzzle]);
   const solverColor = other(turnOf(puzzle.fen));
   const [fen, setFen] = useState(puzzle.fen);
@@ -78,7 +81,7 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
     playMoveSound(r.move.san);
   };
   useEffect(() => {
-    later(playSetupMove, 650);
+    later(playSetupMove, pace(650));
     return clear;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [puzzle.id]);
@@ -128,7 +131,7 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
         setTones({});
         playMoveSound(rr.move.san);
         setIdx(nextIdx + 1);
-      }, MOVE_DELAY);
+      }, pace(MOVE_DELAY));
     } else {
       // Show the wrong move, then take it back. In strict mode (Rush) the puzzle ends here.
       const before = fen;
@@ -191,7 +194,7 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
       playMoveSound(r.move.san);
       i++;
       setIdx(i);
-      later(step, 700);
+      later(step, pace(700));
     };
     later(step, 200);
   };

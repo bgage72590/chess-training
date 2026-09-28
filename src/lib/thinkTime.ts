@@ -2,6 +2,7 @@
 // appearing the instant the user lets go of a piece: quick in the opening and on obvious
 // replies (recaptures, the only legal move), longer when the position is rich.
 import { Chess } from 'chess.js';
+import { paceMs, type ReplySpeed } from './replyPace';
 
 export interface ThinkInput {
   fen: string;
@@ -11,9 +12,11 @@ export interface ThinkInput {
   afterCapture?: boolean;
   /** A 0..1 random number (injectable for tests). */
   rnd?: number;
+  /** The user's reply speed; Standard (the times below) unless given. */
+  speed?: ReplySpeed;
 }
 
-export function thinkTimeMs({ fen, moveNumber, afterCapture = false, rnd = Math.random() }: ThinkInput): number {
+export function thinkTimeMs({ fen, moveNumber, afterCapture = false, rnd = Math.random(), speed = 'standard' }: ThinkInput): number {
   let legal = 20;
   let check = false;
   try {
@@ -23,13 +26,13 @@ export function thinkTimeMs({ fen, moveNumber, afterCapture = false, rnd = Math.
   } catch {
     /* use the defaults */
   }
-  if (legal <= 1) return 450 + rnd * 250;
+  if (legal <= 1) return paceMs(450 + rnd * 250, speed);
   let ms = 900 + Math.min(legal, 40) * 22; // more choices, more thought
   if (moveNumber < 6) ms *= 0.55; // book-like opening moves
   if (afterCapture) ms *= 0.6; // recaptures are obvious
   if (check) ms *= 0.75; // few sensible replies
   ms *= 0.7 + rnd * 0.6; // natural variation
-  return Math.round(Math.min(2600, Math.max(550, ms)));
+  return paceMs(Math.round(Math.min(2600, Math.max(550, ms))), speed);
 }
 
 /** Resolves when at least `ms` have passed since `startedAt` (performance.now()). */

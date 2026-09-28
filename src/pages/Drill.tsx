@@ -15,6 +15,7 @@ import type { Arrow } from '../content/types';
 import { EngineNotice } from '../components/EngineNotice';
 import { MoveInput } from '../components/MoveInput';
 import { thinkTimeMs, waitUntil } from '../lib/thinkTime';
+import { replySpeed } from '../lib/replyPace';
 import { SoundToggle } from '../components/SoundToggle';
 
 type Status = 'playing' | 'thinking' | 'success' | 'failed';
@@ -109,7 +110,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
     }
 
     const reply = res.best && playUci(afterLearner, res.best);
-    if (reply) await waitUntil(startedAt, thinkTimeMs({ fen: afterLearner, moveNumber: used, afterCapture: !!mv.captured }));
+    if (reply) await waitUntil(startedAt, thinkTimeMs({ fen: afterLearner, moveNumber: used, afterCapture: !!mv.captured, speed: replySpeed() }));
     if (run !== runRef.current) return; // restarted, taken back or left meanwhile
     if (!reply) {
       setStatus('playing');

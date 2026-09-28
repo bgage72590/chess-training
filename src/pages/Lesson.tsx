@@ -4,6 +4,7 @@ import { units, type DemoStep, type Lesson, type LessonStep, type MoveStep, type
 import { Board, playMoveSound, type SquareTone } from '../chess/Board';
 import { acceptsMove, colorName, fullMoveOf, moveNumberLabel, parseUci, sanToUci, turnOf, uciOf } from '../chess/utils';
 import { useKeydown, useScrollTopOn, useTimeouts } from '../lib/hooks';
+import { paceMs } from '../lib/replyPace';
 import { BoardColumn } from '../components/BoardColumn';
 import { Button, Feedback, ProgressBar, RichText } from '../components/ui';
 import { Icon } from '../components/Icon';
@@ -76,7 +77,7 @@ function MoveStepView({ step, onDone }: { step: MoveStep; onDone: (r: StepResult
         setTones({});
         playMoveSound(reply.san);
         setIdx(next + 1);
-      }, 450);
+      }, paceMs(450));
     } else {
       const before = fen;
       setFen(mv.after);

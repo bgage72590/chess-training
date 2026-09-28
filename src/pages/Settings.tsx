@@ -5,6 +5,7 @@ import { sound } from '../chess/sound';
 import { BOARD_THEMES, swatchBackground } from '../chess/themes';
 import { Button, PageHeader, Segmented } from '../components/ui';
 import { toast } from '../lib/toast';
+import { REPLY_SPEED_LABELS, type ReplySpeed } from '../lib/replyPace';
 import { useSyncState } from '../store/cloud';
 import { InstallCard } from '../components/InstallCard';
 import { SyncCard } from '../sync/SyncCard';
@@ -120,6 +121,16 @@ export function SettingsPage() {
             />
             <span className="num volume-value">{Math.round((s.volume ?? 0.8) * 100)}%</span>
           </label>
+          <div className="play-option">
+            <span className="stat-label">Computer reply speed</span>
+            <Segmented
+              label="Computer reply speed"
+              value={s.replySpeed}
+              onChange={(v) => set({ replySpeed: v })}
+              options={(Object.keys(REPLY_SPEED_LABELS) as ReplySpeed[]).map((v) => ({ value: v, label: REPLY_SPEED_LABELS[v] }))}
+            />
+            <span className="faint" style={{ fontSize: '0.86rem' }}>How long the computer waits before it answers, and how slowly its pieces move. Games, puzzles, openings, endgames and lessons. The timed Puzzle Rush stays quick.</span>
+          </div>
           <div className="play-option">
             <span className="stat-label">Daily goal</span>
             <Segmented

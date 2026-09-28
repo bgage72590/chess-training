@@ -1,4 +1,5 @@
-import { Component, lazy, Suspense, useEffect, type ReactNode } from 'react';
+import { Component, lazy, Suspense, useEffect, type CSSProperties, type ReactNode } from 'react';
+import { PACES } from './lib/replyPace';
 import { navigate, routeParts, useRoute } from './router';
 import { Icon } from './components/Icon';
 import { getProfile, levelFromXp, liveStreak, updateProfile, useProfile } from './store/profile';
@@ -275,7 +276,8 @@ export function App() {
   if (locked) return null; // avoid a flash of the grown-up app while redirecting
 
   return (
-    <div className="app">
+    // The computer's pieces glide at the user's reply speed (board.css); Kids mode has its own.
+    <div className="app" style={{ '--opp-glide': `${PACES[p.settings.replySpeed].glide}ms` } as CSSProperties}>
       <aside className="sidebar">
         <button className="brand" onClick={() => navigate('home')}>
           <BrandMark />

@@ -4,6 +4,7 @@ import { openings, type Opening, type OpeningLine } from '../content';
 import { navigate } from '../router';
 import { getProfile, logActivity, updateProfile, useProfile } from '../store/profile';
 import { review, isDue, MASTERED_BOX, DAY } from '../lib/srs';
+import { paceMs } from '../lib/replyPace';
 import { useScrollTopOn, useTimeouts } from '../lib/hooks';
 import { Board, playMoveSound, type SquareTone } from '../chess/Board';
 import { colorName, moveNumberLabel, START_FEN, turnOf, uciOf } from '../chess/utils';
@@ -60,7 +61,7 @@ function Trainer({ opening, line, mode, onFinish }: { opening: Opening; line: Op
       playMoveSound(plies[ply].move.san);
       setPly((n) => n + 1);
       setTones({});
-    }, ply === 0 ? 700 : 850 + Math.random() * 350);
+    }, paceMs(ply === 0 ? 700 : 850 + Math.random() * 350));
     return () => window.clearTimeout(t);
   }, [ply, done, learnersMove, plies]);
 
