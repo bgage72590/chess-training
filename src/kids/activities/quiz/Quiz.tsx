@@ -150,7 +150,10 @@ function QuizCard({ item, player, onDone }: Props) {
         return { say: { all: 'Nobody is attacking the king. He is calm!', champion: 'The king is not attacked.' }, tones };
       }
       case 'count':
-        return { say: { all: `It can go to ${item.answer} squares!`, champion: `${item.answer} squares.` } };
+        // Most count items are knights; one bonus item is a rook.
+        return Object.values(item.pieces).some((p) => p?.toUpperCase() === 'R')
+          ? { say: { all: `The rook can zoom to ${item.answer} squares!`, champion: `${item.answer} squares.` } }
+          : { say: { all: `The knight can jump to ${item.answer} squares!`, champion: `${item.answer} squares.` } };
       case 'value': {
         const [a, b] = [item.a.toUpperCase(), item.b.toUpperCase()];
         // One recorded sentence per piece, said one after the other.

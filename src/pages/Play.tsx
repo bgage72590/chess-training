@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Chess, type Move } from 'chess.js';
-import { engine, scoreToCp, useEngineStatus, whitePov, type PvLine, type Score, type SearchOptions } from '../engine/engine';
+import { engine, scoreToCp, useEngineStatus, whitePov, type Score, type SearchOptions } from '../engine/engine';
 import { Board, playMoveSound } from '../chess/Board';
 import { colorName, drawReason, nullMoveFen, other, parseUci, playUci, pvToSan, START_FEN, takeBackTo, turnOf, uciOf } from '../chess/utils';
 import { logActivity, playerWon, updateProfile, type GameRecord } from '../store/profile';
@@ -16,27 +16,49 @@ import { sound } from '../chess/sound';
 import { MoveInput } from '../components/MoveInput';
 import type { Arrow } from '../content/types';
 import { SoundToggle } from '../components/SoundToggle';
+import { fernMove, hopMove, oliveMove, tuckMove } from '../kids/activities/playBot/kidBot';
+
+/** The weaker opponents are small hand-built bots: Stockfish plays far above its label when held back. */
+export type BotStyle = { kind: 'hop' } | { kind: 'tuck' } | { kind: 'fern' } | { kind: 'olive'; noise: number; maxDepth: number; budgetMs: number };
 
 export interface Level {
   n: number;
   name: string;
   elo: number;
   blurb: string;
-  opts: SearchOptions & { randomness?: number };
+  /** A bot for the lower levels, or Stockfish settings. */
+  bot?: BotStyle;
+  opts?: SearchOptions;
 }
 
 export const LEVELS: Level[] = [
-  { n: 1, name: 'First Steps', elo: 400, blurb: 'Leaves pieces hanging. Practise spotting free material.', opts: { skill: 0, depth: 1, multipv: 6, randomness: 0.7 } },
-  { n: 2, name: 'Casual', elo: 700, blurb: 'Knows the rules, misses simple tactics.', opts: { skill: 2, depth: 2, multipv: 5, randomness: 0.4 } },
-  { n: 3, name: 'Improver', elo: 1000, blurb: 'Develops pieces, still blunders under pressure.', opts: { skill: 5, depth: 4, multipv: 4, randomness: 0.2 } },
-  { n: 4, name: 'Club', elo: 1350, blurb: 'A solid club player who punishes loose pieces.', opts: { elo: 1350, movetime: 400 } },
-  { n: 5, name: 'Strong Club', elo: 1550, blurb: 'Plays sound openings and sees two-move tactics.', opts: { elo: 1550, movetime: 500 } },
-  { n: 6, name: 'Tournament', elo: 1750, blurb: 'Rarely blunders. You must outplay it.', opts: { elo: 1750, movetime: 600 } },
-  { n: 7, name: 'Expert', elo: 2000, blurb: 'Accurate and patient in every phase.', opts: { elo: 2000, movetime: 700 } },
-  { n: 8, name: 'Master', elo: 2300, blurb: 'Master-level calculation.', opts: { elo: 2300, movetime: 800 } },
-  { n: 9, name: 'Grandmaster', elo: 2600, blurb: 'Brutal. Good for seeing what best play looks like.', opts: { elo: 2600, movetime: 1000 } },
+  { n: 1, name: 'First Steps', elo: 300, blurb: 'Grabs whatever it can and never defends. Win free pieces.', bot: { kind: 'hop' } },
+  { n: 2, name: 'Beginner', elo: 500, blurb: 'Looks one move ahead, but a third of its moves are careless.', bot: { kind: 'tuck' } },
+  { n: 3, name: 'Casual', elo: 700, blurb: 'Plays for the center and activity. Misses tactics.', bot: { kind: 'fern' } },
+  { n: 4, name: 'Improver', elo: 900, blurb: 'Sees simple tactics, still makes human slips.', bot: { kind: 'olive', noise: 0.6, maxDepth: 2, budgetMs: 400 } },
+  { n: 5, name: 'Club', elo: 1150, blurb: 'Calculates three moves deep. Punishes loose pieces.', bot: { kind: 'olive', noise: 0.2, maxDepth: 3, budgetMs: 700 } },
+  { n: 6, name: 'Strong Club', elo: 1350, blurb: 'Plays sound openings and sees two-move tactics.', opts: { elo: 1350, movetime: 400 } },
+  { n: 7, name: 'Tournament', elo: 1600, blurb: 'Rarely blunders. You must outplay it.', opts: { elo: 1600, movetime: 500 } },
+  { n: 8, name: 'Expert', elo: 1900, blurb: 'Accurate and patient in every phase.', opts: { elo: 1900, movetime: 700 } },
+  { n: 9, name: 'Master', elo: 2300, blurb: 'Master-level calculation.', opts: { elo: 2300, movetime: 900 } },
   { n: 10, name: 'Stockfish', elo: 3200, blurb: 'Full strength. Draws are victories.', opts: { movetime: 1200 } },
 ];
+
+/** A bot level's move (UCI), or null when there is none. */
+function botMove(style: BotStyle, fen: string): string | null {
+  const chess = new Chess(fen);
+  if (!chess.moves().length) return null;
+  const rng = Math.random;
+  const m =
+    style.kind === 'hop'
+      ? hopMove(chess, rng)
+      : style.kind === 'tuck'
+        ? tuckMove(chess, rng)
+        : style.kind === 'fern'
+          ? fernMove(chess, rng)
+          : oliveMove(chess, rng, { noise: style.noise, maxDepth: style.maxDepth, budgetMs: style.budgetMs });
+  return uciOf(m);
+}
 
 interface Prefs {
   level: number;
@@ -59,15 +81,6 @@ function savePrefs(p: Prefs) {
   } catch {
     /* ignore */
   }
-}
-
-function pickEngineMove(lines: PvLine[], best: string, randomness = 0): string {
-  if (!randomness || lines.length < 2) return best;
-  if (Math.random() > randomness) return best;
-  const top = scoreToCp(lines[0].score);
-  // Weaker levels pick among plausible moves, occasionally a clear error.
-  const pool = lines.filter((l) => scoreToCp(l.score) > top - 400 * randomness - 150);
-  return pool[Math.floor(Math.random() * pool.length)]?.pv[0] ?? best;
 }
 
 type Phase = 'setup' | 'playing' | 'over';
@@ -155,13 +168,21 @@ export function PlayPage() {
     const game = gameRef.current;
     const startedAt = performance.now();
     setThinking(true);
-    const o = level.opts;
-    const r = await engine.search(f, { skill: o.skill, elo: o.elo, depth: o.depth, movetime: o.movetime, multipv: o.multipv });
-    if (!r) return;
+    let uci: string | null;
+    if (level.bot) {
+      // Let the player's move land on screen before the bot (plain JS on this thread) thinks.
+      await new Promise((r) => setTimeout(r, 250));
+      if (game !== gameRef.current) return;
+      uci = botMove(level.bot, f);
+    } else {
+      const r = await engine.search(f, level.opts);
+      if (!r) return;
+      uci = r.best;
+    }
     // Take a human amount of time over the move, not the instant the engine answers.
     await waitUntil(startedAt, thinkTimeMs({ fen: f, moveNumber: Math.floor(ms.length / 2), afterCapture: !!ms[ms.length - 1]?.captured }));
     if (game !== gameRef.current) return; // a new game started (or this one ended) meanwhile
-    const played = r.best ? playUci(f, pickEngineMove(r.lines, r.best, o.randomness)) : null;
+    const played = uci ? playUci(f, uci) : null;
     setThinking(false);
     if (!played) return;
     const next = [...ms, played.move];

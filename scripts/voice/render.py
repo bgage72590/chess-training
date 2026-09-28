@@ -151,7 +151,7 @@ def main():
     clips = {} if stale else {k: v for k, v in old.get('clips', {}).items() if os.path.exists(os.path.join(OUT, k + '.mp3'))}
     # Parts recorded elsewhere (--part): fold them in.
     for f in sorted(os.listdir(OUT)):
-        if f.startswith('manifest.') and f.endswith('.json') and not a.part:
+        if f.startswith('manifest.') and f.endswith('.json') and f != 'manifest.json' and not a.part:
             part = json.load(open(os.path.join(OUT, f)))
             if part.get('version') == VERSION:
                 clips.update(part.get('clips', {}))
