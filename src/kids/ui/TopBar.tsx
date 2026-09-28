@@ -1,7 +1,54 @@
 // The player's top bar: leave (X), progress pips (+ a counter chip), hint bulb and speaker.
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { KidsIcon } from './KidsIcon';
 import { ProgressPips, type PipState } from './ProgressPips';
+import { pipReact } from './pipEvents';
+import { centerOf, flyStar, lastTap } from './rewardFx';
+
+/**
+ * The star counter in the chip. When the count rises, stars fly to it from the square the kid just
+ * tapped (else the middle of the board), Pip cheers, and the number counts up with a pop as each lands.
+ */
+export function ChipStars({ done, total }: { done: number; total: number }) {
+  const [shown, setShown] = useState(done);
+  const [hit, setHit] = useState(0);
+  const prev = useRef(done);
+  const icon = useRef<HTMLSpanElement>(null);
+  const flights = useRef<(() => void)[]>([]);
+  useEffect(() => {
+    const before = prev.current;
+    prev.current = done;
+    const to = icon.current;
+    if (done <= before || !to) return setShown(done); // a new item starts the count again
+    const main = document.querySelector('.k-player-main');
+    const from = lastTap() ?? (main ? centerOf(main) : centerOf(to));
+    const n = Math.min(done - before, 3);
+    pipReact('cheer');
+    for (let k = 0; k < n; k++)
+      flights.current.push(
+        flyStar(from, to, {
+          size: 30,
+          ms: 700,
+          delay: k * 130,
+          onLand: () => {
+            setShown(k === n - 1 ? done : before + k + 1);
+            setHit((h) => h + 1);
+          },
+        }),
+      );
+  }, [done]);
+  useEffect(() => () => flights.current.forEach((cancel) => cancel()), []);
+  return (
+    <span className="k-chip-stars">
+      <span ref={icon} key={`i${hit}`} className={`k-chip-ico${hit ? ' hit' : ''}`}>
+        <KidsIcon name="star" size={20} fill />
+      </span>
+      <span key={`n${hit}`} className={`k-chip-num${hit ? ' hit' : ''}`}>
+        {shown}/{total}
+      </span>
+    </span>
+  );
+}
 
 export function TopBar({
   onExit,

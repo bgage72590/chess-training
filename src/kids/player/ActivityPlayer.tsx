@@ -21,12 +21,12 @@ import { useKidCtx } from './context';
 import { Intro, PiecePick } from './Intro';
 import { Results } from './Results';
 import { belowPassRecap, recapFor } from './recap';
-import { TopBar } from '../ui/TopBar';
+import { TopBar, ChipStars } from '../ui/TopBar';
+import { hintTarget, pipReact } from '../ui/pipEvents';
 import { Coach } from '../ui/Coach';
 import { Tray } from '../ui/Tray';
 import { BigButton } from '../ui/BigButton';
 import { Confetti } from '../ui/Confetti';
-import { KidsIcon } from '../ui/KidsIcon';
 import type { PipState } from '../ui/ProgressPips';
 import type { PipMood } from '../ui/Pip';
 import { go } from '../routes';
@@ -121,6 +121,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
   const moodTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setMoodFor = (m: PipMood, ms = 1400) => {
     setMood(m);
+    if (m === 'cheer' || m === 'oops' || m === 'wow') pipReact(m);
     if (moodTimer.current) clearTimeout(moodTimer.current);
     moodTimer.current = setTimeout(() => setMood('idle'), ms);
   };
@@ -181,6 +182,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
     const line = hintSteps[next - 1]?.say ?? (next === 1 ? current?.item.rule : FALLBACK_HINT[next - 1]);
     kidSound('sparkle');
     if (line) say(line, next === 4 ? 'talk' : 'think');
+    if (next < 4) pipReact('point', hintTarget(hintSteps[next - 1]));
   }, [hintLevel, hintSteps, current, say]);
 
   // Idle: step up the ladder (Sprout/Explorer) or pulse the bulb (Champion).
@@ -331,9 +333,8 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
         out = recordRun(d, { nodeId: props.nodeId!, results: results.current, itemIds: itemIds.current, game: isGame, braveTry: braveTry.current }, REGISTRY);
         addFamilyStars(s, out.gained);
       });
-      const o = out as RunOutcome | null;
-      if (o?.bossPassedNow) setConfetti(Date.now());
-      setOutcome(o);
+      // The boss confetti waits for the crown to land (Results fires it).
+      setOutcome(out as RunOutcome | null);
     } else if (mode === 'playground') {
       const score = nodeScore(results.current.map((r) => r.score));
       if (props.opponent?.kind === 'friend') {
@@ -379,6 +380,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
         setHintLevel(next);
         hintLine = hintSteps[next - 1]?.say ?? (next === 1 ? current?.item.rule : FALLBACK_HINT[next - 1]);
         kidSound('sparkle');
+        if (next < 4) pipReact('point', hintTarget(hintSteps[next - 1]));
       }
       if (tuning.hintOfferOnly && n >= 3) setPulse(true);
       const oops = text ?? "Hmm, let's try another way!";
@@ -605,11 +607,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
   const chipNode =
     chip || par ? (
       <>
-        {chip && (
-          <span className="k-chip-stars">
-            <KidsIcon name="star" size={20} fill /> {chip.done}/{chip.total}
-          </span>
-        )}
+        {chip && <ChipStars done={chip.done} total={chip.total} />}
         {par && (
           <span className="k-chip-feet" aria-label={`${par.used} of ${par.par} moves`}>
             {Array.from({ length: Math.min(par.par, 10) }, (_, i) => (

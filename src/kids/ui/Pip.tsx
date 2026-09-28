@@ -1,18 +1,126 @@
 // Pip, the knight-pony guide: a round head and neck in profile, facing right. Inline SVG; the moods
-// are CSS animations (all removed or reduced under reduced motion).
-import { useMemo } from 'react';
+// are CSS animations (all removed or reduced under reduced motion). The coach's Pip also `listen`s
+// for pipReact() events: a hop, a sympathetic head tilt, or a look toward a hinted square.
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { lookVector, onPipReact, type PipReactEvent } from './pipEvents';
+import { centerOf, flyStar, motionReduced } from './rewardFx';
 
 export type PipMood = 'idle' | 'talk' | 'cheer' | 'think' | 'oops' | 'sleepy' | 'wow';
 
 const INK = '#1f2a44';
+const REACT_MS = { cheer: 760, oops: 1100, wow: 900, point: 1500 };
 
-export function Pip({ mood = 'idle', size = 80, hat, className }: { mood?: PipMood; size?: 64 | 72 | 80 | 96 | 120 | 160 | number; hat?: 'crown' | 'party' | null; className?: string }) {
-  // Blink every 4-6 s (random per mount), so two Pips never blink in sync.
+/** The one-shot body motion for an event (the CSS breathing and blinking carry on underneath). */
+function reactFrames(e: PipReactEvent, look: ReturnType<typeof lookVector>): Keyframe[] {
+  switch (e.kind) {
+    case 'cheer':
+      return [
+        { transform: 'none' },
+        { transform: 'translateY(5px) scale(1.06, 0.92)', offset: 0.16 },
+        { transform: 'translateY(-22px) scale(0.95, 1.06) rotate(-5deg)', offset: 0.48 },
+        { transform: 'translateY(0) scale(1.07, 0.92) rotate(2deg)', offset: 0.74 },
+        { transform: 'translateY(-5px) scale(1)', offset: 0.88 },
+        { transform: 'none' },
+      ];
+    case 'wow':
+      return [{ transform: 'none' }, { transform: 'translateY(-7px) scale(1.07) rotate(-5deg)', offset: 0.3 }, { transform: 'translateY(-4px) scale(1.05) rotate(-4deg)', offset: 0.7 }, { transform: 'none' }];
+    case 'oops':
+      // Head tilts back like "hmm?", holds, and eases home. Never a slump.
+      return [{ transform: 'none' }, { transform: 'rotate(-10deg)', offset: 0.22 }, { transform: 'rotate(-9deg) translateX(-1px)', offset: 0.55 }, { transform: 'rotate(-10deg)', offset: 0.72 }, { transform: 'none' }];
+    case 'point': {
+      const f = look.flip ? 'scale(-1, 1) ' : '';
+      return [
+        { transform: `${f}none` },
+        { transform: `${f}rotate(${look.lean}deg)`, offset: 0.16 },
+        { transform: `${f}rotate(${look.lean + 3}deg)`, offset: 0.4 },
+        { transform: `${f}rotate(${look.lean - 2}deg)`, offset: 0.56 },
+        { transform: `${f}rotate(${look.lean}deg)`, offset: 0.85 },
+        { transform: `${f}none` },
+      ];
+    }
+  }
+}
+
+export function Pip({
+  mood = 'idle',
+  size = 80,
+  hat,
+  hatDrop,
+  className,
+  listen,
+  talkWord,
+}: {
+  mood?: PipMood;
+  size?: 64 | 72 | 80 | 96 | 120 | 160 | number;
+  hat?: 'crown' | 'party' | null;
+  /** The hat drops on with a bounce. */
+  hatDrop?: boolean;
+  className?: string;
+  /** Play pipReact() events (only the coach's Pip does). */
+  listen?: boolean;
+  /** Talking in step with speech: the caption word being spoken (-1 between words). Mouth opens on each new word. */
+  talkWord?: number;
+}) {
+  // Blink every 4-6 s and glance around every 8-13 s (random per mount), so two Pips never move in sync.
   const blink = useMemo(() => `${(4 + Math.random() * 2).toFixed(2)}s`, []);
+  const glance = useMemo(() => ({ ['--glance' as string]: `${(8 + Math.random() * 5).toFixed(1)}s`, ['--glance-d' as string]: `-${(Math.random() * 8).toFixed(1)}s` }), []);
+  const root = useRef<HTMLSpanElement>(null);
+  const body = useRef<SVGGElement>(null);
+  const [fx, setFx] = useState<{ kind: 'cheer' | 'oops' | 'wow'; n: number } | null>(null);
+  useEffect(() => {
+    if (!listen) return;
+    let off = 0;
+    let wait: ReturnType<typeof setTimeout> | undefined;
+    let tail: ReturnType<typeof setTimeout> | undefined;
+    const play = (e: PipReactEvent) => {
+      const el = body.current;
+      const host = root.current;
+      if (!el || !host) return;
+      const still = motionReduced();
+      const r = host.getBoundingClientRect();
+      let look = lookVector(1, 0);
+      if (e.kind === 'point') {
+        // Toward the hinted square, or the middle of the board when the hint names none.
+        const target = (e.square && document.querySelector(`.kids-board [data-square="${e.square}"]`)) || document.querySelector('.kids-board');
+        if (target) {
+          const c = centerOf(target);
+          look = lookVector(c.x - (r.left + r.width / 2), c.y - (r.top + r.height / 2));
+          host.style.setProperty('--lx', look.lx.toFixed(2));
+          host.style.setProperty('--ly', look.ly.toFixed(2));
+          host.dataset.look = '1';
+          if (e.square && !still) flyStar({ x: r.left + r.width * 0.85, y: r.top + r.height * 0.42 }, c, { size: 24, ms: 650, spark: true });
+        }
+      } else setFx({ kind: e.kind, n: e.at });
+      if (!still) el.animate(reactFrames(e, look), { duration: REACT_MS[e.kind], easing: 'ease-in-out' });
+      off = performance.now() + REACT_MS[e.kind];
+      clearTimeout(tail);
+      tail = setTimeout(() => {
+        setFx(null);
+        host.style.removeProperty('--lx');
+        host.style.removeProperty('--ly');
+        delete host.dataset.look;
+      }, REACT_MS[e.kind]);
+    };
+    const un = onPipReact((e) => {
+      clearTimeout(wait);
+      // A look toward a hint waits for a hop or a tilt that is still playing.
+      const left = off - performance.now();
+      if (e.kind === 'point' && left > 0) wait = setTimeout(() => play(e), left + 50);
+      else play(e);
+    });
+    return () => {
+      un();
+      clearTimeout(wait);
+      clearTimeout(tail);
+    };
+  }, [listen]);
+  // Pip's face follows what the app says (mood); an event only sets it when the app left him idle.
+  const m: PipMood = mood === 'idle' && fx ? fx.kind : mood;
+  const synced = m === 'talk' && talkWord !== undefined;
   return (
-    <span className={`k-pip mood-${mood} ${className ?? ''}`} style={{ width: size, height: size }} aria-hidden="true">
+    <span ref={root} className={`k-pip mood-${m}${listen ? ' listen' : ''}${synced ? ' sync' : ''}${synced && talkWord < 0 ? ' talk-gap' : ''} ${className ?? ''}`} style={{ width: size, height: size, ...glance }} aria-hidden="true">
       <svg viewBox="0 0 120 120" width={size} height={size}>
-        <g className="k-pip-body">
+        <g className="k-pip-body" ref={body}>
           {/* mane, behind the head */}
           <path
             d="M47 26c-11-2-19 6-16 15-9 3-11 13-5 19-8 5-7 16 0 20-6 6-3 16 4 18-3 7 0 14 5 18h10l2-54c1-14 4-24 8-31z"
@@ -50,12 +158,10 @@ export function Pip({ mood = 'idle', size = 80, hat, className }: { mood?: PipMo
           </g>
           <path className="k-pip-lid" d="M65 42c2-6 13-7 16 0" fill="#fff3d6" stroke={INK} strokeWidth="3" strokeLinecap="round" />
           {/* mouth: closed smile and open (talk) */}
-          <path className="k-pip-mouth" d="M86 72c4 4 10 4 14-1" fill="none" stroke={INK} strokeWidth="3" strokeLinecap="round" />
-          <path className="k-pip-mouth-open" d="M86 71c3 7 12 7 15 0z" fill="#c2477f" stroke={INK} strokeWidth="2.5" strokeLinejoin="round" />
-          {/* oops sweat drop */}
-          <path className="k-pip-sweat" d="M58 30c-3 5-4 8-1 10s6-1 4-5z" fill="#9fd3ff" stroke={INK} strokeWidth="2" />
-          {hat === 'crown' && <path d="M46 20l4-14 8 8 7-11 5 12 8-5-3 14c-9 3-20 3-29-4z" fill="#ffc83d" stroke={INK} strokeWidth="3" strokeLinejoin="round" />}
-          {hat === 'party' && <path d="M50 22 62 -2l9 20c-6 5-15 7-21 4z" fill="#c9b3ff" stroke={INK} strokeWidth="3" strokeLinejoin="round" />}
+          <path key={`c${talkWord}`} className="k-pip-mouth" d="M86 72c4 4 10 4 14-1" fill="none" stroke={INK} strokeWidth="3" strokeLinecap="round" />
+          <path key={`o${talkWord}`} className="k-pip-mouth-open" d="M86 71c3 7 12 7 15 0z" fill="#c2477f" stroke={INK} strokeWidth="2.5" strokeLinejoin="round" />
+          {hat === 'crown' && <path className={hatDrop ? 'k-hat-drop' : undefined} d="M46 20l4-14 8 8 7-11 5 12 8-5-3 14c-9 3-20 3-29-4z" fill="#ffc83d" stroke={INK} strokeWidth="3" strokeLinejoin="round" />}
+          {hat === 'party' && <path className={hatDrop ? 'k-hat-drop' : undefined} d="M50 22 62 -2l9 20c-6 5-15 7-21 4z" fill="#c9b3ff" stroke={INK} strokeWidth="3" strokeLinejoin="round" />}
         </g>
         {/* think bubble and sleepy z's */}
         <g className="k-pip-think">
@@ -72,9 +178,9 @@ export function Pip({ mood = 'idle', size = 80, hat, className }: { mood?: PipMo
           </text>
         </g>
       </svg>
-      {mood === 'cheer' && (
-        <span className="k-pip-sparkles">
-          {Array.from({ length: 6 }, (_, i) => (
+      {m === 'cheer' && (
+        <span className="k-pip-sparkles" key={fx?.n ?? 0}>
+          {Array.from({ length: 8 }, (_, i) => (
             <i key={i} style={{ ['--i' as string]: i }} />
           ))}
         </span>

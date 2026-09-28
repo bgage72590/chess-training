@@ -10,15 +10,18 @@ export function SpeechBubble({ text, token, onSpeak, tail = 'left' }: { text: st
   return (
     <div className={`k-bubble tail-${tail}`}>
       <p className="k-bubble-text" aria-live="polite">
-        {words.map((w, i) => {
-          if (/^\s+$/.test(w) || !w) return w;
-          wi++;
-          return (
-            <span key={i} className={active && sp.word === wi ? 'k-word on' : 'k-word'}>
-              {w}
-            </span>
-          );
-        })}
+        {/* A new line settles in (the live region itself stays put). */}
+        <span key={text} className="k-bubble-line">
+          {words.map((w, i) => {
+            if (/^\s+$/.test(w) || !w) return w;
+            wi++;
+            return (
+              <span key={i} className={active && sp.word === wi ? 'k-word on' : 'k-word'}>
+                {w}
+              </span>
+            );
+          })}
+        </span>
       </p>
       {onSpeak && (
         <button type="button" className="k-speak" aria-label="Say it again" onClick={onSpeak}>

@@ -1,4 +1,6 @@
-// The seven animal buddies, drawn with simple flat shapes (no faces on chess pieces, ever).
+// The seven animal buddies, drawn with simple flat shapes (no faces on chess pieces, ever). The
+// eyes blink on their own beat (CSS, removed under reduced motion).
+import { useMemo } from 'react';
 import type { BuddyId } from '../curriculum/buddies';
 
 const INK = '#1f2a44';
@@ -15,8 +17,8 @@ function Eyes({ y = 50, dx = 11, big = false, mood }: { y?: number; dx?: number;
           <circle cx={50 + dx} cy={y} r={r + 5} fill="#fff" stroke={INK} strokeWidth="3" />
         </>
       )}
-      <circle cx={50 - dx} cy={y + look} r={mood === 'surprised' ? r * 1.2 : r} fill={INK} />
-      <circle cx={50 + dx} cy={y + look} r={mood === 'surprised' ? r * 1.2 : r} fill={INK} />
+      <circle className="k-buddy-eye" cx={50 - dx} cy={y + look} r={mood === 'surprised' ? r * 1.2 : r} fill={INK} />
+      <circle className="k-buddy-eye" cx={50 + dx} cy={y + look} r={mood === 'surprised' ? r * 1.2 : r} fill={INK} />
       <circle cx={50 - dx + 1.5} cy={y + look - 1.5} r={big ? 2.2 : 1.3} fill="#fff" />
       <circle cx={50 + dx + 1.5} cy={y + look - 1.5} r={big ? 2.2 : 1.3} fill="#fff" />
     </>
@@ -129,8 +131,9 @@ export function BuddyFace({ id, mood = 'happy', size = 64, zzz = 0 }: { id: Budd
       );
       break;
   }
+  const blink = useMemo(() => ({ ['--blink' as string]: `${(4 + Math.random() * 3).toFixed(1)}s`, ['--blink-d' as string]: `-${(Math.random() * 4).toFixed(1)}s` }), []);
   return (
-    <span className="k-buddyface" style={{ width: size, height: size }}>
+    <span className="k-buddyface" style={{ width: size, height: size, ...blink }}>
       <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
         {art}
       </svg>

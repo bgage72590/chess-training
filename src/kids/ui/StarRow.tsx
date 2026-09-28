@@ -1,4 +1,5 @@
 // 1-3 stars: outlined when empty, sun with an ink outline when earned; a golden star sparkles.
+import '../motion-rewards.css';
 
 export function StarShape({ filled, size = 28, golden, className, style }: { filled: boolean; size?: number; golden?: boolean; className?: string; style?: React.CSSProperties }) {
   return (
@@ -11,7 +12,7 @@ export function StarShape({ filled, size = 28, golden, className, style }: { fil
         strokeLinejoin="round"
       />
       {filled && <path d="M9.5 8.8 11 6" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity="0.8" />}
-      {golden && <path d="M20 2.5v3M18.5 4h3" stroke="#d99a00" strokeWidth="1.6" strokeLinecap="round" />}
+      {golden && <path className="k-glint" d="M20 2.5v3M18.5 4h3" stroke="#d99a00" strokeWidth="1.6" strokeLinecap="round" />}
     </svg>
   );
 }
@@ -21,6 +22,17 @@ export function StarRow({ stars, size = 28, golden, max = 3, label }: { stars: n
     <span className="k-starrow" role="img" aria-label={label ?? `${stars} of ${max} stars`}>
       {Array.from({ length: max }, (_, i) => (
         <StarShape key={i} filled={i < stars} size={size} golden={golden && i === max - 1} />
+      ))}
+    </span>
+  );
+}
+
+/** A ring of sparkles that flies out from a star that just landed (CSS, one shot). */
+export function StarBurst({ golden }: { golden?: boolean }) {
+  return (
+    <span className={`k-star-burst${golden ? ' golden' : ''}`} aria-hidden="true">
+      {Array.from({ length: 7 }, (_, i) => (
+        <i key={i} style={{ ['--i' as string]: i }} />
       ))}
     </span>
   );

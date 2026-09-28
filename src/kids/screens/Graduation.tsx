@@ -1,4 +1,5 @@
-// Graduation: the pawn reaches rank 8 and promotes. The kid picks Queen or King; a crown drops.
+// Graduation: the pawn reaches rank 8 and promotes. The kid picks Queen or King; a crown drops on
+// with a burst of light behind the pawn and the piece pops in.
 // The printable certificate is offered to grown-ups (behind the gate).
 import { useEffect, useState } from 'react';
 import type { KidProfile } from '../store/kidsStore';
@@ -52,10 +53,13 @@ export function Graduation({ kid }: { kid: KidProfile }) {
       <Confetti run={confetti} />
       <div className="k-grad-stage">
         <div className="k-grad-avatar">
-          <PawnBuddy color={kid.avatar.color} face={form ? 'grin' : kid.avatar.face} hat={form ? 'crown' : null} size={200} className={form ? 'k-grow' : 'k-bob'} />
+          {form && <span className="k-rays big" aria-hidden="true" />}
+          <PawnBuddy color={kid.avatar.color} face={form ? 'grin' : kid.avatar.face} hat={form ? 'crown' : null} hatDrop size={200} className={form ? 'k-grow' : 'k-bob'} />
           {form && <span className={`k-grad-piece pc-w${form === 'queen' ? 'Q' : 'K'}`} aria-hidden="true" />}
         </div>
-        <h1 className="k-title">{form ? `${kid.name}, the chess ${form}!` : 'Your pawn reached the end!'}</h1>
+        <h1 className="k-title k-rise" key={form ?? 'pick'}>
+          {form ? `${kid.name}, the chess ${form}!` : 'Your pawn reached the end!'}
+        </h1>
         {!form ? (
           <div className="k-grad-pick">
             <BigButton variant="magic" icon="crown" onClick={() => choose('queen')}>
