@@ -183,6 +183,9 @@ function QuizCard({ item, player, onDone }: Props) {
   const [shown, setShown] = useState<ReturnType<typeof explain> | null>(null);
 
   // ---------- hints ----------
+  // Four steps for every kind: the last keeps the third step's picture, and the tray (or, when
+  // tapping the attacker, the board) shows the answer.
+  const tapAttacker = phase === 'attacker';
   useEffect(() => {
     const e = explain();
     const steps: HintStep[] = [];
@@ -191,9 +194,12 @@ function QuizCard({ item, player, onDone }: Props) {
       case 'status4':
         steps.push({ say: item.kind === 'status2' ? 'Check means a piece attacks the king.' : 'Is the king attacked? Can he move?' }, { say: 'Look at the king. Who can reach him?', tones: king ? { [king]: 'hint' } : {} }, { say: 'Follow the arrows!', arrows: e.arrows, tones: king ? { [king]: 'hint' } : {} });
         break;
-      case 'count':
-        steps.push({ say: 'Two steps and a turn. Try every direction!' }, { say: 'Look all around the piece.', tones: { [Object.keys(item.pieces)[0]]: 'hint' } }, { say: 'Count the dots!', art: Object.fromEntries(countDests.map((s) => [s, 'dot' as ArtKey])) });
+      case 'count': {
+        // Most count items are knights; one bonus item is a rook.
+        const rook = Object.values(item.pieces).some((p) => p?.toUpperCase() === 'R');
+        steps.push({ say: rook ? 'Rooks zoom in straight lines. Try every direction!' : 'Two steps and a turn. Try every direction!' }, { say: 'Look all around the piece.', tones: { [Object.keys(item.pieces)[0]]: 'hint' } }, { say: 'Count the dots!', art: Object.fromEntries(countDests.map((s) => [s, 'dot' as ArtKey])) });
         break;
+      }
       case 'value':
         steps.push({ say: 'Pawn 1, knight 3, bishop 3, rook 5, queen 9.' }, { say: 'Think about how much candy each one is worth.' }, { say: 'Here are the candies!', art: { c4: `candy:${CANDY[item.a.toUpperCase()]}` as ArtKey, f4: `candy:${CANDY[item.b.toUpperCase()]}` as ArtKey } });
         break;
@@ -201,18 +207,22 @@ function QuizCard({ item, player, onDone }: Props) {
         steps.push({ say: 'Count what you win, then what they can take back.' }, { say: 'Who can take back?', tones: tradeOutcome(item.fen, item.move)?.recapture ? { [tradeOutcome(item.fen, item.move)!.recapture!.from]: 'hint' } : {} }, { say: 'Follow the red arrow!', arrows: e.arrows });
         break;
       case 'can-castle':
-        steps.push({ say: 'To castle: king and rook never moved, the path is empty, and no square is attacked.' }, { say: 'Look at the path between king and rook.', tones: pathTones(item.fen, item.side) });
+        steps.push({ say: 'To castle: king and rook never moved, the path is empty, and no square is attacked.' }, { say: 'Look at the path between king and rook.', tones: pathTones(item.fen, item.side) }, { say: 'Did they move? Is the path empty? Is it safe?', tones: pathTones(item.fen, item.side) });
         break;
       case 'bishop-reach':
-        steps.push({ say: 'A bishop stays on one color forever.' }, { say: 'What color is the bishop on? And the star?', tones: { [bishopSq!]: 'hint', [item.star]: 'hint' } });
+        steps.push({ say: 'A bishop stays on one color forever.' }, { say: 'What color is the bishop on? And the star?', tones: { [bishopSq!]: 'hint', [item.star]: 'hint' } }, { say: 'Same color means yes. Different colors mean no!', tones: { [bishopSq!]: 'hint', [item.star]: 'hint' } });
         break;
       case 'munch':
         steps.push({ say: 'Which of your pieces can reach the cookie?' }, { say: 'Here is one!', tones: { [item.answer[0]]: 'hint' } }, { say: 'The arrows show the munchers!', arrows: item.answer.map((s) => ({ from: s, to: item.target, color: 'green' as const })) });
         break;
     }
+    const last = steps[2] ?? {};
+    if (item.kind === 'munch') steps.push({ ...last, say: 'Tap every piece with an arrow, then Done!' });
+    else if (tapAttacker && item.kind === 'status2') steps.push({ ...last, say: 'Tap the glowing piece!', tones: { ...last.tones, [item.attacker!]: 'hint' } });
+    else steps.push({ ...last, say: 'Tap the green answer!' });
     player.setHints(steps);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tapAttacker]);
 
   // ---------- finishing ----------
   const finish = (extra = 0) => {
@@ -220,7 +230,7 @@ function QuizCard({ item, player, onDone }: Props) {
     player.celebrate('small');
     const hl = player.hintLevel;
     const m = mistakesRef.current + extra;
-    later(() => onDone({ score: standardScore(m, hl), mistakes: m, hintLevel: hl }), 1400);
+    later(() => onDone({ score: standardScore(m, hl), mistakes: m, hintLevel: hl, golden: m === 0 && hl === 0 }), 1400);
   };
 
   const oops = (line: BandText | BandText[], key?: string) => {
@@ -373,13 +383,6 @@ function QuizCard({ item, player, onDone }: Props) {
   }, [phase, wrong, hintLevel, picked, options]);
   useEffect(() => () => player.setTray(null), []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Level 4 for board answers: show them.
-  useEffect(() => {
-    if (hintLevel < 4) return;
-    if (phase === 'attacker' && item.kind === 'status2') player.say('Tap the glowing piece!');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hintLevel]);
-
   // ---------- art ----------
   const art: Partial<Record<Sq, ArtKey[]>> = {};
   const add = (sq: Sq, a: ArtKey) => (art[sq] = [...(art[sq] ?? []), a]);
@@ -410,7 +413,6 @@ function QuizCard({ item, player, onDone }: Props) {
     for (const s of picked) tones[s] = 'focus';
     if (phase === 'done') for (const s of item.answer) tones[s] = 'good';
   }
-  if (item.kind === 'status2' && phase === 'attacker' && hintLevel >= 4 && item.attacker) tones[item.attacker] = 'hint';
   if ((item.kind === 'status2' || item.kind === 'status4') && king && statusOf(item.fen) !== 'nothing' && (reveal || phase === 'done')) add(king, 'check');
 
   const turn = ('fen' in item ? item.fen.split(' ')[1] : 'w') as 'w' | 'b';

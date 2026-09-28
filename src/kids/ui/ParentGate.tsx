@@ -163,7 +163,7 @@ function ParentGate({ reason, onPass, keep }: { reason: string; onPass: () => vo
               onContextMenu={(e) => e.preventDefault()}
               aria-label="Press and hold for 2 seconds"
             >
-              <svg viewBox="0 0 100 100" aria-hidden="true">
+              <svg className="k-hold-ring" viewBox="0 0 100 100" aria-hidden="true">
                 <circle cx="50" cy="50" r="44" className="k-hold-track" />
                 <circle cx="50" cy="50" r="44" className="k-hold-fill" />
               </svg>

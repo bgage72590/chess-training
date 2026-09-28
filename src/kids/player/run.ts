@@ -95,6 +95,11 @@ export class RunPicker {
     } else this.threeStreak = 0;
   }
 
+  /** Is there an unused item below `current`'s tier for "Easier one"? */
+  hasEasier(current: RunItem): boolean {
+    return current.tier > 1 && this.free().some((r) => r.tier < current.tier);
+  }
+
   /** "Easier one": an unused item one tier lower than `current` (null if none). */
   easier(current: RunItem): RunItem | null {
     if (current.tier <= 1) return null;

@@ -306,7 +306,7 @@ export const W7_CHECK: LevelSet<FindMoveItem> = {
 const mateSay = { all: 'Find checkmate!', champion: 'Mate in one.' };
 
 const M1 = fm('m1', 'k7/2Q5/2K5/8/8/8/8/8 w - - 0 1', { kind: 'mate' }, { say: { all: "The Queen's kiss! Find checkmate.", champion: 'Mate in one: the queen’s kiss.' } });
-const M2 = fm('m2', 'k7/8/1K6/8/8/8/8/7Q w - - 0 1', { kind: 'mate' }, { say: mateSay });
+const M2 = fm('m2', 'k7/8/1K6/8/8/8/8/6Q1 w - - 0 1', { kind: 'mate' }, { say: mateSay });
 const M4 = fm('m4', '6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1', { kind: 'mate' }, { tier: 2, say: { all: 'The king is stuck behind his pawns. Checkmate!', champion: 'Back-rank mate in one.' } });
 
 export const W7_MATE1: LevelSet<FindMoveItem> = {
@@ -316,7 +316,7 @@ export const W7_MATE1: LevelSet<FindMoveItem> = {
   items: [
     M1,
     M2,
-    fm('m3', '7k/8/6K1/8/8/8/8/Q7 w - - 0 1', { kind: 'mate' }, { tier: 2, say: mateSay }),
+    fm('m3', '7k/8/6K1/8/8/8/8/1Q6 w - - 0 1', { kind: 'mate' }, { tier: 2, say: mateSay }),
     M4,
     fm('m5', 'k7/7R/1K6/8/8/8/8/8 w - - 0 1', { kind: 'mate' }, { tier: 2, bands: EC, say: mateSay }),
     fm('m6', '1k6/7R/8/8/8/8/8/6RK w - - 0 1', { kind: 'mate' }, { tier: 2, bands: EC, say: { all: 'Two rooks make a ladder. Checkmate!', champion: 'Ladder mate in one.' } }),

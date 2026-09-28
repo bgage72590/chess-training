@@ -215,7 +215,7 @@ export const W8_LADDER: LevelSet<MateDrillItem> = {
   activity: 'mate-drill',
   perRun: { sprout: 1, explorer: 2, champion: 2 },
   intro: [
-    { say: { all: 'Rooks take turns climbing, like a ladder. One guards a row, the other gives check!', champion: 'The rooks alternate: one cuts off a rank, the other checks.' }, fen: '1k6/8/8/8/8/8/R7/1R4K1 w - - 0 1', move: ['a2', 'a8'], ms: 1400 },
+    { say: { all: 'Rooks take turns climbing, like a ladder. One guards a row, the other gives check!', champion: 'The rooks alternate: one cuts off a rank, the other checks.' }, fen: '6k1/1R6/8/8/8/8/R7/6K1 w - - 0 1', move: ['a2', 'a8'], ms: 1400 },
   ],
   items: [
     drill('l1', '8/8/3k4/8/8/8/8/R3K2R w - - 0 1', 'ladder', 12, { say: ladderSay }),

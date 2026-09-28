@@ -36,12 +36,14 @@ import {
   recordRun,
   recordWarmup,
   skipNode,
+  startAtRank,
   warmupPlan,
   worldPassed,
   worldUnlocked,
   type Registry,
 } from '../src/kids/store/progress';
 import { RunPicker, pickWarmupItem } from '../src/kids/player/run';
+import { recapFor } from '../src/kids/player/recap';
 import { escapeWay, solutions, validateFindMove, type Goal } from '../src/kids/activities/findMove/logic';
 import { reviewStars, validateStars } from '../src/kids/activities/stars/logic';
 
@@ -124,13 +126,40 @@ describe('content validation', () => {
   it('find-move rejects bad items', () => {
     expect(validateFindMove({ fen: 'k7/8/1K6/8/8/8/8/1Q6 w - - 0 1', goal: { kind: 'mate' } }, 'explorer')).toContain('no solution');
     expect(validateFindMove({ fen: '4k3/8/8/8/8/8/8/R3K3 w - - 0 1', goal: { kind: 'escape', ways: 'any' } }, 'explorer')).toContain('escape: not in check');
+    // Black is already in check with White to move: Qxa8 would take the king.
+    expect(validateFindMove({ fen: 'k7/8/1K6/8/8/8/8/7Q w - - 0 1', goal: { kind: 'mate' } }, 'explorer')).toEqual(['illegal position: the side not to move is in check']);
+  });
+  it('every Kids position with both kings is legal, and every intro move is legal', () => {
+    const fens: { where: string; fen: string; move?: string[] }[] = [];
+    const walk = (v: unknown, where: string): void => {
+      if (typeof v === 'string') {
+        if (/^[1-8pnbrqk]+(\/[1-8pnbrqk]+){7} [wb] /i.test(v)) fens.push({ where, fen: v });
+      } else if (Array.isArray(v)) v.forEach((x) => walk(x, where));
+      else if (v && typeof v === 'object') Object.values(v).forEach((x) => walk(x, where));
+    };
+    for (const s of [...LEVEL_SETS.values(), ...CHECKPOINTS.values()]) {
+      s.intro?.forEach((step, i) => step.fen && fens.push({ where: `${s.id} intro ${i}`, fen: step.fen, move: step.move }));
+      s.items.forEach((it, i) => walk(it, `${s.id} ${it.id ?? i}`));
+    }
+    for (const p of PACKS) walk(p.playground, `${p.id} playground`);
+    expect(fens.length).toBeGreaterThan(150);
+    for (const { where, fen, move } of fens) {
+      const board = fen.split(' ')[0];
+      // A free-rule picture (a lone statue next to a king) is not a chess position.
+      if (!board.includes('k') || !board.includes('K')) continue;
+      const c = new Chess(fen);
+      const theirKing = c.findPiece({ type: 'k', color: c.turn() === 'w' ? 'b' : 'w' })[0];
+      expect(c.isAttacked(theirKing, c.turn()), `${where}: ${fen}`).toBe(false);
+      if (move) expect(() => c.move({ from: move[0], to: move[1], promotion: 'q' }), `${where}: ${move.join('-')}`).not.toThrow();
+    }
   });
   it('find-move solution sets are complete', () => {
     const sans = (fen: string, goal: Goal) => solutions(fen, goal).map((m) => m.san).sort();
     expect(sans('4k3/8/8/8/8/8/8/R3K3 w - - 0 1', { kind: 'check' })).toEqual(['Ra8+']);
     expect(sans('4k3/8/8/8/4N3/8/8/4K3 w - - 0 1', { kind: 'check' })).toEqual(['Nd6+', 'Nf6+']);
     expect(sans('4k3/8/8/8/8/8/8/3QK3 w - - 0 1', { kind: 'check' })).toEqual(['Qa4+', 'Qd7+', 'Qd8+', 'Qe2+', 'Qh5+']);
-    expect(sans('k7/8/1K6/8/8/8/8/7Q w - - 0 1', { kind: 'mate' })).toEqual(['Qb7#', 'Qh8#']);
+    expect(sans('k7/8/1K6/8/8/8/8/6Q1 w - - 0 1', { kind: 'mate' })).toEqual(['Qg8#']);
+    expect(sans('7k/8/6K1/8/8/8/8/1Q6 w - - 0 1', { kind: 'mate' })).toEqual(['Qb8#']);
     expect(sans('4k3/8/p7/1n6/8/1R3b2/8/4K3 w - - 0 1', { kind: 'safe-capture' })).toEqual(['Rxf3']);
     expect(sans('4k3/8/8/8/1b6/2N5/8/R3K3 w - - 0 1', { kind: 'protect', square: 'c3' })).toEqual(['Kd2', 'Ra3', 'Rc1']);
     expect(sans('4k3/8/8/8/4r3/8/2B5/R2QK3 w - - 0 1', { kind: 'escape', ways: 'any' })).toEqual(['Bxe4', 'Kd2', 'Kf1', 'Kf2', 'Qe2']);
@@ -252,6 +281,33 @@ describe('progress', () => {
     expect(p.currentTier).toBe(2);
     p.report(1);
     expect(p.currentTier).toBe(1);
+  });
+  it('run picker: "Easier one" is offered only while a lower-tier item is left', () => {
+    const set = LEVEL_SETS.get('w7-en-passant')!;
+    const p = new RunPicker(set, 'explorer', { itemsPerRun: 5, startTier: 1, rng: mulberry32(3) });
+    const run = [p.next()!, p.next()!, p.next()!];
+    expect(run.map((x) => x.tier)).toEqual([1, 1, 2]);
+    expect(p.hasEasier(run[2])).toBe(false);
+    expect(p.easier(run[2])).toBe(null);
+    const q = new RunPicker(set, 'explorer', { itemsPerRun: 5, startTier: 2, rng: mulberry32(3) });
+    const first = q.next()!;
+    expect(first.tier).toBe(2);
+    expect(q.hasEasier(first)).toBe(true);
+    expect(q.easier(first)!.tier).toBe(1);
+  });
+});
+
+describe('results recap', () => {
+  const o = (score: 1 | 2 | 3) => ({ score, bossPassedNow: false });
+  it('"Perfect" needs a clean run, not a 3 rounded up from a slip or a hint', () => {
+    expect(recapFor(o(3), 'Count the hops', 'explorer', false, [r(3), r(3)])).toBe('Perfect! You found the best way!');
+    expect(recapFor(o(3), 'Count the hops', 'explorer', false, [r(2, { mistakes: 1 }), r(3), r(3), r(3), r(3)])).toBe('Great job! You kept thinking.');
+    expect(recapFor(o(3), 'Count the hops', 'explorer', false, [r(3, { hintLevel: 1 })])).toBe('Great job! You kept thinking.');
+  });
+  it('the Golden Rules mission recaps its checklist; real games their result', () => {
+    expect(recapFor(o(2), 'Golden Rules', 'explorer', true, [r(2, { stats: { rules: 3 } })])).toBe('You got 3 of 5 Golden Rules!');
+    expect(recapFor(o(3), 'Golden Rules', 'champion', true, [r(3, { stats: { rules: 5 } })])).toBe('5 of 5 Golden Rules.');
+    expect(recapFor(o(2), 'Snack Race', 'explorer', true, [r(2, { outcome: 'draw' })])).toBe("A draw! That's a good fight.");
   });
 });
 
@@ -413,6 +469,21 @@ describe('placement', () => {
     expect(k.nodes['w2-treasure-map']).toMatchObject({ stars: 1, tested: true });
     expect(Object.keys(k.stickers)).toEqual([]);
     expect(worldUnlocked(k, 'w3', REG)).toBe(true);
+  });
+  it('a lower starting world in Grown-ups takes back the placement passes, not played nodes', () => {
+    const k = kidOf('explorer');
+    startAtRank(k, 4, TODAY);
+    expect(worldUnlocked(k, 'w4', REG)).toBe(true);
+    recordRun(k, { nodeId: 'w3-queen-stars', results: [r(3)], itemIds: ['a'] }, REG, TODAY);
+    startAtRank(k, 1, TODAY);
+    expect(k.testedOut).toBe(0);
+    expect(worldUnlocked(k, 'w2', REG)).toBe(false);
+    expect(k.nodes['w1-hello']).toBeUndefined();
+    expect(k.nodes['w3-queen-stars']).toMatchObject({ stars: 3, plays: 1 });
+    expect(k.nodes['w3-queen-stars'].passed).toBeUndefined();
+    startAtRank(k, 2, TODAY);
+    expect(worldUnlocked(k, 'w2', REG)).toBe(true);
+    expect(worldUnlocked(k, 'w3', REG)).toBe(false);
   });
   it('a "real games" Champion who passes cp3-cp5 starts at w6', () => {
     let s = placementStart('games');

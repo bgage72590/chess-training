@@ -27,7 +27,7 @@ export function dbAccepts(p: Puzzle, fenBefore: string, move: Move, ply: number)
   if (!want) return false;
   if (uciOf(move) === want) return true;
   const r = play(fenBefore, move);
-  return !!r && load(r.fen)!.isCheckmate() && (isMatePuzzle(p) || ply >= pzMoves(p).length - 1);
+  return !!r && !!load(r.fen)?.isCheckmate() && (isMatePuzzle(p) || ply >= pzMoves(p).length - 1);
 }
 
 /** Checks a database puzzle's line is legal from its FEN. */

@@ -77,6 +77,7 @@ export function PlayBot({ item, player, onDone, kid }: ActivityProps<PlayBotItem
   const [takebacks, setTakebacks] = useState(0);
   const [ended, setEnded] = useState<{ result: Outcome; how: string } | null>(null);
   const [missionDone, setMissionDone] = useState<'open' | 'playing' | null>(null);
+  const [finished, setFinished] = useState(false); // done: no sheet stays behind the results
   const [replay, setReplay] = useState(false);
   const [mood, setMood] = useState<BuddyMood>('happy');
   const said = useRef({ blunder: false, nap: false });
@@ -154,6 +155,7 @@ export function PlayBot({ item, player, onDone, kid }: ActivityProps<PlayBotItem
   };
 
   const done = () => {
+    setFinished(true);
     const r = missionResult(mission, {
       result: ended?.result ?? null,
       ticks: ticks ?? undefined,
@@ -164,7 +166,7 @@ export function PlayBot({ item, player, onDone, kid }: ActivityProps<PlayBotItem
       outcome: r.outcome,
       mistakes: kidPlies.filter((p) => p.kept).length,
       hintLevel: Math.min(4, hintsUsed) as 0 | 1 | 2 | 3 | 4,
-      stats: { kidMoves: kidPlies.length, hints: hintsUsed, takebacks },
+      stats: { kidMoves: kidPlies.length, hints: hintsUsed, takebacks, ...(ticks && { rules: Object.values(ticks).filter((t) => t === 'yes').length }) },
     });
   };
 
@@ -445,7 +447,7 @@ export function PlayBot({ item, player, onDone, kid }: ActivityProps<PlayBotItem
         />
       )}
 
-      {missionDone === 'open' && !ended && (
+      {missionDone === 'open' && !ended && !finished && (
         <div className="k-sheet" role="dialog" aria-label="Mission done">
           <div className="k-sheet-card">
             <p className="k-sheet-title">Golden Rules: {Object.values(ticks ?? {}).filter((t) => t === 'yes').length} of 5!</p>
@@ -461,7 +463,7 @@ export function PlayBot({ item, player, onDone, kid }: ActivityProps<PlayBotItem
         </div>
       )}
 
-      {ended && (
+      {ended && !finished && (
         <div className="k-sheet" role="dialog" aria-label="Game over">
           <div className="k-sheet-card">
             <p className="k-sheet-title">{endTitle(ended, friend ? null : buddy.name)}</p>

@@ -534,6 +534,21 @@ export function applyPlacement(kid: KidProfile, testedWorlds: number[], today = 
   kid.placed = true;
 }
 
+/**
+ * Grown-ups "Starting world": the worlds below `rank` are tested out. From `rank` on, placement
+ * passes are taken back so a lower start locks the later worlds again; played nodes keep their stars.
+ */
+export function startAtRank(kid: KidProfile, rank: number, today = dayKey()) {
+  for (const w of WORLDS.slice(rank - 1))
+    for (const n of nodesOf(w.id)) {
+      const np = kid.nodes[n.id];
+      if (!np) continue;
+      if (np.plays === 0) delete kid.nodes[n.id];
+      else delete np.passed;
+    }
+  applyPlacement(kid, Array.from({ length: rank - 1 }, (_, i) => i + 1), today);
+}
+
 // ---------- Grown-up report ----------
 
 export function canDo(kid: KidProfile, reg: Registry): { skill: SkillId; level: 'full' | 'half' | 'none' }[] {

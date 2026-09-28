@@ -41,7 +41,7 @@ type RunProps = Omit<ActivityProps<PuzzleItem>, 'item'> & { item: ActivityProps<
 function combine(rs: ItemResult[]): ItemResult {
   if (rs.length === 1) return rs[0];
   const score = Math.max(1, Math.min(3, Math.round(mean(rs.map((r) => r.score))))) as 1 | 2 | 3;
-  return { score, mistakes: rs.reduce((a, r) => a + r.mistakes, 0), hintLevel: Math.max(...rs.map((r) => r.hintLevel)) as ItemResult['hintLevel'] };
+  return { score, mistakes: rs.reduce((a, r) => a + r.mistakes, 0), hintLevel: Math.max(...rs.map((r) => r.hintLevel)) as ItemResult['hintLevel'], golden: rs.every((r) => r.golden) };
 }
 
 // ---------- hand: the framework FindMove, item by item ----------
@@ -224,7 +224,7 @@ function PuzzleBoard({ puzzle, player, kid, tries, onFinish }: { puzzle: Puzzle;
   const finish = (solved: boolean) => {
     const hl = player.hintLevel;
     const score = solved ? standardScore(misses.current, hl) : 1;
-    later(() => onFinish({ solved, score, mistakes: misses.current, hintLevel: hl }), solved ? 1300 : 900);
+    later(() => onFinish({ solved, score, mistakes: misses.current, hintLevel: hl, golden: solved && misses.current === 0 && hl === 0 }), solved ? 1300 : 900);
   };
 
   // After the last try: Pip plays the rest of the line.

@@ -113,7 +113,7 @@ export function MateDrill({ item, player, onDone }: ActivityProps<MateDrillItem>
     player.say({ all: `Checkmate in ${n} moves! Amazing!`, champion: `Checkmate in ${n} moves.` }, 'cheer');
     const hl = player.hintLevel;
     const score = watching ? 1 : (Math.min(drillScore(n, item.maxMoves), standardScore(mistakes, hl)) as 1 | 2 | 3);
-    later(() => onDone({ score, mistakes, hintLevel: hl, stats: { moves: n, maxMoves: item.maxMoves } }), 1800);
+    later(() => onDone({ score, mistakes, hintLevel: hl, golden: score === 3 && mistakes === 0 && hl === 0, stats: { moves: n, maxMoves: item.maxMoves } }), 1800);
   };
 
   // The king thinks, then replies.
