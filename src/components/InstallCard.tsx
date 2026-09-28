@@ -9,6 +9,9 @@ const HOW: Record<string, string> = {
   unsupported: 'This browser cannot install web apps. Open Tempo in Chrome, Edge or Safari to install it.',
 };
 
+/** The app's address, shown as text to select or type (a link may open inside the same sandbox). */
+export const APP_ADDRESS = APP_URL.replace(/^https:\/\/|\/$/g, '');
+
 /** Settings section: install Tempo as an app with its own icon. */
 export function InstallCard() {
   const s = useInstall();
@@ -18,13 +21,16 @@ export function InstallCard() {
       {s.installed ? (
         <p className="muted">You are using the installed app. Open it from its icon any time; it works offline, Stockfish included.</p>
       ) : s.how === 'elsewhere' ? (
-        <p className="muted">
-          Open{' '}
-          <a href={APP_URL} target="_blank" rel="noreferrer">
-            {APP_URL.replace('https://', '')}
-          </a>{' '}
-          in Chrome, Edge or Safari and install it from there. Progress stays with each copy: move it with Export and Import below.
-        </p>
+        <>
+          <p className="muted">
+            Open <span className="mono app-address">{APP_ADDRESS}</span> in your browser (Chrome, Edge or Safari) to install it. Progress stays with each copy: move it with Export and Import below.
+          </p>
+          <p>
+            <a href={APP_URL} target="_blank" rel="noreferrer">
+              Open the full app
+            </a>
+          </p>
+        </>
       ) : (
         <>
           <p className="muted">Tempo can live on your dock, Start menu or home screen like any other app. It opens in its own window and works offline, Stockfish included.</p>

@@ -8,8 +8,14 @@ import { joiningCopy, mergeProfiles } from './merge';
 import { maxTally, readTally } from './tally';
 import { getProfile, normalizeProfile, replaceProfile, subscribeProfile, type Profile } from '../store/profile';
 
+/**
+ * The single-file copy (a claude.ai Artifact) or a copy shown inside another page. There, sync
+ * and downloads are left to the full app, and progress moves with Export and Import.
+ */
+export const embedded = import.meta.env.MODE === 'single' || (typeof window !== 'undefined' && window.top !== window.self);
+
 /** Sync needs a configured backend, and is left to the host inside claude.ai (single-file build). */
-export const syncAvailable = !!SYNC_URL && !!SYNC_KEY && import.meta.env.MODE !== 'single' && typeof window !== 'undefined' && window.top === window.self;
+export const syncAvailable = !!SYNC_URL && !!SYNC_KEY && !embedded && typeof window !== 'undefined';
 
 /**
  * A part that mirrors the tallies (tally.ts) kept inside another part. Older app versions drop or

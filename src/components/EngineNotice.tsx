@@ -15,7 +15,7 @@ export function EngineNotice() {
         tone="warn"
         icon="bolt"
         title="Using the backup engine"
-        body="This browser blocked Stockfish, so a lighter built-in engine is running. It plays at club level and its evaluations are approximate."
+        body="Stockfish could not be loaded here, so a lighter built-in engine is running. It plays at club level and its evaluations are approximate."
       />
     );
   }

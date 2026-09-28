@@ -1503,6 +1503,10 @@
   flex-direction: column;
   gap: 14px;
 }
+/* The app's address, shown as text to select or type: it may break anywhere on a narrow screen. */
+.settings-section .app-address {
+  overflow-wrap: anywhere;
+}
 .settings-section h2 {
   font-size: 1.3rem;
   padding-bottom: 12px;

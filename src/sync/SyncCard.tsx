@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import './sync.css';
 import { Button, Feedback } from '../components/ui';
 import { toast } from '../lib/toast';
+import { APP_URL } from '../pwa/install';
+import { APP_ADDRESS } from '../components/InstallCard';
+import { useSyncState } from '../store/cloud';
 import { formatSyncCode, newSyncCode, normalizeSyncCode, syncLink } from './code';
-import { sync, syncAvailable, useSync } from './index';
+import { embedded, sync, syncAvailable, useSync } from './index';
 
 function ago(t: number | null): string {
   if (!t) return 'not yet';
@@ -76,6 +79,27 @@ export function deleteSyncedCopy(): Promise<void> {
   );
 }
 
+/** The single-file or embedded copy: sync (and Pip's recorded voices) are in the full app. */
+function SyncInFullApp() {
+  const cloud = useSyncState();
+  return (
+    <section className="card settings-section sync-card">
+      <h2>Sync across devices</h2>
+      <p className="muted">
+        Syncing across devices with a private sync code, and Pip&rsquo;s recorded voices in Kids mode, come with the full app at <span className="mono app-address">{APP_ADDRESS}</span>.
+      </p>
+      <p>
+        <a href={APP_URL} target="_blank" rel="noreferrer">
+          Open the full app
+        </a>
+      </p>
+      <p className="faint">
+        {cloud === 'synced' || cloud === 'saving' ? 'This copy keeps progress in your claude.ai account and in this browser.' : 'This copy keeps progress in this browser.'} Export and Import below move it.
+      </p>
+    </section>
+  );
+}
+
 /** Settings section: sync progress across devices with a private sync code. */
 export function SyncCard() {
   const s = useSync();
@@ -83,7 +107,7 @@ export function SyncCard() {
   const [input, setInput] = useState('');
   const [bad, setBad] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  if (!syncAvailable) return null;
+  if (!syncAvailable) return embedded ? <SyncInFullApp /> : null;
 
   const copy = async (text: string, what: string) => {
     try {
