@@ -9,3 +9,4 @@ test-results
 
 # Temporary worktrees used by parallel agents
 .claude/worktrees/
+__pycache__/
