@@ -28,6 +28,34 @@
       "blurb": "Warm and cozy",
       "engine": "google",
       "voice": "en-US-Chirp3-HD-Sulafat"
+    },
+    {
+      "id": "pepper",
+      "name": "Pepper",
+      "blurb": "Lively and fun",
+      "engine": "google",
+      "voice": "en-US-Chirp3-HD-Laomedeia"
+    },
+    {
+      "id": "willow",
+      "name": "Willow",
+      "blurb": "Soft and gentle",
+      "engine": "google",
+      "voice": "en-US-Chirp3-HD-Achernar"
+    },
+    {
+      "id": "bella",
+      "name": "Bella",
+      "blurb": "Clear and friendly",
+      "engine": "google",
+      "voice": "en-US-Chirp3-HD-Autonoe"
+    },
+    {
+      "id": "rocket",
+      "name": "Rocket",
+      "blurb": "An upbeat boy's voice",
+      "engine": "google",
+      "voice": "en-US-Chirp3-HD-Puck"
     }
   ]
 }
