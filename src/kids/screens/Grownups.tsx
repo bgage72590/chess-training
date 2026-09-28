@@ -9,7 +9,7 @@ import { WORLDS, WORLD_BY_ID } from '../curriculum/worlds';
 import { BUDDIES, type BuddyId } from '../curriculum/buddies';
 import { REGISTRY } from '../packs';
 import { defaultKidsState, defaultSettings, getKids, normalizeKids, replaceKids, updateKid, updateKids, useKids, useSaveFailed, kidsRecovered, type KidProfile, type KidSettings } from '../store/kidsStore';
-import { applyPlacement, canDo, canGraduate, currentWorld, minutesLast7, neededHelp, totalStars } from '../store/progress';
+import { canDo, canGraduate, currentWorld, minutesLast7, neededHelp, startAtRank, totalStars } from '../store/progress';
 import { kidSinceReset } from '../store/syncKids';
 import { syncAvailable, useSync } from '../../sync';
 import { isKidsLocked, setKidsLocked } from '../lock';
@@ -317,7 +317,7 @@ function Actions({ kid }: { kid: KidProfile }) {
             type="button"
             className="k-gu-btn"
             onClick={() => {
-              updateKid(kid.id, (d) => applyPlacement(d, Array.from({ length: startWorld - 1 }, (_, i) => i + 1)));
+              updateKid(kid.id, (d) => startAtRank(d, startWorld));
               toast({ title: `${kid.name} now starts at Rank ${startWorld}.` }, 2500);
             }}
           >

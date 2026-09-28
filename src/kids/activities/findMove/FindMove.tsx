@@ -53,7 +53,8 @@ export function FindMove({ item, player, onDone }: ActivityProps<FindMoveItem>) 
 
   // One solution move for the hints (and Watch Pip).
   const solution = useMemo((): Move | null => {
-    if (replaying) return null;
+    // None while the other side is to move (a found escape way or a line step on show).
+    if (replaying || fen.split(' ')[1] !== item.fen.split(' ')[1]) return null;
     if (goal.kind === 'line') {
       const u = goal.uci[ply];
       if (!u) return null;
@@ -62,7 +63,7 @@ export function FindMove({ item, player, onDone }: ActivityProps<FindMoveItem>) 
     const sols = solutions(fen, goal);
     if (goal.kind === 'escape' && ways !== 'any') return sols.find((m) => !found.includes(escapeWay(fen, m))) ?? sols[0] ?? null;
     return sols[0] ?? null;
-  }, [fen, goal, ply, found, ways, replaying]);
+  }, [fen, goal, ply, found, ways, replaying, item.fen]);
 
   useEffect(() => {
     const rule = item.rule ?? ruleLine(goal);
@@ -82,8 +83,11 @@ export function FindMove({ item, player, onDone }: ActivityProps<FindMoveItem>) 
   // Watch Pip: play the solution, then reset so the kid repeats it.
   const demoAt = useRef('');
   useEffect(() => {
-    if (player.hintLevel !== 4 || !solution || demoAt.current === fen) return;
-    demoAt.current = fen;
+    if (player.hintLevel !== 4 || !solution) return;
+    // Keyed by the move too: after a found escape way, the next way is shown from the same position.
+    const at = fen + uciOf(solution);
+    if (demoAt.current === at) return;
+    demoAt.current = at;
     const r = play(fen, solution);
     if (!r) return;
     setDemo({ fen: r.fen, last: [solution.from, solution.to] });
@@ -119,7 +123,7 @@ export function FindMove({ item, player, onDone }: ActivityProps<FindMoveItem>) 
       if (m.promotion === 'n' && c?.inCheck()) player.award('st-surprise-knight');
     }
     const hl = player.hintLevel;
-    later(() => onDone({ score: standardScore(extraMistakes, hl), mistakes: extraMistakes, hintLevel: hl }), 1300);
+    later(() => onDone({ score: standardScore(extraMistakes, hl), mistakes: extraMistakes, hintLevel: hl, golden: extraMistakes === 0 && hl === 0 }), 1300);
   };
 
   const wrong = (m: Move, line: string, after: string) => {
@@ -133,7 +137,8 @@ export function FindMove({ item, player, onDone }: ActivityProps<FindMoveItem>) 
     const r = play(fen, m);
     if (!r) return;
     const after = r.fen;
-    const ac = load(after)!;
+    const ac = load(after);
+    if (!ac) return;
 
     if (goal.kind === 'line') {
       if (!lineAccepts(fen, m, goal, ply)) return wrong(m, wrongLine(goal), after);

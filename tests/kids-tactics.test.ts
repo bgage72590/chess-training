@@ -41,9 +41,10 @@ describe('pack registration', () => {
 
 describe('w8-mate-hunt (Sprout hand mates)', () => {
   const hand = W8_MATE_HUNT.items.filter((i) => i.source === 'hand') as PI[];
-  it('has the 3 spec mates, each a real mate in one with a queen', () => {
-    expect(hand.map((i) => lineOf(i).fen.split(' ')[0])).toEqual(['k7/2Q5/2K5/8/8/8/8/8', 'k7/8/1K6/8/8/8/8/7Q', '7k/8/6K1/8/8/8/8/Q7']);
-    const want = [['Qb7#'], ['Qb7#', 'Qh8#'], ['Qa8#', 'Qg7#']];
+  it('has 3 hand mates, each a real mate in one with a queen', () => {
+    // The spec's h1 and a1 queens already gave check (Black in check with White to move).
+    expect(hand.map((i) => lineOf(i).fen.split(' ')[0])).toEqual(['k7/2Q5/2K5/8/8/8/8/8', 'k7/8/1K6/8/8/8/8/6Q1', '7k/8/6K1/8/8/8/8/1Q6']);
+    const want = [['Qb7#'], ['Qg8#'], ['Qb8#']];
     hand.forEach((it, i) => {
       const fm = lineOf(it);
       expect(validateFindMove(fm, 'sprout')).toEqual([]);

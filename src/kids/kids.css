@@ -961,6 +961,9 @@
   .k-player.left-handed .k-player-tray {
     order: 1;
   }
+  .k-player.left-handed .k-player-main {
+    order: 2;
+  }
   .k-player-coach {
     align-items: flex-start;
     padding-top: 24px;
@@ -2369,7 +2372,7 @@
   font-family: var(--k-font-display);
   font-weight: 600;
   font-size: 15px;
-  color: var(--acc, var(--k-ink-soft));
+  color: color-mix(in srgb, var(--acc, var(--k-ink-soft)) 60%, #1f2a44);
   text-transform: none;
 }
 .kids-app[data-night='1'] .k-rank {
@@ -2448,6 +2451,11 @@
   flex-direction: column;
   align-items: center;
   width: 150px;
+  /* Titles and boss pills can overlap a neighbour's circle: taps go through to its button. */
+  pointer-events: none;
+}
+.k-path-node button {
+  pointer-events: auto;
 }
 .k-node-title {
   font-family: var(--k-font-display);
@@ -2875,6 +2883,7 @@
 }
 .k-bosscard {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
@@ -2898,10 +2907,14 @@
   flex: none;
 }
 .k-bosscard-main {
-  flex: 1;
+  flex: 1 1 160px;
   display: grid;
   gap: 4px;
   justify-items: start;
+}
+.k-bosscard > .k-btn {
+  flex: none;
+  margin-left: auto;
 }
 .k-bosscard-kicker {
   font-family: var(--k-font-display);
@@ -3195,6 +3208,9 @@
   overflow: hidden;
   min-height: 30px;
 }
+.kids-app[data-night='1'] .k-trophy .k-small {
+  color: #2b3556; /* the shelf is darker at bedtime */
+}
 .k-wardrobe {
   display: grid;
   gap: 16px;
@@ -3271,7 +3287,7 @@
   user-select: none;
   -webkit-touch-callout: none;
 }
-.k-hold svg {
+.k-hold-ring {
   position: absolute;
   inset: 0;
   rotate: -90deg;
@@ -3931,6 +3947,8 @@
   max-height: 84px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* A line taller than the bubble starts at the top and scrolls, instead of centring off the top. */
+  align-items: safe center;
 }
 .k-player-coach .k-bubble-text {
   line-height: 1.25;

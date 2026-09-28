@@ -162,12 +162,13 @@ export function CaptureCrown({ item, player, onDone, kid }: ActivityProps<CrownI
   const art: Partial<Record<Sq, ArtKey>> = {};
   const myKing = danger ? kingSq(st.pos, danger.prev.turn) : null;
   if (myKing) art[myKing] = 'danger';
+  // While the bells ring, it is still the mover's turn: they choose Undo or Move anyway.
   const side = danger ? danger.prev.turn : st.turn;
   const orientation = seats && flip && side === 'b' ? 'black' : 'white';
 
   return (
     <div className="k-game k-crown">
-      <GameBar friend={seats} turn={st.turn} buddy={BUDDY[item.bot]} thinking={thinking} over={!!result} kidColor="w" />
+      <GameBar friend={seats} turn={side} buddy={BUDDY[item.bot]} thinking={thinking} over={!!result} kidColor="w" />
       <div className="k-game-board">
         <KidsBoard
           fen={placementFen(st.pos, st.turn)}
@@ -180,7 +181,7 @@ export function CaptureCrown({ item, player, onDone, kid }: ActivityProps<CrownI
           wobble={wobble}
           hint={live && !seats ? player.hint : null}
           showDests={(from) => player.band !== 'champion' || dotsFor(kid, st.pos[from])}
-          label={seats ? `Capture the Crown. ${seats[st.turn].name}'s turn.` : 'Capture the Crown board'}
+          label={seats ? `Capture the Crown. ${seats[side].name}'s turn.` : 'Capture the Crown board'}
         />
         {result && <ResultCard outcome={result.outcome ?? 'draw'} text={result.text} />}
       </div>
@@ -188,7 +189,7 @@ export function CaptureCrown({ item, player, onDone, kid }: ActivityProps<CrownI
         <div className="k-sheet" role="alertdialog" aria-label="Danger bells">
           <div className="k-sheet-card k-danger">
             <Pip mood="wow" size={72} />
-            <p className="k-sheet-title">Ding ding! Your king can be captured!</p>
+            <p className="k-sheet-title">{seats ? <>{seats[danger.prev.turn].name}, your king can be captured!</> : 'Ding ding! Your king can be captured!'}</p>
             <div className="k-sheet-actions">
               <BigButton variant="go" icon="again" onClick={undo} autoFocus>
                 Undo

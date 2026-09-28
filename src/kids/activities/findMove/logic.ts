@@ -120,7 +120,7 @@ export function lineAccepts(fenBefore: string, move: Move, goal: Extract<Goal, {
   if (uciOf(move) === uci || uciOf(move) === uci.slice(0, 4)) return true;
   if (!last) return false;
   const r = play(fenBefore, move);
-  return !!r && load(r.fen)!.isCheckmate();
+  return !!r && !!load(r.fen)?.isCheckmate();
 }
 
 const sameFen = (a: string, b: string) => a.split(' ').slice(0, 4).join(' ') === b.split(' ').slice(0, 4).join(' ');
@@ -129,6 +129,8 @@ export function validateFindMove(item: FindMoveItem & ItemMeta, band: AgeBand): 
   const errs: string[] = [];
   const c = load(item.fen);
   if (!c) return ['FEN does not load'];
+  const theirKing = c.findPiece({ type: 'k', color: c.turn() === 'w' ? 'b' : 'w' })[0];
+  if (theirKing && c.isAttacked(theirKing, c.turn())) return ['illegal position: the side not to move is in check'];
   // Insufficient-material draws are fine for teaching (K+N v K checks); mate and stalemate are not.
   if (c.isCheckmate() || c.isStalemate()) errs.push('position is game over');
   const goal = item.goal;

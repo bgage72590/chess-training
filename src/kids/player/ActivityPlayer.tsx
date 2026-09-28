@@ -20,6 +20,7 @@ import { markBreak, onBreak, sessionOver } from './useSession';
 import { useKidCtx } from './context';
 import { Intro, PiecePick } from './Intro';
 import { Results } from './Results';
+import { belowPassRecap, recapFor } from './recap';
 import { TopBar } from '../ui/TopBar';
 import { Coach } from '../ui/Coach';
 import { Tray } from '../ui/Tray';
@@ -314,7 +315,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
     const lower = LOWER[band];
     if (lower && current.run.item.tune?.[lower]) return beginItem(current.run, { lowerBand: lower });
   };
-  const canEasier = !!current && ((picker && current.run.tier > 1) || (LOWER[band] && !!current.run.item.tune?.[LOWER[band]!]));
+  const canEasier = !!current && (!!picker?.hasEasier(current.run) || (LOWER[band] && !!current.run.item.tune?.[LOWER[band]!]));
 
   // ---------- finishing ----------
   function finishRun() {
@@ -450,7 +451,28 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
     if (props.onExit) props.onExit();
     else go.map();
   };
-  const onX = () => (itemLive && results.current.length < total ? setConfirmLeave(true) : exit());
+  const guardLeave = itemLive && results.current.length < total;
+  const onX = () => (guardLeave ? setConfirmLeave(true) : exit());
+  // The browser or Android back gesture asks too. A history entry with the same URL takes the first
+  // back press (the router sees no change) and opens the sheet; a second back leaves. The entry is
+  // dropped again when the guard ends. A pop that lands on another guard entry is not a back press.
+  const guardBack = guardLeave && !confirmLeave;
+  useEffect(() => {
+    if (!guardBack) return;
+    try {
+      history.pushState({ kidsGuard: 1 }, '');
+    } catch {
+      return;
+    }
+    const onPop = () => {
+      if (!history.state?.kidsGuard) setConfirmLeave(true);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      if (history.state?.kidsGuard) history.back();
+    };
+  }, [guardBack]);
 
   // ---------- results ----------
   const renderResults = () => {
@@ -494,7 +516,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
     const lowest = node && offers.practice ? activeNodes(node.world, k.band, REGISTRY).filter((n) => !n.boss && !n.bonus).sort((a, b) => (k.nodes[a.id]?.stars ?? 0) - (k.nodes[b.id]?.stars ?? 0))[0] : undefined;
     const below = !!node?.boss && !isGame && !bossPassed(k, node) && !k.nodes[node.id]?.skipped;
     const nextWorld = node ? WORLDS[WORLDS.findIndex((w) => w.id === node.world) + 1] : undefined;
-    const recap = below && nextWorld ? belowPassRecap(outcome.score, bossPassMark(band), nextWorld.rank, band) : recapFor(outcome, node?.title ?? '', band, isGame);
+    const recap = below && nextWorld ? belowPassRecap(outcome.score, bossPassMark(band), nextWorld.rank, band) : recapFor(outcome, node?.title ?? '', band, isGame, results.current);
     const fast = node ? fastTrackOffer(k, node.id, REGISTRY) : null;
     return (
       <Results
@@ -718,20 +740,4 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       {phase === 'results' && renderResults()}
     </div>
   );
-}
-
-/** A non-game boss below the pass mark: say what opens the next rank, from the first attempt. */
-function belowPassRecap(score: number, need: number, rank: number, band: AgeBand): string {
-  const got = score === 1 ? 'one star' : score === 2 ? 'two stars' : 'three stars';
-  const want = need === 1 ? 'one star' : need === 2 ? 'two stars' : 'three stars';
-  if (band === 'champion') return `${score} of ${need} stars. Get ${need} to open Rank ${rank}.`;
-  return `You got ${got}! Get ${want} to open Rank ${rank}. Try again?`;
-}
-
-function recapFor(o: RunOutcome, title: string, band: AgeBand, game: boolean): string {
-  if (game) return o.score === 3 ? 'You won! Brilliant playing!' : o.score === 2 ? "A draw! That's a good fight." : 'Good game! Every game makes you stronger.';
-  if (o.bossPassedNow) return band === 'champion' ? `${title} complete.` : `You beat ${title}! Amazing!`;
-  if (o.score === 3) return band === 'champion' ? 'Clean and efficient.' : 'Perfect! You found the best way!';
-  if (o.score === 2) return 'Great job! You kept thinking.';
-  return 'You did it! Practice makes it easier.';
 }

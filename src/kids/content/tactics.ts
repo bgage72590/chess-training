@@ -37,8 +37,8 @@ export const W8_MATE_HUNT: LevelSet<PuzzleItem> = {
   ],
   items: [
     mateHand('s1', 'k7/2Q5/2K5/8/8/8/8/8 w - - 0 1'),
-    mateHand('s2', 'k7/8/1K6/8/8/8/8/7Q w - - 0 1'),
-    mateHand('s3', '7k/8/6K1/8/8/8/8/Q7 w - - 0 1'),
+    mateHand('s2', 'k7/8/1K6/8/8/8/8/6Q1 w - - 0 1'),
+    mateHand('s3', '7k/8/6K1/8/8/8/8/1Q6 w - - 0 1'),
     ...dbItems('e', ['mateIn1'], 800, 5, E),
     ...dbItems('c', ['mateIn1'], 1000, 6, C),
   ],
@@ -71,7 +71,7 @@ export const FORKS: PI[] = [
   fork('f9', 'r5k1/8/8/8/8/8/8/4K2Q w - - 0 1', ['h1d5', 'g8h8', 'd5a8'], 2),
   fork('f10', 'r3k3/8/8/8/8/8/8/2Q1K3 w - - 0 1', ['c1c6', 'e8e7', 'c6a8'], 2),
   fork('f11', '3k4/8/8/8/6b1/8/8/4K2Q w - - 0 1', ['h1h4', 'd8c8', 'h4g4'], 2),
-  fork('f12', '7r/k7/8/8/8/8/8/4K1Q1 w - - 0 1', ['g1d4', 'a7a8', 'd4h8'], 3),
+  fork('f12', '7r/k7/8/8/8/8/8/3QK3 w - - 0 1', ['d1d4', 'a7a8', 'd4h8'], 3),
   fork('f13', '1k6/8/8/8/8/8/7r/2Q1K3 w - - 0 1', ['c1f4', 'b8c8', 'f4h2'], 3),
   fork('f14', '8/8/8/k6n/8/8/8/4K2Q w - - 0 1', ['h1d5', 'a5a6', 'd5h5'], 2),
   // Rook forks.
