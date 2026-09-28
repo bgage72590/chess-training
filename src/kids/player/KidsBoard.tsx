@@ -12,6 +12,8 @@ import { useKidCtx } from './context';
 import { KidsPromoPicker } from './KidsPromoPicker';
 import { kidSound } from '../lib/kidsSound';
 import { playableDests } from '../lib/chessDests';
+import { useBoardFx } from '../activities/useBoardFx';
+import '../motion-board.css';
 
 const FILES = 'abcdefgh';
 
@@ -46,7 +48,7 @@ const toSq = (f: number, r: number) => FILES[f] + (r + 1);
 
 export function KidsBoard(props: KidsBoardProps) {
   const { fen, orientation = 'white', interactive = true, playerColor, freeMoves, area } = props;
-  const { kid, band, tuning } = useKidCtx();
+  const { kid, band, tuning, reducedMotion } = useKidCtx();
   const wrap = useRef<HTMLDivElement>(null);
   const [sel, setSel] = useState<Sq | null>(null);
   const [cursor, setCursor] = useState<Sq | null>(null);
@@ -91,6 +93,7 @@ export function KidsBoard(props: KidsBoardProps) {
   const lone = !!freeMoves && tuning.autoSelectLone && movable.length === 1 ? movable[0] : null;
   const active = kbdFrom ?? sel ?? lone;
   const showDests = typeof props.showDests === 'function' ? !!active && props.showDests(active) : props.showDests ?? true;
+  useBoardFx(wrap, { reduced: reducedMotion, orientation, fen, from: active, lift: kbdFrom ?? sel });
   /** Where the current press went down (tap-only: a drag-and-release still makes the move). */
   const downSq = useRef<Sq | null>(null);
 
