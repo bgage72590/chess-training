@@ -27,11 +27,22 @@ async function ranged(req, res) {
   });
 }
 
+/** A request that skips the browser's HTTP cache (GitHub Pages lets it keep files for 10 minutes). */
+const revalidate = (req) => {
+  try {
+    return fetch(req, { cache: 'no-cache' });
+  } catch {
+    return fetch(req);
+  }
+};
+
 self.addEventListener('install', (event) => {
+  // `reload`: a copy of the page or an unhashed file the HTTP cache still holds from the last
+  // version would pair the new files with old ones offline.
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) => cache.addAll(FILES.map(scoped)))
+      .then((cache) => cache.addAll(FILES.map((f) => new Request(scoped(f), { cache: 'reload' }))))
       .then(() => self.skipWaiting()),
   );
 });
@@ -72,7 +83,7 @@ self.addEventListener('fetch', (event) => {
   // old clips.
   if (req.method === 'GET' && url.pathname.includes('/voice/')) {
     if (url.pathname.endsWith('.json')) {
-      const fresh = fetch(req);
+      const fresh = revalidate(req);
       event.respondWith(fresh.then((res) => res.clone()).catch(() => caches.open(VOICE).then((c) => c.match(req)).then((hit) => hit ?? Response.error())));
       event.waitUntil(
         fresh
@@ -108,9 +119,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Pages: network first so a new version appears when online; the cached app works offline.
+  // Pages: network first (past the HTTP cache) so a new version appears as soon as it is out;
+  // the cached app works offline.
   if (req.mode === 'navigate') {
-    event.respondWith(fetch(req).catch(() => caches.match(scoped('./'))));
+    event.respondWith(revalidate(req).catch(() => caches.match(scoped('./'))));
     return;
   }
 

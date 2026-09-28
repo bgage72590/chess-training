@@ -5,7 +5,7 @@ import { getProfile, levelFromXp, liveStreak, updateProfile, useProfile } from '
 import { useToasts, toast } from './lib/toast';
 import { ACHIEVEMENTS } from './lib/achievements';
 import { dueLines, dueReviewPuzzles } from './lib/due';
-import { ProgressBar } from './components/ui';
+import { Button, ProgressBar } from './components/ui';
 import { InstallButton } from './components/InstallCard';
 import { HomePage } from './pages/Home';
 import { LearnPage } from './pages/Learn';
@@ -106,6 +106,11 @@ function Toasts() {
           <div>
             <div className="toast-title">{t.title}</div>
             {t.body && <div className="toast-body">{t.body}</div>}
+            {t.action && (
+              <Button size="s" variant="primary" className="toast-action" onClick={t.action.run}>
+                {t.action.label}
+              </Button>
+            )}
           </div>
         </div>
       ))}

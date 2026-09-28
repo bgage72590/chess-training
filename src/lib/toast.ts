@@ -6,6 +6,8 @@ export interface Toast {
   body?: string;
   tone: 'good' | 'info' | 'accent' | 'bad';
   icon?: string;
+  /** A button in the notice. */
+  action?: { label: string; run: () => void };
 }
 
 let toasts: Toast[] = [];

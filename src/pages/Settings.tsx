@@ -202,6 +202,9 @@ export function SettingsPage() {
           <p className="muted">
             Engine: Stockfish 19 (GPLv3) via stockfish.js. Pieces: “cburnett” by Colin M.L. Burnett. Rules: chess.js. Puzzles are generated from Stockfish self-play and verified for a unique solution.
           </p>
+          <p className="faint num" style={{ fontSize: '0.8rem' }}>
+            Version {__BUILD__}
+          </p>
         </section>
       </div>
     </>

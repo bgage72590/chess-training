@@ -1317,6 +1317,9 @@ button.feedback:hover {
   font-size: 0.87rem;
   color: var(--ink-2);
 }
+.toast-action {
+  margin-top: 8px;
+}
 @media (max-width: 900px) {
   /* Under the top bar: at the bottom they would cover the result a move just revealed. */
   .toasts {

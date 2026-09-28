@@ -1,6 +1,7 @@
 // Installing Tempo as an app: registers the offline service worker and captures the browser's
 // install prompt so the app can offer its own "Install" button.
 import { useSyncExternalStore } from 'react';
+import { recoverFromMissingFiles, watchForUpdates } from './update';
 
 interface InstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -45,7 +46,8 @@ function detectHow(): InstallState['how'] {
 /** Call once at start-up, before the browser may fire its install prompt. */
 export function setupInstall() {
   if (import.meta.env.PROD && import.meta.env.MODE !== 'single' && 'serviceWorker' in navigator) {
-    window.addEventListener('load', () => void navigator.serviceWorker.register('./sw.js').catch(() => undefined));
+    recoverFromMissingFiles();
+    window.addEventListener('load', () => void navigator.serviceWorker.register('./sw.js').then((reg) => watchForUpdates(reg)).catch(() => undefined));
   }
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
