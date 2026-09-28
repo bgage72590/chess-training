@@ -1,7 +1,6 @@
 // A world up close: the banner, crown progress, Pip's world intro, and a card per node.
 import { useEffect, useState } from 'react';
 import type { KidProfile } from '../store/kidsStore';
-import { updateKid } from '../store/kidsStore';
 import { REGISTRY } from '../packs';
 import { WORLDS, WORLD_BY_ID, nodesOf, type WorldId } from '../curriculum/worlds';
 import { bossPassed, crownOf, mastered, nextNode, nodeUnlocked, totalStars, visibleTo, worldPassed, worldUnlocked } from '../store/progress';
@@ -12,7 +11,7 @@ import { NodeIcon } from '../ui/NodeBubble';
 import { StarRow } from '../ui/StarRow';
 import { Coach } from '../ui/Coach';
 import { MapBar } from './MapScreen';
-import { lineId, speech } from '../player/speech';
+import { heardFirst, lineId, speech } from '../player/speech';
 import { useKidCtx } from '../player/context';
 import { go } from '../routes';
 
@@ -25,15 +24,12 @@ export function WorldScreen({ kid, worldId }: { kid: KidProfile; worldId: WorldI
   const nextW = WORLDS[world.rank];
   const current = nextNode(kid, REGISTRY);
   const [token, setToken] = useState<number | undefined>();
-  const say = () => setToken(speech.speak([world.intro], { rate: kid.settings.rate ?? tuning.speechRate, pitch: tuning.pitch, clipRate: kid.settings.rate ?? undefined }));
+  const say = (onEnd?: () => void) => setToken(speech.speak([world.intro], { rate: kid.settings.rate ?? tuning.speechRate, pitch: tuning.pitch, clipRate: kid.settings.rate ?? undefined, onEnd }));
 
-  // Pip's world intro is spoken on the first visit.
+  // Pip's world intro is spoken on the first visit (until it has been heard to the end).
   useEffect(() => {
     const id = lineId(`world-${worldId}`);
-    if (kid.settings.voice !== 'off' && !kid.firsts.includes(id)) {
-      say();
-      updateKid(kid.id, (d) => void d.firsts.push(id));
-    }
+    if (kid.settings.voice !== 'off' && !kid.settings.muted && !kid.firsts.includes(id)) say(() => heardFirst(kid.id, id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [worldId]);
 
@@ -56,7 +52,7 @@ export function WorldScreen({ kid, worldId }: { kid: KidProfile; worldId: WorldI
             </span>
           </div>
         </div>
-        <Coach text={world.intro} token={token} onSpeak={say} size={80} />
+        <Coach text={world.intro} token={token} onSpeak={() => say()} size={80} />
       </div>
       {!unlocked && (
         <div className="k-card k-world-locked">
