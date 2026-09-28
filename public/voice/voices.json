@@ -14,6 +14,20 @@
       "blurb": "Relaxed and easygoing",
       "engine": "google",
       "voice": "en-US-Chirp3-HD-Aoede"
+    },
+    {
+      "id": "sparkle",
+      "name": "Sparkle",
+      "blurb": "Bright and bubbly",
+      "engine": "google",
+      "voice": "en-US-Chirp3-HD-Zephyr"
+    },
+    {
+      "id": "honey",
+      "name": "Honey",
+      "blurb": "Warm and cozy",
+      "engine": "google",
+      "voice": "en-US-Chirp3-HD-Sulafat"
     }
   ]
 }
