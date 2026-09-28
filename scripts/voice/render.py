@@ -33,8 +33,9 @@ ENGINES = {
     # A touch slower than normal, for young listeners. The voice speaks at this pace itself;
     # slowing clips down in the browser instead (time-stretching) makes speech sound robotic.
     'kokoro': {'voice': 'af_heart', 'model': 'kokoro-v1.0.onnx', 'speed': 0.94},  # full precision: int8 is buzzier
-    # (Chirp 3 HD ignores a pace close to 1: 0.95 sounds like 1.0, 0.85 is 5-19% slower, 0.75 19-33%.)
-    'google': {'voice': 'en-US-Chirp3-HD-Leda', 'speed': 0.95},
+    # (Chirp 3 HD ignores a pace close to 1: 0.95 sounds like 1.0, 0.85 is 5-19% slower, 0.75 19-33%.
+    # 0.85 was chosen by ear from scripts/voice/audition.py.)
+    'google': {'voice': 'en-US-Chirp3-HD-Leda', 'speed': 0.85},
 }
 BITRATE = 64
 PAD = 0.08  # seconds of quiet kept before and after the words

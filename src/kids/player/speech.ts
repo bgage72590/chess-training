@@ -290,10 +290,11 @@ function speakTts(p: LinePlan, opts: SpeakOpts, live: () => boolean, done: () =>
 /**
  * Quiet between recorded clips, on top of the 0.16 s each clip keeps at its two ends: a person
  * pauses a moment between sentences and a little longer between lines, and clips played back to
- * back sound rushed. A grown-up's slower pace lengthens them too.
+ * back sound rushed. Chosen by ear from scripts/voice/audition.py (0.8 s between lines, sentences a
+ * little closer). A grown-up's slower pace lengthens them too.
  */
-export const SENTENCE_GAP_MS = 300;
-export const LINE_GAP_MS = 500;
+export const SENTENCE_GAP_MS = 450;
+export const LINE_GAP_MS = 800;
 
 /** Says the lines one after another: recorded clips where there are some, the device voice otherwise. */
 function run(lines: string[], opts: SpeakOpts, token: number) {
