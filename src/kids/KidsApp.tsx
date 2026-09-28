@@ -65,11 +65,12 @@ export function KidsApp({ route }: { route: string }) {
 
   useSessionTracker(kid?.id ?? null);
 
-  // Speech stops on every route change.
+  // Speech stops on every route change (and on leaving Kids mode). A cleanup, so it runs before the
+  // new screen's effects and stops only the old screen's lines, never the new screen's first one.
+  useEffect(() => () => speech.leaveScreen(), [route]);
   useEffect(() => {
-    speech.cancel();
     if (r.screen !== 'picker') lockedLandingUsed = true;
-  }, [route, r.screen]);
+  }, [r.screen]);
   // Leaving the grown-ups area ends the gate pass, so a handed-back device asks again.
   useEffect(() => {
     if (!GROWNUP_SCREENS.includes(r.screen)) clearGatePass();
@@ -78,7 +79,6 @@ export function KidsApp({ route }: { route: string }) {
   useEffect(() => {
     if (kid && BOUNDARY_SCREENS.includes(r.screen) && sessionOver(kid)) markBreak(kid.id);
   }, [kid, r.screen]);
-  useEffect(() => () => speech.cancel(), []);
   useEffect(() => kidsSound.setEnabled(kid ? kid.settings.sound && !kid.settings.muted : true), [kid]);
   useEffect(() => speech.setVoice(s.device.voiceURI), [s.device.voiceURI]);
   useEffect(() => speech.setPipVoice(kid?.settings.pipVoice), [kid?.settings.pipVoice]);

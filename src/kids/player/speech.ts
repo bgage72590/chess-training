@@ -14,6 +14,10 @@ interface SpeakOpts {
   /** Speed for recorded clips: only a grown-up's explicit choice. Clips are recorded at a
    *  kid-friendly pace, and speeding or slowing them in the browser makes them sound robotic. */
   clipRate?: number;
+  /** Called once every line has been said to the end (never for lines cut off or not spoken). */
+  onEnd?: () => void;
+  /** Goes on through the next screen change: a line said on the way out of a screen. */
+  keep?: boolean;
 }
 
 interface SpeechState {
@@ -46,6 +50,7 @@ let voice: SpeechSynthesisVoice | null = null;
 let pending: { lines: string[]; opts: SpeakOpts; token: number } | null = null;
 let timers: ReturnType<typeof setTimeout>[] = [];
 let tokenSeq = 0;
+let keepLine = false;
 
 function clearTimers() {
   timers.forEach(clearTimeout);
@@ -122,7 +127,7 @@ function loadList(): Promise<void> {
     .then((l: VoiceList | null) => {
       if (l?.voices?.length) voiceList = l;
     })
-    .catch(() => undefined);
+    .catch(() => void (listLoad = null)); // offline: try again next time
   return listLoad;
 }
 
@@ -183,7 +188,11 @@ function prefetchClips() {
   setTimeout(step, 4000);
 }
 
-if (typeof window !== 'undefined') void ready(10_000).then(prefetchClips);
+if (typeof window !== 'undefined') {
+  const warm = () => void ready(10_000).then(prefetchClips);
+  warm();
+  window.addEventListener('online', warm); // a list that failed to load, or a prefetch cut off, picks up again
+}
 
 let runGen = 0;
 
@@ -302,7 +311,10 @@ function run(lines: string[], opts: SpeakOpts, token: number) {
   const next = (i: number) => {
     if (!live()) return;
     clearTimers();
-    if (i >= plan.length) return set({ speaking: false, word: -1 });
+    if (i >= plan.length) {
+      set({ speaking: false, word: -1 });
+      return opts.onEnd?.();
+    }
     const p = plan[i];
     const a = activeManifest();
     const clips = a ? clipsFor(p, a.m) : null;
@@ -316,7 +328,7 @@ function run(lines: string[], opts: SpeakOpts, token: number) {
   };
   // The clip list loads with Kids mode; give it a moment on the very first line.
   if (activeId() !== null && !activeManifest()) void ready(800).then(() => next(0));
-  else if (!voiceList && listLoad) void ready(800).then(() => next(0));
+  else if (!voiceList && pipVoice !== DEVICE_VOICE) void ready(800).then(() => next(0));
   else next(0);
 }
 
@@ -367,6 +379,7 @@ export const speech = {
   speak(lines: string[], opts: SpeakOpts = {}): number {
     const token = ++tokenSeq;
     speech.cancel(false);
+    keepLine = !!opts.keep;
     set({ token, word: -1, speaking: false });
     const clean = lines.map((l) => l.trim()).filter(Boolean);
     if (!clean.length || muted || !speech.supported()) return token;
@@ -378,6 +391,7 @@ export const speech = {
     return token;
   },
   cancel(bump = true) {
+    keepLine = false;
     clearTimers();
     pending = null;
     runGen++;
@@ -395,6 +409,11 @@ export const speech = {
       /* ignore */
     }
     if (bump) set({ speaking: false, word: -1, token: ++tokenSeq });
+  },
+  /** A screen change: stops the old screen's speech, except a line it said on the way out (`keep`). */
+  leaveScreen() {
+    if (keepLine) keepLine = false;
+    else speech.cancel();
   },
   /** Muted while the parent gate is open (the gate is never spoken). */
   setMuted(on: boolean) {
@@ -441,25 +460,31 @@ export function lineId(text: string): string {
   return h.toString(36);
 }
 
+/** Remembers that a kid heard a 'first' line (pass it as onEnd, so a line cut off is said again next time). */
+export function heardFirst(kidId: string, id: string) {
+  updateKid(kidId, (d) => void (d.firsts.includes(id) || d.firsts.push(id)));
+}
+
 /**
  * Speaks lines the way this kid hears them: the kid's rate (or the band's), the band's pitch, and the
- * voice mode ('off' never auto-speaks; 'first' auto-speaks a line only the first time). `force` is a
- * speaker-button tap, which always speaks. Returns the speech token when something was spoken.
+ * voice mode ('off' never auto-speaks; 'first' auto-speaks a line until it has been heard once). `force`
+ * is a speaker-button tap, which always speaks. Returns the speech token when something was spoken.
  */
-export function sayAs(kid: KidProfile | null | undefined, lines: string[], opts: { force?: boolean } = {}): number | undefined {
+export function sayAs(kid: KidProfile | null | undefined, lines: string[], opts: { force?: boolean; keep?: boolean } = {}): number | undefined {
   const clean = lines.map((l) => l.trim()).filter(Boolean);
   if (!clean.length) return undefined;
   const band = kid?.band ?? 'explorer';
   const t = BAND_TUNING[band];
   const rate = kid?.settings.rate ?? t.speechRate;
   const voice = kid?.settings.voice ?? 'auto';
+  let onEnd: (() => void) | undefined;
   if (!opts.force && kid) {
     if (voice === 'off' || getKid(kid.id)?.settings.muted) return undefined;
     if (voice === 'first') {
       const id = lineId(clean.join(' '));
       if (getKid(kid.id)?.firsts.includes(id)) return undefined;
-      updateKid(kid.id, (d) => void d.firsts.push(id));
+      onEnd = () => heardFirst(kid.id, id);
     }
   }
-  return speech.speak(clean, { rate, pitch: t.pitch, clipRate: kid?.settings.rate ?? undefined });
+  return speech.speak(clean, { rate, pitch: t.pitch, clipRate: kid?.settings.rate ?? undefined, onEnd, keep: opts.keep });
 }

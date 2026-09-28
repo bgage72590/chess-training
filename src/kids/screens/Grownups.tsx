@@ -182,6 +182,14 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
     speech.setPipVoice(id);
     preview();
   };
+  // The picked voice may be another kid's: leaving gives Pip the active kid's voice back.
+  useEffect(
+    () => () => {
+      const all = getKids();
+      speech.setPipVoice(all.kids.find((k) => k.id === all.activeKid)?.settings.pipVoice);
+    },
+    [],
+  );
   const changeBand = (b: AgeBand) => {
     if (b === kid.band) return;
     const reset = window.confirm("Reset this kid's settings to the new age defaults?");

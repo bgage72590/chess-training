@@ -7,6 +7,26 @@ const FONTS = 'tempo-fonts';
 const VOICE = 'tempo-voice';
 const scoped = (path) => new URL(path, self.registration.scope).href;
 
+/** The part of a whole (200) response that a `Range: bytes=a-b` request asks for, as a 206 (Safari needs one for media). */
+async function ranged(req, res) {
+  const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.get('range') ?? '');
+  if (!m || (!m[1] && !m[2]) || res.status !== 200) return res;
+  const body = await res.arrayBuffer();
+  const size = body.byteLength;
+  const start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
+  const end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+  if (start > end) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
+  return new Response(body.slice(start, end + 1), {
+    status: 206,
+    headers: {
+      'Content-Type': res.headers.get('Content-Type') ?? 'audio/mpeg',
+      'Content-Range': `bytes ${start}-${end}/${size}`,
+      'Content-Length': String(end - start + 1),
+      'Accept-Ranges': 'bytes',
+    },
+  });
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
@@ -67,16 +87,21 @@ self.addEventListener('fetch', (event) => {
           .catch(() => undefined),
       );
     } else {
+      // <audio> asks for byte ranges, and a partial (206) response cannot be cached: fetch and keep
+      // the whole clip (by URL, whatever the request headers), and answer ranges from it.
       event.respondWith(
         caches.open(VOICE).then((cache) =>
-          cache.match(req).then(
-            (hit) =>
-              hit ??
-              fetch(req).then((res) => {
-                if (res.ok) void cache.put(req, res.clone());
-                return res;
-              }),
-          ),
+          cache
+            .match(req.url, { ignoreVary: true })
+            .then(
+              (hit) =>
+                hit ??
+                fetch(req.url).then((res) => {
+                  if (res.status === 200) void cache.put(req.url, res.clone());
+                  return res;
+                }),
+            )
+            .then((res) => ranged(req, res)),
         ),
       );
     }

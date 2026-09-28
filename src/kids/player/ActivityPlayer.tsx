@@ -15,7 +15,7 @@ import { kidSound, type KidSound } from '../lib/kidsSound';
 import { toast } from '../../lib/toast';
 import { engine } from '../../engine/engine';
 import { RunPicker, type RunItem } from './run';
-import { lineId, speech } from './speech';
+import { heardFirst, lineId, sayAs, speech } from './speech';
 import { markBreak, onBreak, sessionOver } from './useSession';
 import { useKidCtx } from './context';
 import { Intro, PiecePick } from './Intro';
@@ -138,8 +138,8 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       const speakIt = force || (!k?.settings.muted && (voice === 'auto' || (voice === 'first' && !k?.firsts.includes(id))));
       let token: number | undefined;
       if (speakIt) {
-        token = speech.speak(lines, { rate, pitch: tuning.pitch, clipRate: kid.settings.rate ?? undefined });
-        if (voice === 'first' && !force && !k?.firsts.includes(id)) updateKid(kid.id, (d) => void d.firsts.push(id));
+        const onEnd = voice === 'first' && !force ? () => heardFirst(kid.id, id) : undefined;
+        token = speech.speak(lines, { rate, pitch: tuning.pitch, clipRate: kid.settings.rate ?? undefined, onEnd });
       } else speech.cancel();
       setCoach({ text: caption, lines, token });
       if (m) setMoodFor(m, m === 'cheer' ? 1200 : 1800);
@@ -147,6 +147,8 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [band, kid.id, kid.settings.voice, rate, tuning.pitch],
   );
+  // Pip's demo and the piece parade are read aloud every time, except in Quiet mode or with "Speaker button only".
+  const sayDemo = (t: string, m?: PipMood) => say(t, m, kid.settings.voice !== 'off' && !getKid(kid.id)?.settings.muted);
 
   // ---------- per-item state ----------
   const [hintLevel, setHintLevel] = useState<0 | 1 | 2 | 3 | 4>(0);
@@ -567,7 +569,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
                   icon="leaf"
                   onClick={() => {
                     updateKid(kid.id, (d) => skipNode(d, node!.id));
-                    say("We'll come back to this one later!");
+                    sayAs(kid, ["We'll come back to this one later!"], { keep: true });
                     go.map();
                   }}
                 >
@@ -642,12 +644,12 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
           <Coach text={coach.text} mood={mood} token={coach.token} size={band === 'sprout' ? 80 : 72} />
         </aside>
         <main className="k-player-main" data-item={current?.run.id} data-set={current?.run.setId} data-phase={phase}>
-          {phase === 'intro' && <Intro steps={watchSteps} band={band} rate={rate} onSay={(t) => say(t, 'talk', true)} onDone={() => setPhase('item')} />}
+          {phase === 'intro' && <Intro steps={watchSteps} band={band} rate={rate} onSay={(t) => sayDemo(t, 'talk')} onDone={() => setPhase('item')} />}
           {phase === 'parade' && pickStep?.pick && (
             <PiecePick
               pick={pickStep.pick}
               band={band}
-              onSay={(t, m) => say(t, m, true)}
+              onSay={sayDemo}
               onDone={() => {
                 setPhase('item');
                 nextItem();

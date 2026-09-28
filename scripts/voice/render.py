@@ -21,6 +21,9 @@ To record in several places at once, give each a share of the lines and --part N
 only those, writes manifest.NAME.json and removes nothing. The next full run folds the parts in.
 Only lines without a clip of this VERSION are recorded; clips for lines that are gone are removed.
 --out DIR writes somewhere else (e.g. to try voices on a few sample lines).
+
+Each clip keeps PAD of quiet before and after the words (voices can start with a second of silence,
+which puts the read-along highlight ahead of the voice); retrim.py trims clips recorded before that.
 """
 import argparse, base64, io, json, os, sys, time, wave
 from multiprocessing import Pool
@@ -33,6 +36,8 @@ ENGINES = {
     'google': {'voice': 'en-US-Chirp3-HD-Leda', 'speed': 0.95},
 }
 BITRATE = 64
+PAD = 0.08  # seconds of quiet kept before and after the words
+TRIM = f'@trim{round(PAD * 1000)}'  # in the version of trimmed recordings
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'public', 'voice')
 MASTER = os.path.join(os.path.dirname(__file__), 'voices.json')
 PUBLIC_ROOT = OUT
@@ -47,8 +52,8 @@ _k = None
 def version():
     """Changing any of these re-records every clip (and the app drops cached clips of another version)."""
     if ENGINE == 'kokoro':
-        return f"{VOICE}@{ENGINES['kokoro']['model']}@{SPEED}@{BITRATE}k"
-    return f'{ENGINE}:{VOICE}@{SPEED}@{BITRATE}k'
+        return f"{VOICE}@{ENGINES['kokoro']['model']}@{SPEED}@{BITRATE}k{TRIM}"
+    return f'{ENGINE}:{VOICE}@{SPEED}@{BITRATE}k{TRIM}'
 
 
 def init_kokoro(model_dir):
@@ -97,22 +102,56 @@ def speak_google(text, use_rate=True):
     return pcm, sr
 
 
-def render(line):
+def trim(audio, sr):
+    """Cuts the silence before and after the words, keeping PAD at each end (adding silence where the
+    recording has less). Words are the 10 ms stretches within 40 dB of the loudest, measured twice:
+    without the inaudible rumble below ~100 Hz some voices start with, and tilted toward high
+    pitches, so a soft 'f', 's' or 'h' counts. The cut ends fade over 10 ms, so they never click."""
+    import numpy as np
+    x = np.asarray(audio, dtype=np.float32)
+    w, pad = sr // 100, int(sr * PAD)
+    n = len(x) // w
+    if not n:
+        return x
+    f = np.fft.rfftfreq(len(x), 1 / sr)
+    no_rumble = np.fft.irfft(np.fft.rfft(x) * np.clip((f - 60) / 60, 0, 1), len(x))
+    tilted = np.diff(x, prepend=x[:1])
+
+    def loud(y):
+        p = np.convolve(np.mean(y[: n * w].reshape(n, w) ** 2, axis=1), np.ones(3) / 3, 'same')  # over 30 ms: a click is no word
+        return p > p.max() * 1e-4
+
+    words = np.flatnonzero(loud(no_rumble) | loud(tilted))
+    if not len(words):
+        return x
+    start, end = words[0] * w, (words[-1] + 1) * w
+    a, b = max(0, start - pad), min(len(x), end + pad)
+    out = x[a:b].copy()
+    fade_in, fade_out = min(w, start - a), min(w, b - end)
+    out[:fade_in] *= np.linspace(0, 1, fade_in, dtype=np.float32)
+    out[len(out) - fade_out:] *= np.linspace(1, 0, fade_out, dtype=np.float32)
+    silence = lambda k: np.zeros(k, dtype=np.float32)
+    return np.concatenate([silence(pad - (start - a)), out, silence(pad - (b - end))])
+
+
+def encode(audio, sr, bitrate=BITRATE):
     import numpy as np, lameenc
-    samples, sr = speak_kokoro(line['text']) if ENGINE == 'kokoro' else speak_google(line['text'])
-    # 80 ms of silence at each end, so clips never click or clip words.
-    pad = np.zeros(int(sr * 0.08), dtype=np.float32)
-    audio = np.concatenate([pad, samples.astype(np.float32), pad])
-    peak = float(np.max(np.abs(audio))) or 1.0
-    audio = audio * min(1.0, 0.89 / peak)
     enc = lameenc.Encoder()
-    enc.set_bit_rate(BITRATE)
+    enc.set_bit_rate(bitrate)
     enc.set_in_sample_rate(sr)
     enc.set_channels(1)
     enc.set_quality(2)
-    mp3 = enc.encode((audio * 32767).astype(np.int16).tobytes()) + enc.flush()
+    return enc.encode((np.clip(audio, -1, 1) * 32767).astype(np.int16).tobytes()) + enc.flush()
+
+
+def render(line):
+    import numpy as np
+    samples, sr = speak_kokoro(line['text']) if ENGINE == 'kokoro' else speak_google(line['text'])
+    audio = trim(samples, sr)
+    peak = float(np.max(np.abs(audio))) or 1.0
+    audio = audio * min(1.0, 0.89 / peak)
     with open(os.path.join(OUT, line['key'] + '.mp3'), 'wb') as f:
-        f.write(mp3)
+        f.write(encode(audio, sr))
     return line['key'], round(len(audio) / sr * 1000)
 
 
