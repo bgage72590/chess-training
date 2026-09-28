@@ -1348,6 +1348,35 @@ button.feedback:hover {
   .toast {
     animation-name: toast-drop;
   }
+  /* A notice with a button sits over the top bar, one line high, clear of the board. */
+  .toasts:has(.toast-closable) {
+    top: calc(4px + env(safe-area-inset-top, 0px));
+  }
+  .toast-closable {
+    align-items: center;
+    padding: 6px 8px 6px 10px;
+  }
+  .toast-closable .toast-icon,
+  .toast-closable .toast-body {
+    display: none;
+  }
+  .toast-closable > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    min-width: 0;
+  }
+  .toast-closable .toast-title {
+    font-size: 0.92rem;
+    line-height: 1.2;
+  }
+  .toast-closable .toast-action {
+    margin-top: 0;
+  }
+  .toast-closable .toast-close {
+    margin: 0 0 0 auto;
+  }
 }
 @keyframes toast-drop {
   from {

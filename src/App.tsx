@@ -124,7 +124,7 @@ function Toasts() {
   return (
     <div className="toasts" aria-live="polite">
       {toasts.map((t) => (
-        <div key={t.id} className={`toast toast-${t.tone}`}>
+        <div key={t.id} className={`toast toast-${t.tone}${t.closable ? ' toast-closable' : ''}`}>
           <span className="toast-icon">
             <Icon name={t.icon ?? 'star'} size={18} />
           </span>

@@ -46,7 +46,7 @@ function serviceWorker(): Plugin {
 
 /** What the app is built from. A commit that touches none of it (Pip's clips, docs, tests)
  *  builds the same app, so installed copies are not updated for it. */
-const APP_INPUTS = ['--', 'src', 'public', 'index.html', 'package.json', 'package-lock.json', 'vite.config.ts', ':(exclude)public/voice'];
+const APP_INPUTS = ['--', 'src', 'public', 'index.html', 'package.json', 'package-lock.json', 'vite.config.ts', 'tsconfig.json', 'tsconfig.app.json', 'scripts/copy-engine.mjs', ':(exclude)public/voice'];
 
 const git = (args: string[]) => {
   try {
@@ -62,7 +62,7 @@ const git = (args: string[]) => {
  * the same app always builds the same files.
  */
 function buildLabel(mode: string) {
-  const last = git(['log', '-1', '--format=%cd · %h', '--date=format-local:%Y-%m-%d %H:%M UTC', ...APP_INPUTS]) || 'development';
+  const last = git(['log', '-1', '--abbrev=7', '--format=%cd · %h', '--date=format-local:%Y-%m-%d %H:%M UTC', ...APP_INPUTS]) || 'development';
   const changed = git(['status', '--porcelain', ...APP_INPUTS]) ? ' + local changes' : '';
   return `${last}${changed}${mode === 'single' ? ' · claude.ai copy' : ''}`;
 }

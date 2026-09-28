@@ -19,10 +19,22 @@ export function updateTookOver() {
   onNextRouteChange(() => location.reload());
   // Kids mode only reloads at the next screen: its notices are for the kids.
   if (location.hash.startsWith('#/kids')) return;
-  toast({ title: 'A new version of Tempo is ready', body: 'It opens when you go to another screen.', icon: 'refresh', action: { label: 'Reload now', run: () => location.reload() }, closable: true }, 0);
+  // A game in progress is not saved, so reloading from the notice ends it.
+  const game = location.hash.startsWith('#/play');
+  toast(
+    {
+      title: 'A new version of Tempo is ready',
+      body: game ? 'It opens when you leave this game.' : 'It opens when you go to another screen.',
+      icon: 'refresh',
+      action: { label: game ? 'Reload now (ends the game)' : 'Reload now', run: () => location.reload() },
+      closable: true,
+    },
+    20_000,
+  );
 }
 
-/** Resolves once `w` has finished activating: from then on the caches hold only its version. */
+/** Resolves once `w` has finished activating: from then on the caches hold only its version. An
+ *  activating worker always ends 'activated' or 'redundant', however long its activation takes. */
 function activated(w: ServiceWorker | null): Promise<void> {
   return new Promise((done) => {
     const settled = () => !w || w.state === 'activated' || w.state === 'redundant';
@@ -33,13 +45,12 @@ function activated(w: ServiceWorker | null): Promise<void> {
       done();
     };
     w!.addEventListener('statechange', check);
-    setTimeout(done, 10_000);
   });
 }
 
 /** This page's own scripts and style sheets. */
 function pageFiles(script: string): string[] {
-  const loaded = [...document.querySelectorAll<HTMLScriptElement | HTMLLinkElement>('script[src], link[rel="stylesheet"][href]')].map((e) => (e instanceof HTMLScriptElement ? e.src : e.href));
+  const loaded = [...document.querySelectorAll<HTMLScriptElement | HTMLLinkElement>('script[src], link[rel="stylesheet"][href]')].map((e) => ('src' in e ? e.src : e.href));
   return [...new Set([script, ...loaded])].filter((u) => new URL(u, location.href).origin === location.origin);
 }
 
@@ -77,6 +88,9 @@ export function watchForUpdates(reg: ServiceWorkerRegistration, script = import.
  */
 export function recoverFromMissingFiles() {
   window.addEventListener('vite:preloadError', () => {
+    // Offline without the offline copy, a reload would only show the browser's error page: Kids
+    // mode says what happened instead.
+    if (navigator.onLine === false && !navigator.serviceWorker?.controller) return;
     try {
       if (Date.now() - Number(sessionStorage.getItem(RELOADED_KEY) ?? 0) < 60_000) return;
       sessionStorage.setItem(RELOADED_KEY, String(Date.now()));

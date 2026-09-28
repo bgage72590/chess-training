@@ -107,11 +107,12 @@ describe('an open app picks up a new version', () => {
   /** A service worker container; `release()` plays a new worker taking over the way browsers do it. */
   function browser(controlled: boolean) {
     const sw = Object.assign(new EventTarget(), { controller: (controlled ? { state: 'activated' } : null) as unknown });
-    const release = async (from: string | null, to: string) => {
+    /** `to` names the new version's cache; `files` are its files (by default the script `to`). */
+    const release = async (from: string | null, to: string, files = [to]) => {
       // The page gets its new controller while the worker is still activating, before its activate
       // step removes the other versions' caches.
       const worker = Object.assign(new EventTarget(), { state: 'activating' });
-      caches.set(to, new Set([to]));
+      caches.set(to, new Set(files));
       sw.controller = worker;
       sw.dispatchEvent(new Event('controllerchange'));
       await vi.advanceTimersByTimeAsync(0);
@@ -133,8 +134,8 @@ describe('an open app picks up a new version', () => {
     await release(OLD, NEW);
     expect(toast).toHaveBeenCalledTimes(1);
     const notice = vi.mocked(toast).mock.calls[0];
-    expect(notice[0]).toMatchObject({ title: 'A new version of Tempo is ready', closable: true, action: { label: 'Reload now' } });
-    expect(notice[1]).toBe(0); // stays until closed
+    // On the Play screen the button says it ends the game (games in progress are not saved).
+    expect(notice[0]).toMatchObject({ title: 'A new version of Tempo is ready', body: 'It opens when you leave this game.', closable: true, action: { label: 'Reload now (ends the game)' } });
     expect(win.location.reload).not.toHaveBeenCalled(); // not in the middle of a game
     navigate('puzzles'); // the app's own navigation (pushState), no hashchange
     expect(win.location.reload).toHaveBeenCalledTimes(1);
@@ -145,6 +146,35 @@ describe('an open app picks up a new version', () => {
     // A second release before the reload does not stack notices.
     await release(NEW, 'https://app.test/assets/index-newer.js');
     expect(toast).toHaveBeenCalledTimes(1);
+  });
+
+  it("a page whose style sheet changed is older too; other sites' files do not count", async () => {
+    const { watchForUpdates } = await import('../src/pwa/update');
+    const { navigate } = await import('../src/router');
+    const [css1, css2] = ['https://app.test/assets/index-1.css', 'https://app.test/assets/index-2.css'];
+    const fonts = { href: 'https://fonts.googleapis.com/css2?family=Newsreader' }; // never cached by the app
+    doc.querySelectorAll = () => [{ src: NEW }, { href: css1 }, fonts];
+    win.location.hash = '#/puzzles';
+    // Only the styles changed: the page has the same script as the new version, but not its style sheet.
+    caches.set('v1', new Set([NEW, css1]));
+    const first = browser(true);
+    watchForUpdates(reg(), NEW, first.sw);
+    await first.release('v1', 'v2', [NEW, css2]);
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast).mock.calls[0][0]).toMatchObject({ body: 'It opens when you go to another screen.', action: { label: 'Reload now' } });
+    navigate('learn');
+    expect(win.location.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('a release that changes nothing on this page (and the fonts from another site) raises no notice', async () => {
+    const { watchForUpdates } = await import('../src/pwa/update');
+    const css = 'https://app.test/assets/index-1.css';
+    doc.querySelectorAll = () => [{ src: NEW }, { href: css }, { href: 'https://fonts.googleapis.com/css2?family=Newsreader' }];
+    caches.set('v1', new Set([NEW, css]));
+    const { sw, release } = browser(true);
+    watchForUpdates(reg(), NEW, sw);
+    await release('v1', 'v2', [NEW, css, 'https://app.test/engine/stockfish.js']);
+    expect(toast).not.toHaveBeenCalled();
   });
 
   it('a page opened after the release is already current: no notice, no reload', async () => {
@@ -208,6 +238,11 @@ describe('an open app picks up a new version', () => {
     win.dispatchEvent(new Event('vite:preloadError'));
     expect(win.location.reload).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(61_000);
+    win.dispatchEvent(new Event('vite:preloadError'));
+    expect(win.location.reload).toHaveBeenCalledTimes(2);
+    // Offline without the offline copy, a reload would only show the browser's error page.
+    await vi.advanceTimersByTimeAsync(61_000);
+    vi.stubGlobal('navigator', { onLine: false });
     win.dispatchEvent(new Event('vite:preloadError'));
     expect(win.location.reload).toHaveBeenCalledTimes(2);
   });
