@@ -1,1 +1,19 @@
-{ "default": "sunny", "voices": [] }
+{
+  "default": "sunny",
+  "voices": [
+    {
+      "id": "sunny",
+      "name": "Sunny",
+      "blurb": "Bright and cheerful",
+      "engine": "google",
+      "voice": "en-US-Chirp3-HD-Leda"
+    },
+    {
+      "id": "breezy",
+      "name": "Breezy",
+      "blurb": "Relaxed and easygoing",
+      "engine": "google",
+      "voice": "en-US-Chirp3-HD-Aoede"
+    }
+  ]
+}
