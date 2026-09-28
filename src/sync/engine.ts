@@ -1,7 +1,9 @@
 // Keeps this device's progress and the synced copy in step. A sync pulls the copy, merges
 // it with local data part by part, applies any change locally, and pushes the merged
 // result with a version check; if another device wrote in between, it pulls and merges
-// again. Merges only ever add progress, so syncing from several devices is safe.
+// again. Merges only ever add progress (or apply a reset), so syncing from several devices is
+// safe. A copy that disappears after syncing was deleted on another device: this device then
+// stops syncing rather than upload it again.
 import type { SyncBackend } from './backend';
 
 /** One piece of synced data (the grown-up profile, the kids' profiles...). */
@@ -9,12 +11,17 @@ export interface SyncPart<T = unknown> {
   key: string;
   read(): T;
   write(value: T): void;
-  merge(local: T, remote: T): T;
-  /** Brings data from older app versions up to date before merging. */
-  normalize?(value: unknown): T;
+  /** `joining`: this device's first sync with the copy. Resets made there before it joined do not
+   *  apply to its own progress then. */
+  merge(local: T, remote: T, joining: boolean): T;
+  /** Brings data from older app versions up to date before merging. `parts`: the whole synced
+   *  copy, for data a part keeps in a part of its own. */
+  normalize?(value: unknown, parts: Record<string, unknown>): T;
 }
 
 export type SyncStatus = 'off' | 'syncing' | 'synced' | 'offline' | 'error';
+
+export const COPY_DELETED = 'The synced copy was deleted on another device, so this device stopped syncing. Its progress is still here.';
 
 export interface SyncSnapshot {
   status: SyncStatus;
@@ -48,6 +55,7 @@ export class SyncEngine {
   private again = false;
   private applying = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private deleting = false;
 
   constructor(
     private backend: SyncBackend,
@@ -83,22 +91,38 @@ export class SyncEngine {
     if (!this.parts.some((p) => p.key === part.key)) this.parts.push(part);
   }
 
-  /** Starts syncing this device with an existing code (merging both sides) or a new one. */
-  async link(code: string) {
+  /**
+   * Starts syncing this device with a code: a new one (the first sync creates the copy) or, with
+   * `mustExist`, another device's. Then it resolves to false, linking nothing, when no copy has
+   * that code (a typo), and throws when the sync service cannot be reached to check.
+   */
+  async link(code: string, { mustExist = false } = {}): Promise<boolean> {
+    if (mustExist && !(await this.backend.get(code))) return false;
     this.set({ code, status: 'syncing', error: null, lastSyncedAt: null });
+    await this.running; // a sync for the previous code stops early
     await this.syncNow();
+    return true;
   }
 
-  /** Stops syncing on this device; local progress stays. */
-  unlink() {
+  /** Stops syncing on this device; local progress stays. `error` says why, if it was not asked for. */
+  unlink(error: string | null = null) {
+    if (this.timer) clearTimeout(this.timer);
     this.storage.save(null);
-    this.snap = { status: 'off', code: null, lastSyncedAt: null, error: null };
+    this.snap = { status: 'off', code: null, lastSyncedAt: null, error };
     this.listeners.forEach((l) => l());
   }
 
-  /** Deletes the synced copy for everyone, then unlinks. */
+  /** Deletes the synced copy for everyone, then unlinks. Throws, staying linked, if that fails. */
   async deleteCopy() {
-    if (this.snap.code) await this.backend.remove(this.snap.code);
+    const code = this.snap.code;
+    if (!code) return;
+    this.deleting = true; // no new syncs meanwhile (one could re-create the copy)
+    try {
+      await this.running;
+      await this.backend.remove(code);
+    } finally {
+      this.deleting = false;
+    }
     this.unlink();
   }
 
@@ -110,7 +134,7 @@ export class SyncEngine {
   }
 
   syncNow(): Promise<void> {
-    if (!this.snap.code) return Promise.resolve();
+    if (!this.snap.code || this.deleting) return Promise.resolve();
     if (this.running) {
       this.again = true;
       return this.running;
@@ -133,13 +157,17 @@ export class SyncEngine {
       for (let attempt = 0; attempt < 5; attempt++) {
         const remote = await this.backend.get(code);
         if (this.snap.code !== code) return; // unlinked meanwhile
+        // Synced before but gone now: deleted on another device. Only a device's first sync with a
+        // code creates the copy.
+        const joining = !this.snap.lastSyncedAt;
+        if (!remote && !joining) return this.unlink(COPY_DELETED);
         const remoteParts = (remote?.data as Payload | undefined)?.parts ?? {};
         const merged: Record<string, unknown> = {};
         let differsFromRemote = !remote;
         for (const part of this.parts) {
           const local = part.read();
-          const theirs = part.key in remoteParts ? (part.normalize ? part.normalize(remoteParts[part.key]) : remoteParts[part.key]) : undefined;
-          const value = theirs === undefined ? local : part.merge(local, theirs);
+          const theirs = part.key in remoteParts ? (part.normalize ? part.normalize(remoteParts[part.key], remoteParts) : remoteParts[part.key]) : undefined;
+          const value = theirs === undefined ? local : part.merge(local, theirs, joining);
           if (stable(value) !== stable(local)) {
             this.applying = true;
             try {

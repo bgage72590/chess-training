@@ -9,6 +9,9 @@
 --    grants). The app can only call the three SECURITY DEFINER functions below.
 --  * sync_put is a compare-and-swap on `version`, so two devices cannot overwrite each
 --    other: the loser pulls, merges and retries.
+--  * sync_delete removes a copy for good. The app creates a copy (base_version 0) only on a
+--    device's first sync with a new code, and joining with a code needs an existing copy, so a
+--    device that synced with a deleted copy stops syncing instead of re-creating it.
 
 create extension if not exists pgcrypto with schema extensions;
 

@@ -1,20 +1,33 @@
 // Cross-device sync wiring: the engine instance, the parts it syncs, and when it runs.
 import { useSyncExternalStore } from 'react';
+import { toast } from '../lib/toast';
 import { SYNC_KEY, SYNC_URL } from './config';
 import { supabaseBackend } from './backend';
 import { SyncEngine, type SyncPart } from './engine';
-import { mergeProfiles } from './merge';
+import { joiningCopy, mergeProfiles } from './merge';
+import { maxTally, readTally } from './tally';
 import { getProfile, normalizeProfile, replaceProfile, subscribeProfile, type Profile } from '../store/profile';
 
 /** Sync needs a configured backend, and is left to the host inside claude.ai (single-file build). */
 export const syncAvailable = !!SYNC_URL && !!SYNC_KEY && import.meta.env.MODE !== 'single' && typeof window !== 'undefined' && window.top === window.self;
 
+/**
+ * A part that mirrors the tallies (tally.ts) kept inside another part. Older app versions drop or
+ * outdate those while merging, but pass parts they do not know on untouched; the other part's
+ * normalize folds this one back in. It is read after that part is merged, so it is up to date.
+ */
+export const tallyPart = <T>(key: string, read: () => T): SyncPart<T> => ({ key, read, write: () => undefined, merge: (local) => local });
+
+const PROFILE_TALLY = 'profile-tally';
 const profilePart: SyncPart<Profile> = {
   key: 'profile',
   read: getProfile,
   write: (p) => replaceProfile(p, { keepTimestamp: true }),
-  merge: (a, b) => normalizeProfile(mergeProfiles(a, b)),
-  normalize: (v) => normalizeProfile(v as Partial<Profile>),
+  merge: (a, b, joining) => normalizeProfile(mergeProfiles(joining ? joiningCopy(a, b) : a, b)),
+  normalize: (v, parts) => {
+    const p = normalizeProfile(v as Partial<Profile>);
+    return { ...p, tally: maxTally(p.tally, readTally(parts[PROFILE_TALLY])) };
+  },
 };
 
 const STORE_KEY = 'tempo.sync.v1';
@@ -36,13 +49,18 @@ const storage = {
   },
 };
 
-export const sync = new SyncEngine(supabaseBackend(SYNC_URL, SYNC_KEY), [profilePart], storage, () => navigator.onLine);
+export const sync = new SyncEngine(supabaseBackend(SYNC_URL, SYNC_KEY), [profilePart, tallyPart(PROFILE_TALLY, () => getProfile().tally ?? {})], storage, () => navigator.onLine);
 
 /** Other modules (e.g. Kids mode) register their data here to be synced too. */
 export const addSyncPart = (part: SyncPart) => sync.addPart(part);
 
 export function startSync() {
   if (!syncAvailable) return;
+  // Sync stops by itself only when the copy was deleted on another device: say so.
+  sync.subscribe(() => {
+    const { code, error } = sync.snapshot;
+    if (!code && error) toast({ title: 'Sync stopped on this device', body: error, icon: 'x', tone: 'bad' }, 9000);
+  });
   subscribeProfile(() => {
     if (!sync.isApplying) sync.schedule();
   });

@@ -9,6 +9,8 @@ import type { AgeBand } from '../activities/types';
 import { BAND_TUNING, BANDS } from '../curriculum/tuning';
 import { AVATAR_COLORS, FACES, HATS, type AvatarColor, type FaceId, type HatId } from '../curriculum/wardrobe';
 import type { BuddyId } from '../curriculum/buddies';
+import { deviceId } from '../../sync/device';
+import { filterTally, readTally, tallyGrowth, type Counts, type Tally } from '../../sync/tally';
 
 export const KIDS_KEY = 'tempo.kids.v1';
 export const MAX_KIDS = 8;
@@ -20,7 +22,9 @@ export interface KidsState {
   v: 1;
   activeKid: string | null;
   kids: KidProfile[];
-  family: { stars: number; parties: number };
+  /** The family star jar. `tally`: what each device added (sync/tally.ts), so stars earned on two
+   *  devices at once add up. */
+  family: { stars: number; parties: number; tally?: Tally };
   device: { pinSalt?: string; pinHash?: string; voiceURI?: string };
   updatedAt: number;
   /** Deleted kids (id -> when), so syncing another device does not bring them back. */
@@ -53,6 +57,12 @@ export interface KidProfile {
   testedOut?: number;
   /** The play session (spec 10.5): persisted so a re-pick or a reload never resets the limit. */
   session?: KidSession;
+  /** Last change to the name, avatar, age group or settings (ms): syncing keeps the latest ones. */
+  settingsAt?: number;
+  /** Last progress reset by a grown-up (ms). Syncing drops older progress from copies that missed it. */
+  resetAt?: number;
+  /** What each device added to the day minutes and stars (see kidCounters). */
+  tally?: Tally;
 }
 
 export interface KidSession {
@@ -313,7 +323,21 @@ function normalizeKid(x: unknown): KidProfile | null {
     if (typeof se.breakAt === 'number' && Number.isFinite(se.breakAt)) kid.session.breakAt = se.breakAt;
   }
   if (isObj(x.graduated)) kid.graduated = { t: num(x.graduated.t, Date.now()), form: oneOf(x.graduated.form, ['queen', 'king'] as const, 'queen') };
+  if (typeof x.settingsAt === 'number') kid.settingsAt = num(x.settingsAt, 0, 0);
+  if (typeof x.resetAt === 'number') kid.resetAt = num(x.resetAt, 0, 0);
+  const tally = readTally(x.tally);
+  if (tally) kid.tally = tally;
   return kid;
+}
+
+/** A kid's counters that add up across devices: minutes and stars per day ('YYYY-MM-DD.minutes'). */
+export function kidCounters(k: KidProfile): Counts {
+  const c: Counts = {};
+  for (const [day, d] of Object.entries(k.days)) {
+    c[`${day}.minutes`] = d.minutes;
+    c[`${day}.stars`] = d.stars;
+  }
+  return c;
 }
 
 /** Validates and repairs stored or imported kids data. Anything unusable becomes the empty default. */
@@ -335,6 +359,8 @@ export function normalizeKids(raw: unknown): KidsState {
   if (typeof dev.voiceURI === 'string') device.voiceURI = dev.voiceURI;
   const activeKid = typeof raw.activeKid === 'string' && kids.some((k) => k.id === raw.activeKid) ? raw.activeKid : null;
   const out: KidsState = { v: 1, activeKid, kids, family: { stars: num(fam.stars, 0, 0), parties: num(fam.parties, 0, 0) }, device, updatedAt: num(raw.updatedAt, 0, 0) };
+  const famTally = readTally(fam.tally);
+  if (famTally) out.family.tally = famTally;
   const removed = numMap(raw.removed);
   if (Object.keys(removed).length) out.removed = removed;
   return out;
@@ -346,6 +372,9 @@ export function pruneForSave(s: KidsState): KidsState {
     if (k.puzzle.seen.length > SEEN_MAX) k.puzzle.seen = k.puzzle.seen.slice(-SEEN_MAX);
     const keys = Object.keys(k.days).sort();
     if (keys.length > DAYS_MAX) for (const d of keys.slice(0, keys.length - DAYS_MAX)) delete k.days[d];
+    const tally = filterTally(k.tally, (key) => key.slice(0, 10) in k.days);
+    if (tally) k.tally = tally;
+    else delete k.tally;
     if (k.firsts.length > FIRSTS_MAX) k.firsts = k.firsts.slice(-FIRSTS_MAX);
   }
   return s;
@@ -435,8 +464,15 @@ if (typeof window !== 'undefined') {
   }
 }
 
+/** A kid's grown-up choices, which sync by settingsAt rather than by the latest play. */
+const choices = (k: KidProfile) => JSON.stringify([k.name, k.avatar, k.band, k.settings]);
+
 function commit(next: KidsState) {
   next.updatedAt = Date.now();
+  for (const k of next.kids) {
+    const prev = getKid(k.id);
+    if (prev && choices(prev) !== choices(k)) k.settingsAt = next.updatedAt;
+  }
   state = pruneForSave(next);
   saveFailed = !writeKids(state);
   emit();
@@ -477,6 +513,15 @@ export function replaceKids(next: KidsState) {
 export function updateKids(fn: (draft: KidsState) => void) {
   const next = structuredClone(state);
   fn(next);
+  // Record what this device added, so the same day on another device adds to it when they sync.
+  const dev = deviceId();
+  for (const k of next.kids) {
+    const prev = getKid(k.id);
+    const tally = prev && tallyGrowth(k.tally, dev, kidCounters(prev), kidCounters(k));
+    if (tally) k.tally = tally;
+  }
+  const family = tallyGrowth(next.family.tally, dev, { stars: state.family.stars }, { stars: next.family.stars });
+  if (family) next.family.tally = family;
   commit(next);
 }
 
@@ -505,11 +550,12 @@ export function awardTo(kidId: string, id: string): boolean {
   return true;
 }
 
+/** The active kid is this device's choice and never syncs, so picking one is not a synced change. */
 export function setActiveKid(id: string | null) {
   if (state.activeKid === id) return;
-  updateKids((d) => {
-    d.activeKid = id;
-  });
+  state = { ...state, activeKid: id };
+  saveFailed = !writeKids(state);
+  emit();
 }
 
 const subscribe = (l: () => void) => {

@@ -4,6 +4,8 @@ import { useSyncExternalStore } from 'react';
 import { dayKey, daysBetween } from '../lib/srs';
 import { RD_START } from '../lib/rating';
 import type { SrsCard } from '../lib/srs';
+import { deviceId } from '../sync/device';
+import { readTally, tallyGrowth, type Counts, type Tally } from '../sync/tally';
 
 export type BoardTheme = 'slate' | 'walnut' | 'marble' | 'tourney' | 'ink' | 'rose';
 /** Piece artwork: the classic flat set, or rendered 3D Staunton pieces. */
@@ -112,6 +114,11 @@ export interface Profile {
   settingsAt?: number;
   /** Look version: 1 = the walnut board and 3D pieces became the defaults. */
   look?: number;
+  /** What each device added to the counters (see counters()), so progress made on two devices
+   *  between syncs adds up when they merge. */
+  tally?: Tally;
+  /** Last progress reset (ms). Syncing drops older progress from copies that missed it. */
+  resetAt?: number;
 }
 
 const KEY = 'tempo.profile.v1';
@@ -155,6 +162,7 @@ export function normalizeProfile(p: Partial<Profile>): Profile {
     settings,
     puzzles: { ...base.puzzles, ...p.puzzles },
     streak: { ...base.streak, ...p.streak },
+    tally: readTally(p.tally),
     // Profiles from before level tracking: do not announce levels reached long ago.
     levelSeen: p.levelSeen ?? levelFromXp(p.xp ?? 0).level,
   };
@@ -197,6 +205,8 @@ export function updateProfile(fn: (draft: Profile) => void) {
   fn(next);
   next.updatedAt = Date.now();
   if (JSON.stringify(next.settings) !== JSON.stringify(state.settings)) next.settingsAt = next.updatedAt;
+  const tally = tallyGrowth(next.tally, deviceId(), counters(state), counters(next));
+  if (tally) next.tally = tally;
   state = next;
   persist();
   listeners.forEach((l) => l());
@@ -224,7 +234,15 @@ export function useSettings(): Settings {
   return useProfile().settings;
 }
 
-const emptyDay = (): DayLog => ({ xp: 0, puzzles: 0, lessons: 0, lines: 0, drills: 0, games: 0, vision: 0 });
+export const emptyDay = (): DayLog => ({ xp: 0, puzzles: 0, lessons: 0, lines: 0, drills: 0, games: 0, vision: 0 });
+
+/** The counters that add up across devices: puzzle attempts and solves, and every day log field
+ *  (keyed 'YYYY-MM-DD.field'). Total XP is the sum of the days' XP. */
+export function counters(p: Profile): Counts {
+  const c: Counts = { attempts: p.puzzles.attempts, solved: p.puzzles.solved };
+  for (const [day, log] of Object.entries(p.days)) for (const [f, v] of Object.entries(log)) if (typeof v === 'number') c[`${day}.${f}`] = v;
+  return c;
+}
 
 /** Records training activity: adds XP, bumps the day's counters and maintains the streak. */
 export function logActivity(d: Profile, xp: number, kind?: keyof Omit<DayLog, 'xp'>, count = 1) {

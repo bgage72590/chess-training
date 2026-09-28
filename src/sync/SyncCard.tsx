@@ -46,6 +46,36 @@ const STATUS: Record<string, string> = {
   error: 'Could not reach the sync service; it will try again.',
 };
 
+/**
+ * Links this device and says how it went: `join` links to another device's copy (a code with no
+ * copy is refused), otherwise the code is new and the first sync creates the copy. Resolves to
+ * whether the device is now linked.
+ */
+export async function linkDevice(code: string, join: boolean): Promise<boolean> {
+  const bad = { icon: 'x', tone: 'bad' } as const;
+  try {
+    if (!(await sync.link(code, { mustExist: join }))) {
+      toast({ title: 'No synced copy found for this code', body: 'Check the code and try again.', ...bad });
+      return false;
+    }
+  } catch {
+    toast({ title: 'Could not reach the sync service', body: 'Check your connection and try again.', ...bad });
+    return false;
+  }
+  // Linking clears lastSyncedAt, so it is set only if the first sync went through.
+  if (sync.snapshot.lastSyncedAt) toast({ title: join ? 'Device linked' : 'Sync is on', body: 'Progress on this device now follows the synced copy.', icon: 'check', tone: 'good' });
+  else toast({ title: 'Sync code saved', body: "The sync service can't be reached yet; this device will keep trying.", ...bad });
+  return true;
+}
+
+/** Deletes the synced copy for every device and says how it went (it fails when offline). */
+export function deleteSyncedCopy(): Promise<void> {
+  return sync.deleteCopy().then(
+    () => toast({ title: 'Synced copy deleted', body: 'Progress on this device stays here.', icon: 'check', tone: 'good' }),
+    () => toast({ title: 'Could not delete the synced copy', body: 'Check your connection and try again.', icon: 'x', tone: 'bad' }),
+  );
+}
+
 /** Settings section: sync progress across devices with a private sync code. */
 export function SyncCard() {
   const s = useSync();
@@ -55,10 +85,6 @@ export function SyncCard() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   if (!syncAvailable) return null;
 
-  const link = async (code: string) => {
-    await sync.link(code);
-    toast({ title: 'Sync is on', body: 'Progress on this device now follows the synced copy.', icon: 'check', tone: 'good' });
-  };
   const copy = async (text: string, what: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -75,9 +101,10 @@ export function SyncCard() {
         <p className="muted">
           Keep your progress, and your kids&rsquo; progress, on every phone, tablet and computer. No account or email needed: Tempo gives you a private sync code.
         </p>
+        {s.error && <Feedback tone="warn" icon="x" title="Sync stopped" body={s.error} />}
         {!joining ? (
           <div className="btn-row">
-            <Button variant="primary" icon="repeat" onClick={() => void link(newSyncCode())}>
+            <Button variant="primary" icon="repeat" onClick={() => void linkDevice(newSyncCode(), false)}>
               Turn on sync
             </Button>
             <Button variant="ghost" onClick={() => setJoining(true)}>
@@ -91,7 +118,7 @@ export function SyncCard() {
               e.preventDefault();
               const code = normalizeSyncCode(input);
               if (!code) return setBad(true);
-              void link(code);
+              void linkDevice(code, true);
             }}
           >
             <label htmlFor="sync-code" className="stat-label">
@@ -154,7 +181,7 @@ export function SyncCard() {
             Delete synced copy…
           </Button>
         ) : (
-          <Button variant="danger" onClick={() => void sync.deleteCopy().then(() => setConfirmDelete(false))}>
+          <Button variant="danger" onClick={() => void deleteSyncedCopy().finally(() => setConfirmDelete(false))}>
             Delete it for all devices
           </Button>
         )}

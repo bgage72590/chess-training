@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { defaultProfile, normalizeProfile, replaceProfile, updateProfile, useProfile, type Profile } from '../store/profile';
+import { normalizeProfile, replaceProfile, updateProfile, useProfile, type Profile } from '../store/profile';
 import { Board } from '../chess/Board';
 import { sound } from '../chess/sound';
 import { BOARD_THEMES, swatchBackground } from '../chess/themes';
@@ -8,6 +8,8 @@ import { toast } from '../lib/toast';
 import { useSyncState } from '../store/cloud';
 import { InstallCard } from '../components/InstallCard';
 import { SyncCard } from '../sync/SyncCard';
+import { useSync } from '../sync';
+import { sinceReset } from '../sync/merge';
 import { navigate } from '../router';
 
 const SAMPLE = 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4';
@@ -17,6 +19,7 @@ export function SettingsPage() {
   const s = p.settings;
   const [confirmReset, setConfirmReset] = useState(false);
   const sync = useSyncState();
+  const linked = !!useSync().code;
   const [importText, setImportText] = useState('');
   const set = (patch: Partial<typeof s>) => updateProfile((d) => Object.assign(d.settings, patch));
 
@@ -35,7 +38,8 @@ export function SettingsPage() {
     try {
       const data = JSON.parse(importText) as Profile;
       if (data.v !== 1 || typeof data.xp !== 'number') throw new Error('bad');
-      replaceProfile(normalizeProfile(data));
+      // Imported progress counts as newer than any reset this device knows of, so syncing keeps it.
+      replaceProfile(normalizeProfile({ ...data, resetAt: Math.max(data.resetAt ?? 0, p.resetAt ?? 0) || undefined }));
       setImportText('');
       toast({ title: 'Progress imported', icon: 'check', tone: 'good' });
     } catch {
@@ -151,7 +155,9 @@ export function SettingsPage() {
                 ? 'Connecting to your account storage…'
                 : sync === 'error'
                   ? 'Your account storage could not be reached, so progress is kept in this browser for now.'
-                  : 'Progress is stored in this browser only. Export it to move to another device.'}
+                  : linked
+                    ? 'Progress is kept in this browser and synced to your linked devices.'
+                    : 'Progress is stored in this browser only. Export it to move to another device.'}
           </p>
           <div className="btn-row">
             <Button icon="download" onClick={exportData}>
@@ -175,7 +181,8 @@ export function SettingsPage() {
                 <Button
                   variant="danger"
                   onClick={() => {
-                    replaceProfile({ ...defaultProfile(), settings: s });
+                    // Keeps settings; the reset time syncs, so linked devices drop older progress too.
+                    replaceProfile(sinceReset(p, Date.now()));
                     setConfirmReset(false);
                     toast({ title: 'Progress reset', icon: 'refresh' });
                   }}
@@ -188,6 +195,7 @@ export function SettingsPage() {
               </>
             )}
           </div>
+          {confirmReset && <p className="faint">{linked ? 'This erases your progress on this device and on every device linked with your sync code. Settings stay.' : 'This erases your progress in this browser. Settings stay.'}</p>}
         </section>
         <section className="card settings-section">
           <h2>Credits</h2>
