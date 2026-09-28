@@ -1,10 +1,12 @@
-// The kid's Pawn Buddy avatar: a pawn silhouette with a color, a face and an optional hat.
+// The kid's Pawn Buddy avatar: a pawn silhouette with a color, a face and an optional hat. The eyes
+// blink now and then (CSS, removed under reduced motion); a crown can drop on with a bounce.
+import { useMemo } from 'react';
 import { AVATAR_COLORS, type AvatarColor, type FaceId, type HatId } from '../curriculum/wardrobe';
 
 const INK = '#1f2a44';
 
-function Face({ face }: { face: FaceId }) {
-  const eye = (cx: number) => <circle cx={cx} cy="31" r="3.2" fill={INK} />;
+function Face({ face, blink }: { face: FaceId; blink: boolean }) {
+  const eye = (cx: number) => <circle className={blink ? 'k-buddy-eye' : undefined} cx={cx} cy="31" r="3.2" fill={INK} />;
   const happyEye = (cx: number) => <path d={`M${cx - 4} 32c2-4 6-4 8 0`} fill="none" stroke={INK} strokeWidth="3" strokeLinecap="round" />;
   const closedEye = (cx: number) => <path d={`M${cx - 4} 30c2 4 6 4 8 0`} fill="none" stroke={INK} strokeWidth="3" strokeLinecap="round" />;
   const smile = <path d="M43 39c4 4 10 4 14 0" fill="none" stroke={INK} strokeWidth="3" strokeLinecap="round" />;
@@ -113,10 +115,12 @@ function Hat({ hat }: { hat: HatId }) {
   }
 }
 
-export function PawnBuddy({ color, face, hat, size = 96, className }: { color: AvatarColor; face: FaceId; hat?: HatId | null; size?: number; className?: string }) {
+export function PawnBuddy({ color, face, hat, hatDrop, size = 96, className }: { color: AvatarColor; face: FaceId; hat?: HatId | null; hatDrop?: boolean; size?: number; className?: string }) {
   const c = AVATAR_COLORS[color] ?? AVATAR_COLORS.sun;
+  // Each big buddy blinks on its own beat (every 4-7 s); the small ones in grids stay still.
+  const blink = useMemo(() => ({ ['--blink' as string]: `${(4 + Math.random() * 3).toFixed(1)}s`, ['--blink-d' as string]: `-${(Math.random() * 4).toFixed(1)}s` }), []);
   return (
-    <svg className={`k-buddy ${className ?? ''}`} viewBox="0 -4 100 120" width={size} height={size * 1.2} aria-hidden="true">
+    <svg className={`k-buddy ${className ?? ''}`} viewBox="0 -4 100 120" width={size} height={size * 1.2} aria-hidden="true" style={blink}>
       <g stroke={INK} strokeWidth="3" strokeLinejoin="round">
         <path d="M24 100c3-16 10-30 13-42h26c3 12 10 26 13 42z" fill={c.fill} />
         <path d="M58 58h5c3 12 10 26 13 42H66c-2-16-5-30-8-42z" fill={c.shade} stroke="none" opacity="0.55" />
@@ -127,8 +131,12 @@ export function PawnBuddy({ color, face, hat, size = 96, className }: { color: A
         <path d="M62 16c9 7 10 22 1 30 5-9 5-21-1-30z" fill={c.shade} stroke="none" opacity="0.55" />
       </g>
       <circle cx="42" cy="22" r="4" fill="#fff" opacity="0.55" />
-      <Face face={face} />
-      {hat && <Hat hat={hat} />}
+      <Face face={face} blink={size >= 80} />
+      {hat && (
+        <g className={hatDrop ? 'k-hat-drop' : undefined}>
+          <Hat hat={hat} />
+        </g>
+      )}
     </svg>
   );
 }

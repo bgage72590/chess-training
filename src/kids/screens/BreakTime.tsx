@@ -13,6 +13,7 @@ import { SpeechBubble } from '../ui/SpeechBubble';
 import { requireGate } from '../ui/ParentGate';
 import { extendSession } from '../player/useSession';
 import { sayAs, speech } from '../player/speech';
+import { useCountUp } from '../ui/rewardFx';
 
 export function BreakTime({ kid, onBye, onContinue, resting = false }: { kid: KidProfile; onBye(): void; onContinue(): void; resting?: boolean }) {
   const today = kid.days[dayKey()] ?? { minutes: 0, stars: 0 };
@@ -20,6 +21,7 @@ export function BreakTime({ kid, onBye, onContinue, resting = false }: { kid: Ki
   const title = resting ? 'Rest time!' : 'Great playing!';
   const lines = resting ? ['Pip is still resting.', 'Come back after a little break!'] : ['Your brain grew today.', 'Time for a little break.'];
   const spoken = [title, ...lines];
+  const starsShown = useCountUp(today.stars, 900);
   const kidRef = useRef(kid);
   kidRef.current = kid;
   useEffect(() => {
@@ -35,7 +37,7 @@ export function BreakTime({ kid, onBye, onContinue, resting = false }: { kid: Ki
         <SpeechBubble text={lines.join(' ')} tail="top" onSpeak={() => sayAs(kid, spoken, { force: true })} />
         <div className="k-break-today">
           <span className="k-break-stat">
-            <KidsIcon name="star" size={28} fill /> {today.stars} {today.stars === 1 ? 'star' : 'stars'} today
+            <KidsIcon name="star" size={28} fill /> {starsShown} {today.stars === 1 ? 'star' : 'stars'} today
           </span>
           {stickers.length > 0 && (
             <div className="k-break-stickers">

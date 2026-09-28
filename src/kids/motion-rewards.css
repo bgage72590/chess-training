@@ -1,0 +1,625 @@
+/* Kids mode: rewards and Pip's reactions. Loaded after kids.css (see ui/rewardFx.ts). Everything here
+   moves with transform and opacity only. Reduced motion: kids.css turns every animation below into a
+   150 ms fade, so each effect either starts from opacity 0 or is a harmless still; the Web Animation
+   helpers (rewardFx.ts, Confetti.tsx) skip their motion themselves. Keyframes are prefixed kr-. */
+
+/* ================= Shared ================= */
+@keyframes kr-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+.k-rise {
+  animation: kr-rise 480ms var(--k-ease-out) both;
+}
+@keyframes kr-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+}
+@keyframes kr-ring {
+  from {
+    opacity: 0.9;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+@keyframes kr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes kr-shard {
+  0% {
+    opacity: 1;
+    transform: translateY(-14px) scale(0.3);
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(var(--dist, -46px)) scale(1) rotate(90deg);
+  }
+}
+
+/* ================= Pip ================= */
+/* Eyes and pupils can slide ("look at that square"); an idle Pip glances around now and then. */
+.k-pip .k-pip-pupil,
+.k-pip .k-pip-shine {
+  translate: calc(var(--lx, 0) * 1px) calc(var(--ly, 0) * 1px);
+  transition: translate 180ms var(--k-ease-out);
+}
+.k-pip.mood-idle:not([data-look]) .k-pip-pupil,
+.k-pip.mood-idle:not([data-look]) .k-pip-shine {
+  animation: kr-glance var(--glance, 10s) ease-in-out var(--glance-d, 0s) infinite;
+}
+.k-pip.mood-idle .k-pip-body {
+  animation: k-breath 3s ease-in-out infinite, kr-headlook var(--glance, 10s) ease-in-out var(--glance-d, 0s) infinite;
+}
+@keyframes kr-glance {
+  0%,
+  50%,
+  100% {
+    translate: 0 0;
+  }
+  54%,
+  62% {
+    translate: -2.4px -1px;
+  }
+  66%,
+  74% {
+    translate: 2.6px 0.6px;
+  }
+  78% {
+    translate: 0 0;
+  }
+}
+@keyframes kr-headlook {
+  0%,
+  50%,
+  100% {
+    rotate: 0deg;
+  }
+  54%,
+  62% {
+    rotate: -3deg;
+  }
+  66%,
+  74% {
+    rotate: 2deg;
+  }
+  78% {
+    rotate: 0deg;
+  }
+}
+
+/* The coach's Pip plays hops and tilts as one-shot Web Animations, so the mood classes leave his body alone. */
+.k-pip.listen.mood-cheer .k-pip-body,
+.k-pip.listen.mood-oops .k-pip-body {
+  animation: k-breath 3s ease-in-out infinite;
+  transform: none;
+}
+/* A miss is never scary: he looks up and thinks "hmm" (the head tilt is the one-shot). */
+.k-pip.mood-oops .k-pip-pupil,
+.k-pip.mood-oops .k-pip-shine {
+  transform: translate(1px, -2.5px);
+}
+
+/* The mouth opens on each spoken word (the word index re-keys the paths) and closes between them. */
+.k-pip.sync.mood-talk .k-pip-mouth-open {
+  animation: kr-talk-open 300ms step-end 1 both;
+}
+.k-pip.sync.mood-talk .k-pip-mouth {
+  animation: kr-talk-shut 300ms step-end 1 both;
+}
+.k-pip.sync.talk-gap .k-pip-mouth-open {
+  display: none;
+}
+.k-pip.sync.talk-gap .k-pip-mouth {
+  animation: none;
+}
+@keyframes kr-talk-open {
+  0% {
+    opacity: 1;
+  }
+  38% {
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes kr-talk-shut {
+  0% {
+    opacity: 0;
+  }
+  38% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Cheer sparkles: eight, near and far, in two sizes. */
+.k-pip-sparkles i {
+  --dist: -52px;
+  width: 11px;
+  height: 11px;
+  filter: drop-shadow(0 0 2px #ffb700);
+  rotate: calc(var(--i) * 45deg);
+  animation: kr-shard 900ms var(--k-ease-out) forwards;
+}
+.k-pip-sparkles i:nth-child(even) {
+  --dist: -78px;
+  width: 8px;
+  height: 8px;
+  background: #fff6c9;
+  animation-delay: 60ms;
+}
+
+/* A hat (or the boss crown) dropping onto Pip's or the pawn's head. */
+.k-hat-drop {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: kr-hat-drop 720ms var(--k-ease-spring) both;
+}
+@keyframes kr-hat-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-150px) rotate(-24deg);
+  }
+  20% {
+    opacity: 1;
+  }
+  62% {
+    transform: translateY(2px) rotate(5deg) scale(1.08, 0.9);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* Pawn Buddies and animal buddies blink on their own beat. */
+.k-buddy-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: k-blink var(--blink, 5s) var(--blink-d, 0s) infinite;
+}
+
+/* ================= Speech bubble ================= */
+.k-bubble-line {
+  display: block;
+  animation: kr-line 260ms var(--k-ease-out) both;
+}
+@keyframes kr-line {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.k-word {
+  border-radius: 6px;
+  transition: border-color 80ms, background-color 120ms;
+}
+.k-word.on {
+  background-color: rgb(255 200 61 / 0.26);
+}
+
+/* ================= Star counter in the top bar ================= */
+.k-chip-ico {
+  position: relative;
+  display: inline-flex;
+}
+.k-chip-ico.hit {
+  animation: kr-chip-ico 520ms var(--k-ease-spring);
+}
+.k-chip-ico.hit::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--k-sun);
+  opacity: 0;
+  animation: kr-ring 520ms var(--k-ease-out) both;
+}
+.k-chip-num.hit {
+  display: inline-block;
+  animation: kr-chip-num 420ms var(--k-ease-spring);
+}
+@keyframes kr-chip-ico {
+  30% {
+    transform: scale(1.5) rotate(-14deg);
+  }
+}
+@keyframes kr-chip-num {
+  35% {
+    transform: scale(1.35);
+  }
+}
+
+/* ================= Family star jar ================= */
+.k-jar-body {
+  position: relative;
+  display: inline-block;
+}
+.k-jar-body svg {
+  display: block;
+  transform-origin: 50% 100%;
+}
+.k-jar-fill {
+  transition: transform 520ms var(--k-ease-out), opacity 200ms;
+}
+.k-jar-gem {
+  transition: opacity 300ms;
+}
+.k-jar-drop {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+  translate: calc(var(--x, 0) * 1px) 0;
+  background: var(--k-sun);
+  clip-path: polygon(50% 0, 62% 38%, 100% 38%, 69% 60%, 80% 100%, 50% 75%, 20% 100%, 31% 60%, 0 38%, 38% 38%);
+  pointer-events: none;
+  opacity: 0;
+  animation: kr-jar-drop 560ms cubic-bezier(0.5, 0, 0.9, 0.6) calc(350ms + var(--i) * 190ms) both;
+}
+@keyframes kr-jar-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-34px) scale(0.6) rotate(-30deg);
+  }
+  15% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(30px) scale(1) rotate(200deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(44px) scale(0.4) rotate(260deg);
+  }
+}
+.k-jar-count.hit {
+  display: inline-block;
+  animation: kr-chip-num 420ms var(--k-ease-spring);
+}
+
+/* ================= Results ================= */
+.k-results-title {
+  animation: kr-rise 460ms var(--k-ease-out) 120ms both;
+}
+.k-star-slot {
+  position: relative;
+  display: block;
+}
+.k-results-stars .k-star-slot:nth-child(2) {
+  translate: 0 -10px;
+}
+/* A star landing in its slot thumps down from a bit too big. */
+.k-star-slot .k-star-in {
+  animation: kr-star-land 420ms var(--k-ease-spring) both;
+}
+@keyframes kr-star-land {
+  from {
+    transform: scale(1.55);
+  }
+}
+.k-star-burst {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.k-star-burst i {
+  position: absolute;
+  left: -4.5px;
+  top: -4.5px;
+  width: 9px;
+  height: 9px;
+  background: var(--k-sun);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  rotate: calc(var(--i) * 51.4deg);
+  opacity: 0;
+  animation: kr-shard 620ms var(--k-ease-out) both;
+}
+.k-star-burst.golden i:nth-child(odd) {
+  background: #fff;
+}
+.k-glint {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: kr-glint 1.4s ease-in-out 300ms 1 both;
+}
+@keyframes kr-glint {
+  40% {
+    transform: scale(1.8) rotate(45deg);
+  }
+}
+
+/* The buttons stay out of the way (and untappable) until the reveal is over, then rise in one by one. */
+.k-results:not(.done) .k-results-actions,
+.k-results:not(.done) .k-results-offers {
+  opacity: 0;
+  pointer-events: none;
+}
+.k-results.done .k-results-offers > *,
+.k-results.done .k-results-actions > * {
+  animation: kr-rise 480ms var(--k-ease-spring) both;
+}
+.k-results.done .k-results-actions > * {
+  animation-delay: 120ms;
+}
+.k-results.done .k-results-actions > :nth-child(2) {
+  animation-delay: 190ms;
+}
+.k-results.done .k-results-actions > :nth-child(3) {
+  animation-delay: 260ms;
+}
+.k-results.done .k-results-offers > :nth-child(2) {
+  animation-delay: 60ms;
+}
+.k-results.quick.done .k-results-actions > *,
+.k-results.quick.done .k-results-offers > * {
+  animation-delay: 300ms;
+}
+
+/* A new sticker or badge is stamped on: it slams down big, settles, and rings like an ink press. */
+.k-results-gifts.wait {
+  visibility: hidden;
+}
+.k-results-gifts .k-peel {
+  animation: none;
+}
+.k-results-gifts.in .k-peel > span:last-child {
+  animation: k-fade-in 300ms var(--k-ease-out) calc(var(--stamp-d, 300ms) + var(--i, 0) * 260ms + 380ms) both;
+}
+.k-stamp {
+  position: relative;
+  display: inline-grid;
+  animation: kr-stamp 560ms var(--k-ease-spring) calc(var(--stamp-d, 300ms) + var(--i, 0) * 260ms) both;
+}
+.k-results-gifts.wait .k-stamp {
+  animation: none;
+  opacity: 0;
+}
+.k-stamp::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 3px solid var(--k-sun-edge);
+  opacity: 0;
+  animation: kr-ring 520ms var(--k-ease-out) calc(var(--stamp-d, 300ms) + var(--i, 0) * 260ms + 300ms) both;
+}
+.k-stamp::before {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: -6px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  filter: drop-shadow(0 0 3px var(--k-sun));
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  opacity: 0;
+  animation: kr-glint-pop 520ms var(--k-ease-out) calc(var(--stamp-d, 300ms) + var(--i, 0) * 260ms + 320ms) both;
+}
+@keyframes kr-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(2.5) rotate(-16deg);
+  }
+  40% {
+    opacity: 1;
+  }
+  60% {
+    transform: scale(0.88) rotate(3deg);
+  }
+  80% {
+    transform: scale(1.06) rotate(-1deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes kr-glint-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(0);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.2) rotate(45deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.6) rotate(90deg);
+  }
+}
+
+/* The boss crown: rays of light behind Pip, a ring and glints where the crown lands, a small thump. */
+.k-results-pip {
+  position: relative;
+}
+.k-rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 320px;
+  height: 320px;
+  margin: -160px 0 0 -160px;
+  pointer-events: none;
+  clip-path: inset(0 0 50% 0);
+  -webkit-mask: radial-gradient(circle, #000 14%, transparent 68%);
+  mask: radial-gradient(circle, #000 14%, transparent 68%);
+  animation: kr-fade 600ms var(--k-ease-out) both;
+}
+.k-rays::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-conic-gradient(from 0deg, rgb(255 214 102 / 0.75) 0 7deg, transparent 7deg 22.5deg);
+  animation: kr-spin 20s linear 2;
+}
+.k-rays.big {
+  width: min(560px, 140vw);
+  height: min(560px, 140vw);
+  margin: calc(min(560px, 140vw) / -2) 0 0 calc(min(560px, 140vw) / -2);
+  clip-path: none;
+  z-index: -1;
+}
+@keyframes kr-fade {
+  from {
+    opacity: 0;
+  }
+}
+.k-grad-avatar {
+  isolation: isolate;
+}
+.k-graduate {
+  overflow-x: clip;
+}
+.k-crown-ring {
+  position: absolute;
+  left: 50%;
+  top: 14%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.k-crown-ring::before {
+  content: '';
+  position: absolute;
+  width: 96px;
+  height: 96px;
+  margin: -48px 0 0 -48px;
+  border-radius: 50%;
+  border: 5px solid #fff6c9;
+  box-shadow: 0 0 18px 4px rgb(255 200 61 / 0.9);
+  opacity: 0;
+  animation: kr-ring 700ms var(--k-ease-out) both;
+}
+.k-crown-ring i {
+  --dist: -70px;
+  position: absolute;
+  left: -8px;
+  top: -8px;
+  width: 16px;
+  height: 16px;
+  background: var(--k-sun);
+  filter: drop-shadow(0 0 3px #ff9f00);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  rotate: calc(var(--i) * 45deg);
+  opacity: 0;
+  animation: kr-shard 720ms var(--k-ease-out) both;
+}
+.k-crown-ring i:nth-child(even) {
+  --dist: -96px;
+  background: #fff;
+}
+.k-results.thump {
+  animation: kr-thump 360ms var(--k-ease-out);
+}
+@keyframes kr-thump {
+  30% {
+    transform: scale(1.02, 0.985);
+  }
+}
+
+/* ================= Graduation and break time ================= */
+.k-grad-piece {
+  animation: kr-piece 700ms var(--k-ease-spring) 600ms both;
+}
+@keyframes kr-piece {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.3) rotate(-20deg);
+  }
+}
+.k-grad-pick > * {
+  animation: kr-rise 480ms var(--k-ease-spring) 200ms both;
+}
+.k-grad-pick > :nth-child(2) {
+  animation-delay: 290ms;
+}
+.k-break-stickers > * {
+  animation: kr-pop 420ms var(--k-ease-spring) both;
+}
+.k-break-stickers > :nth-child(2) {
+  animation-delay: 90ms;
+}
+.k-break-stickers > :nth-child(3) {
+  animation-delay: 180ms;
+}
+.k-break-stickers > :nth-child(4) {
+  animation-delay: 270ms;
+}
+.k-break-stickers > :nth-child(5) {
+  animation-delay: 360ms;
+}
+.k-break-stickers > :nth-child(6) {
+  animation-delay: 450ms;
+}
+
+/* ================= Confetti bits ================= */
+.k-bit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  will-change: transform, opacity;
+  background-image: linear-gradient(120deg, rgb(255 255 255 / 0.4), transparent 55%);
+}
+.k-bit.star {
+  clip-path: polygon(50% 0, 62% 38%, 100% 38%, 69% 60%, 80% 100%, 50% 75%, 20% 100%, 31% 60%, 0 38%, 38% 38%);
+}
+.k-bit.crown {
+  clip-path: polygon(0 100%, 0 20%, 25% 55%, 50% 0, 75% 55%, 100% 20%, 100% 100%);
+}
+.k-bit.pawn {
+  clip-path: polygon(40% 0, 60% 0, 70% 20%, 60% 45%, 80% 100%, 20% 100%, 40% 45%, 30% 20%);
+}
+.k-bit.dot {
+  border-radius: 50%;
+}
+.k-bit.ribbon {
+  border-radius: 2px;
+}
+.k-bit.diamond {
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+.k-bit.heart {
+  clip-path: polygon(50% 100%, 8% 55%, 0 32%, 8% 10%, 28% 0, 45% 10%, 50% 22%, 55% 10%, 72% 0, 92% 10%, 100% 32%, 92% 55%);
+}
+.k-bit.spark {
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+}
+
+/* Reduced motion: no blinking or glancing loops (kids.css turns the rest into a plain fade). */
+.kids-app[data-motion='reduced'] .k-buddy-eye,
+.kids-app[data-motion='reduced'] .k-pip .k-pip-pupil,
+.kids-app[data-motion='reduced'] .k-pip .k-pip-shine {
+  animation: none !important;
+}
