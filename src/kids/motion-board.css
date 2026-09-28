@@ -1,0 +1,237 @@
+/* Kids board feel: springy glide, landing squash, capture poof, lifted piece, popping move dots and a
+   pulsing check. Transform and opacity only. Everything animated sits under data-motion='full' (which is
+   also off for the system's reduced-motion setting); reduced motion keeps the plain fades from kids.css.
+   The classes are put on the shared Board's pieces by activities/useBoardFx.ts.
+   Scaling is done with the separate `scale` property: Board keeps each piece's position in `transform`,
+   so the hook sets a transform-origin at the foot of the piece's own cell before it squashes. */
+
+/* Poof nodes only exist while a capture leaves the board (about 0.9 s). */
+.k-poof,
+.k-puff {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+  --d: 120ms;
+}
+.k-poof {
+  z-index: 3;
+}
+.k-puff {
+  z-index: 5;
+}
+.k-poof > div {
+  position: absolute;
+  inset: 0;
+  background-size: 100% 100%;
+}
+.k-puff > i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26%;
+  height: 26%;
+  margin: -13% 0 0 -13%;
+  border-radius: 50%;
+  background: var(--k-cloud);
+  box-shadow: inset -2px -3px 0 var(--k-cloud-shade);
+  opacity: 0;
+}
+.k-puff > i:nth-child(1) {
+  --x: -170%;
+  --y: -110%;
+}
+.k-puff > i:nth-child(2) {
+  --x: 170%;
+  --y: -110%;
+}
+.k-puff > i:nth-child(3) {
+  --x: -190%;
+  --y: 90%;
+}
+.k-puff > i:nth-child(4) {
+  --x: 190%;
+  --y: 90%;
+}
+.k-puff > i:nth-child(5) {
+  --x: 0%;
+  --y: -210%;
+}
+.k-puff::before {
+  content: '';
+  position: absolute;
+  inset: 6%;
+  border-radius: 50%;
+  box-shadow: 0 0 0 max(2px, 0.5cqw) rgb(255 255 255 / 0.85);
+  opacity: 0;
+}
+.kids-app[data-motion='reduced'] .k-poof,
+.kids-app[data-motion='reduced'] .k-puff {
+  display: none;
+}
+
+/* The move dots are round. */
+.kids-board .dest:not(.capture) {
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .kids-app[data-motion='full'] .kids-board .board {
+    --k-glide: 300ms;
+    /* A soft overshoot (about 4%) that settles exactly on the square. */
+    --k-glide-ease: cubic-bezier(0.26, 1.32, 0.42, 1);
+  }
+  /* The computer's pieces take a little longer, like a hand moving them. */
+  .kids-app[data-motion='full'] .kids-board .board.opp-w .piece[class*='pc-w'],
+  .kids-app[data-motion='full'] .kids-board .board.opp-b .piece[class*='pc-b'] {
+    --k-glide: 380ms;
+  }
+  .kids-app[data-motion='full'] .kids-board .board .piece:not(.dragging):not(.ghost) {
+    transition:
+      transform var(--k-glide) var(--k-glide-ease),
+      translate 160ms var(--k-ease-spring),
+      filter 160ms var(--k-ease-out);
+  }
+
+  /* Landing: a tiny squash as the glide ends. */
+  .kids-app[data-motion='full'] .kids-board .piece.k-land {
+    animation: k-land 240ms var(--k-ease-out) calc(var(--k-glide) - 80ms);
+  }
+  /* The wrong-move wobble wins over a squash still running. */
+  .kids-app[data-motion='full'] .kids-board .piece.k-land.k-wobble {
+    animation: k-wobble 300ms ease-in-out;
+  }
+  @keyframes k-land {
+    0% {
+      scale: 1 1;
+    }
+    32% {
+      scale: 1.1 0.88;
+    }
+    64% {
+      scale: 0.97 1.05;
+    }
+    100% {
+      scale: 1 1;
+    }
+  }
+
+  /* Picked up: a soft lift with a shadow underneath. */
+  .kids-app[data-motion='full'] .kids-board .board .piece.k-lifted {
+    translate: 0 -10%;
+    z-index: 6;
+    filter: drop-shadow(0 max(5px, 1.4cqw) max(3px, 0.8cqw) rgb(31 42 68 / 0.4));
+  }
+
+  /* Move dots pop in one after another, rippling out from the piece, then breathe. */
+  .kids-app[data-motion='full'] .kids-board .dest,
+  .kids-app[data-motion='full'] .kids-board .k-art-dot {
+    animation:
+      k-dot-pop 260ms var(--k-ease-spring) var(--k-d, 0ms) backwards,
+      k-dot-breathe 1.9s ease-in-out calc(var(--k-d, 0ms) + 260ms) infinite;
+  }
+  .kids-app[data-motion='full'] .kids-board .dest.capture {
+    animation-name: k-dot-pop, k-ring-breathe;
+  }
+  @keyframes k-dot-pop {
+    from {
+      transform: scale(0);
+      opacity: 0;
+    }
+  }
+  @keyframes k-dot-breathe {
+    50% {
+      transform: scale(1.18);
+    }
+  }
+  @keyframes k-ring-breathe {
+    50% {
+      transform: scale(1.05);
+    }
+  }
+
+  /* Check: the king gulps and its square pulses three times, once the checking piece has landed. */
+  .kids-app[data-motion='full'] .kids-board .sq.check::after {
+    box-shadow: none; /* the square-shaped inner shadow would poke into the neighbours as the glow grows */
+    animation: k-check-pulse 640ms ease-in-out 240ms 3 backwards;
+  }
+  @keyframes k-check-pulse {
+    0% {
+      transform: scale(0.55);
+      opacity: 0;
+    }
+    40% {
+      transform: scale(1.2);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  .kids-app[data-motion='full'] .kids-board .piece.k-incheck {
+    animation: k-gulp 560ms var(--k-ease-out) 240ms 2;
+  }
+  @keyframes k-gulp {
+    0%,
+    100% {
+      scale: 1 1;
+    }
+    30% {
+      scale: 1.14 0.9;
+    }
+    60% {
+      scale: 0.97 1.04;
+    }
+  }
+
+  /* Capture: the captured piece waits for the capturer to arrive, then shrinks and spins away in a puff. */
+  .kids-app[data-motion='full'] .k-poof > div {
+    animation: k-poof-out 340ms ease-in var(--d) forwards;
+  }
+  @keyframes k-poof-out {
+    0% {
+      scale: 1;
+      rotate: 0deg;
+      opacity: 1;
+    }
+    25% {
+      scale: 1.14;
+      rotate: -12deg;
+      opacity: 1;
+    }
+    100% {
+      scale: 0.1;
+      rotate: 260deg;
+      opacity: 0;
+    }
+  }
+  .kids-app[data-motion='full'] .k-puff > i {
+    animation: k-puff-out 420ms var(--k-ease-out) var(--d) forwards;
+  }
+  .kids-app[data-motion='full'] .k-puff::before {
+    animation: k-ring-out 360ms var(--k-ease-out) var(--d) forwards;
+  }
+  @keyframes k-puff-out {
+    0% {
+      transform: translate(0, 0) scale(0.4);
+      opacity: 0.95;
+    }
+    100% {
+      transform: translate(var(--x), var(--y)) scale(1.25);
+      opacity: 0;
+    }
+  }
+  @keyframes k-ring-out {
+    0% {
+      transform: scale(0.35);
+      opacity: 0.9;
+    }
+    100% {
+      transform: scale(1.35);
+      opacity: 0;
+    }
+  }
+}
