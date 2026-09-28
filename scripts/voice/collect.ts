@@ -39,33 +39,85 @@ const FILES = 'abcdefgh'.split('');
 const RANKS = '12345678'.split('');
 const SQUARES = FILES.flatMap((f) => RANKS.map((r) => f + r));
 const NUMBERS = Array.from({ length: 16 }, (_, i) => String(i));
+const COUNTS = Array.from({ length: 61 }, (_, i) => String(i)); // a bare `n`: move counts, dash scores
+const RANK_NUMBERS = ['1', '2', '3', '4', '5', '6', '7', '8'];
+const STAR_WORDS = ['one star', 'two stars', 'three stars'];
+// World and boss names come from the curriculum (loaded by path: it is app code, not a script).
+const CURRICULUM = '../../src/kids/curriculum/worlds';
+const { WORLDS, NODES } = (await import(CURRICULUM)) as { WORLDS: { title: string }[]; NODES: { title: string; boss?: boolean }[] };
+const WORLD_TITLES = WORLDS.map((w) => w.title);
+const BOSS_TITLES = NODES.filter((n) => n.boss).map((n) => n.title);
+const PIECE_VALUES = ['1', '3', '5', '9'];
+const GARDEN = Array.from({ length: 30 }, (_, i) => String(i + 1));
 /** Most versions of one template to record (a line with a square and a number is too many). */
 const MAX_VERSIONS = 70;
 
 /** The values a ${...} placeholder can take, guessed from its code; null when unknown. */
 function valuesFor(expr: string): string[] | null {
   const e = expr.toLowerCase();
+  const t = e.trim();
+  if (/way_label/.test(e)) return ['run', 'block', 'capture'];
+  if (/^sw\.title$/.test(t)) return WORLD_TITLES;
+  if (/^title$/.test(t)) return BOSS_TITLES;
+  if (/^rank$/.test(t)) return RANK_NUMBERS;
+  if (/^(got|want)$/.test(t)) return STAR_WORDS;
+  if (/^(score|need)$/.test(t)) return ['1', '2', '3'];
+  if (/^t\.(gain|loss)$/.test(t)) return PIECE_VALUES;
+  if (/garden\[1\]/.test(e)) return GARDEN;
+  if (/^n$/.test(t)) return COUNTS;
+  if (/^rules$/.test(t)) return ['0', '1', '2', '3', '4', '5'];
   if (/buddy/.test(e)) return BUDDIES;
   if (/target\[0\]/.test(e)) return FILES;
   if (/target\[1\]/.test(e)) return RANKS;
   if (/^(target|sq|square)$/.test(e.trim())) return SQUARES;
   if (/color|^home$|^star$/.test(e.trim())) return ['light', 'dark'];
   if (/name|piece|who|guard/.test(e)) return PIECES;
-  if (/^(n|count|left|left\.length|targets\.length|total|gain|loss|t\.gain|t\.loss|item\.answer|item\.count)$/.test(e.trim())) return NUMBERS;
+  if (/^(count|left|left\.length|targets\.length|missing\.length|total|gain|loss|item\.answer|item\.count)$/.test(t)) return NUMBERS;
   return null;
 }
 
 /** Records each version of a template line whose placeholders have known values. */
-function expand(quasis: string[], exprs: string[]) {
+function expandWhole(quasis: string[], exprs: string[]): boolean {
   const sets = exprs.map(valuesFor);
   // Colons mark board labels for screen readers ("Paint board: 3 squares left"), not speech.
-  if (sets.some((v) => !v) || !isLine(quasis.join('X')) || quasis.join('').includes(':')) return;
-  if (sets.reduce((n, v) => n * v!.length, 1) > MAX_VERSIONS) return;
+  if (sets.some((v) => !v) || !isLine(quasis.join('X')) || quasis.join('').includes(':')) return false;
+  if (sets.reduce((n, v) => n * v!.length, 1) > MAX_VERSIONS) return false;
   const walk = (i: number, acc: string) => {
     if (i === exprs.length) return add(acc);
     for (const v of sets[i]!) walk(i + 1, acc + v + quasis[i + 1]);
   };
   walk(0, quasis[0]);
+  return true;
+}
+
+/**
+ * Records a template line, or else each of its sentences: the app says a line without a
+ * recording sentence by sentence when every sentence has one (speech.ts). This covers lines
+ * with too many versions, and sentences next to a placeholder that cannot be guessed.
+ */
+function expand(quasis: string[], exprs: string[]) {
+  if (expandWhole(quasis, exprs)) return;
+  if (quasis.join('').includes(':')) return;
+  let seg: { quasis: string[]; exprs: string[] } = { quasis: [''], exprs: [] };
+  const flush = () => {
+    const q = seg.quasis.map((x, i) => (i === 0 ? x.trimStart() : x));
+    q[q.length - 1] = q[q.length - 1].trimEnd();
+    if (seg.exprs.length ? true : q[0]) (seg.exprs.length ? expandWhole(q, seg.exprs) : add(q[0]));
+    seg = { quasis: [''], exprs: [] };
+  };
+  quasis.forEach((q, i) => {
+    // Split the static text after sentence ends; placeholders stay with their sentence.
+    const pieces = q.split(/(?<=[.!?])\s+/);
+    pieces.forEach((piece, j) => {
+      if (j > 0) flush();
+      seg.quasis[seg.quasis.length - 1] += piece;
+    });
+    if (i < exprs.length) {
+      seg.exprs.push(exprs[i]);
+      seg.quasis.push('');
+    }
+  });
+  flush();
 }
 
 type Node = { type?: string; [k: string]: unknown };

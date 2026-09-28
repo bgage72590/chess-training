@@ -4086,3 +4086,42 @@
     height: 48px;
   }
 }
+
+/* Grown-ups: Pip's voice picker (tap a card to choose and hear it). */
+.k-gu-voice-row {
+  align-items: flex-start;
+}
+.k-gu-voices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 8px;
+  flex: 1 1 320px;
+}
+.k-gu-voice {
+  display: grid;
+  gap: 2px;
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 2px solid var(--k-line);
+  border-radius: 12px;
+  background: var(--k-card-2);
+  color: var(--k-ink);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.k-gu-voice strong {
+  font-size: 15px;
+}
+.k-gu-voice small {
+  font-size: 12.5px;
+  color: var(--k-ink-soft);
+}
+.k-gu-voice.on {
+  border-color: var(--k-sea-deep, var(--k-sea));
+  background: var(--k-sea);
+  color: #1f2a44;
+}
+.k-gu-voice.on small {
+  color: #1f2a44;
+}

@@ -112,9 +112,8 @@ function TapLine({ item, player, onDone }: P<'tap-line'>) {
   useEffect(() => {
     player.progress(lit.length, line.length);
     const next = left[0];
-    const word = item.line === 'file' ? 'straight up and down' : item.line === 'rank' ? 'straight across' : 'on a slanty line';
     player.setHints([
-      { say: `The road goes ${word}.` },
+      { say: item.line === 'file' ? 'The road goes straight up and down.' : item.line === 'rank' ? 'The road goes straight across.' : 'The road goes on a slanty line.' },
       next ? { say: 'This one is on the road!', tones: { [next]: 'hint' } } : {},
       { say: 'Follow the arrow!', arrows: [{ from: line[0], to: line[line.length - 1], color: 'yellow' }] },
       { say: 'Tap every dot!', art: Object.fromEntries(left.map((s) => [s, 'dot' as ArtKey])) },
@@ -247,7 +246,7 @@ function FindSquare({ item, player, onDone }: P<'find-square'>) {
       { say: `First the letter ${target[0]}, then the number ${target[1]}.` },
       { say: `Here is the ${target[0]} road.`, tones: Object.fromEntries(ALL_SQUARES.filter((s) => s[0] === target[0]).map((s) => [s, 'hint' as SquareTone])) },
       { say: 'Where the two roads cross!', tones: fileRank(target) },
-      { say: `Here it is: ${target}!`, tones: { [target]: 'hint' }, art: { [target]: 'target' } },
+      { say: `Here it is, ${target}!`, tones: { [target]: 'hint' }, art: { [target]: 'target' } },
     ]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round]);
@@ -258,7 +257,7 @@ function FindSquare({ item, player, onDone }: P<'find-square'>) {
       setMistakes((m) => m + 1);
       setFlash(target);
       later(() => setFlash(null), 1500);
-      player.mistake(`That's ${sq}. Find ${target}!`);
+      player.mistake([`That's ${sq}.`, `Find ${target}!`]);
       return;
     }
     kidSound('pop', round + 1);
@@ -407,7 +406,7 @@ function Setup({ item, player, onDone }: P<'setup'>) {
     setMistakes((m) => m + 1);
     setWobble(null);
     requestAnimationFrame(() => setWobble(sq));
-    player.mistake(`Not there. ${setupTip(sel, hints)}`);
+    player.mistake(['Not there.', setupTip(sel, hints)]);
   };
 
   const art: Partial<Record<Sq, ArtKey>> = {};

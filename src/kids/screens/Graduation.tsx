@@ -44,7 +44,8 @@ export function Graduation({ kid }: { kid: KidProfile }) {
     kidSound('crown');
     kidSound('fanfare');
     setConfetti(Date.now());
-    sayAs(kid, [`All hail ${kid.name || 'you'}, the chess ${f}!`]);
+    // The name is on screen; Pip's line is recorded.
+    sayAs(kid, [f === 'queen' ? 'All hail the chess queen!' : 'All hail the chess king!']);
   };
   return (
     <div className={`k-screen k-graduate${form ? ' gold' : ''}`}>

@@ -115,7 +115,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
   const pendingAfterBreak = useRef<(() => void) | null>(null);
 
   // ---------- coach / voice ----------
-  const [coach, setCoach] = useState<{ text: string; token?: number }>({ text: '' });
+  const [coach, setCoach] = useState<{ text: string; lines?: string[]; token?: number }>({ text: '' });
   const [mood, setMood] = useState<PipMood>('idle');
   const moodTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setMoodFor = (m: PipMood, ms = 1400) => {
@@ -140,7 +140,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
         token = speech.speak(lines, { rate, pitch: tuning.pitch, clipRate: kid.settings.rate ?? undefined });
         if (voice === 'first' && !force && !k?.firsts.includes(id)) updateKid(kid.id, (d) => void d.firsts.push(id));
       } else speech.cancel();
-      setCoach({ text: caption, token });
+      setCoach({ text: caption, lines, token });
       if (m) setMoodFor(m, m === 'cheer' ? 1200 : 1800);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -370,7 +370,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       kidSound('boop');
       setMoodFor('oops', 1600);
       const n = itemMistakes.current;
-      let hintLine: BandText | undefined;
+      let hintLine: BandText | BandText[] | undefined;
       if (!tuning.hintOfferOnly && n >= hintAfter && hintLevel < 4) {
         const next = (hintLevel + 1) as 1 | 2 | 3 | 4;
         setHintLevel(next);
@@ -379,8 +379,9 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       }
       if (tuning.hintOfferOnly && n >= 3) setPulse(true);
       const oops = text ?? "Hmm, let's try another way!";
+      const lines = (t: BandText | BandText[] | undefined) => (t === undefined ? [] : Array.isArray(t) ? t : [t]);
       // Sprouts hear and see one short line at a time: the new hint replaces the "oops" line.
-      say(band === 'sprout' && hintLine ? hintLine : [oops, ...(hintLine ? [hintLine] : [])], 'oops');
+      say(band === 'sprout' && hintLine ? hintLine : [...lines(oops), ...lines(hintLine)], 'oops');
       if (n >= 3 && !easierOffered.current && mode !== 'placement' && !isGame) {
         easierOffered.current = true;
         setTimeout(() => setOffer('easier'), 900);
@@ -611,7 +612,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
         pips={pips}
         chip={chipNode}
         hint={phase === 'item' && current ? { onPress: advanceHint, pulse, disabled: hintLevel >= 4 } : undefined}
-        onSpeaker={coach.text ? () => say(coach.text, undefined, true) : undefined}
+        onSpeaker={coach.text ? () => say(coach.lines ?? coach.text, undefined, true) : undefined}
       />
       {props.header}
       <div className="k-player-body">

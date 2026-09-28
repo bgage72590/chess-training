@@ -14,7 +14,7 @@ import { isKidsLocked, setKidsLocked } from '../lock';
 import { hashPin, newSalt, pinSupported, clearGatePass } from '../ui/ParentGate';
 import { PawnBuddy } from '../ui/PawnBuddy';
 import { KidsIcon } from '../ui/KidsIcon';
-import { speech } from '../player/speech';
+import { DEVICE_VOICE, speech } from '../player/speech';
 import { voiceNote, voiceScore } from '../player/voices';
 import { toast } from '../../lib/toast';
 import { go } from '../routes';
@@ -167,6 +167,19 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
     return () => clearTimeout(t);
   }, []);
   const device = useKids().device;
+  const [pipVoices, setPipVoices] = useState(speech.pipVoices());
+  useEffect(() => {
+    let live = true;
+    void speech.loadPipVoices().then(() => live && setPipVoices(speech.pipVoices()));
+    return () => void (live = false);
+  }, []);
+  const pipVoice = st.pipVoice || speech.defaultPipVoice();
+  const preview = () => speech.speak(["Hi! I'm Pip. Let's play chess together!"], { rate: st.rate ?? 1, clipRate: st.rate ?? undefined });
+  const pickVoice = (id: string) => {
+    set('pipVoice', id);
+    speech.setPipVoice(id);
+    preview();
+  };
   const changeBand = (b: AgeBand) => {
     if (b === kid.band) return;
     const reset = window.confirm("Reset this kid's settings to the new age defaults?");
@@ -180,8 +193,27 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
       <Seg<AgeBand> label="Age group" value={kid.band} options={BANDS.map((b) => [b, BAND_LABEL[b]])} onChange={changeBand} />
       <Seg label="Read aloud" value={st.voice} options={[['auto', 'Every line'], ['first', 'New ideas'], ['off', 'Speaker button only']]} onChange={(v) => set('voice', v)} />
       {speech.supported() && (
+        <div className="k-gu-row k-gu-voice-row">
+          <span className="k-gu-label">
+            Pip&apos;s voice <small>Tap a voice to hear it</small>
+          </span>
+          <div className="k-gu-voices" role="radiogroup" aria-label="Pip's voice">
+            {pipVoices.map((v) => (
+              <button key={v.id} type="button" role="radio" aria-checked={pipVoice === v.id} className={`k-gu-voice${pipVoice === v.id ? ' on' : ''}`} onClick={() => pickVoice(v.id)}>
+                <strong>{v.name}</strong>
+                <small>{v.blurb}</small>
+              </button>
+            ))}
+            <button type="button" role="radio" aria-checked={pipVoice === DEVICE_VOICE} className={`k-gu-voice${pipVoice === DEVICE_VOICE ? ' on' : ''}`} onClick={() => pickVoice(DEVICE_VOICE)}>
+              <strong>This device</strong>
+              <small>The device&apos;s own voice</small>
+            </button>
+          </div>
+        </div>
+      )}
+      {speech.supported() && pipVoice === DEVICE_VOICE && (
         <div className="k-gu-row">
-          <span className="k-gu-label">Voice</span>
+          <span className="k-gu-label">Device voice</span>
           <div className="k-gu-inline">
             <select
               value={device.voiceURI ?? ''}
@@ -191,7 +223,7 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
                 speech.setVoice(v);
               }}
             >
-              <option value="">{speech.recorded() || device.voiceURI ? "Pip's recorded voice (most natural)" : `Automatic: best device voice${speech.current() ? ` (${speech.current()!.name})` : ''}`}</option>
+              <option value="">{`Automatic: most natural${speech.current() ? ` (${speech.current()!.name})` : ''}`}</option>
               {voices.map((v) => {
                 const note = voiceNote(v);
                 return (
@@ -202,13 +234,13 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
                 );
               })}
             </select>
-            <button type="button" className="k-gu-btn" onClick={() => speech.speak(["Hi! I'm Pip. Let's play chess together!"], { rate: st.rate ?? 1, clipRate: st.rate ?? undefined })}>
+            <button type="button" className="k-gu-btn" onClick={preview}>
               Preview
             </button>
           </div>
         </div>
       )}
-      {speech.supported() && device.voiceURI && voices.length > 0 && !voices.some((v) => voiceScore(v) >= 80) && (
+      {speech.supported() && pipVoice === DEVICE_VOICE && voices.length > 0 && !voices.some((v) => voiceScore(v) >= 80) && (
         <p className="k-gu-note">
           This device has no natural-sounding voice yet. For a much better one: on a Mac, iPhone or iPad, go to Settings, Accessibility, Spoken Content (Read &amp; Speak on a Mac), Voices, English, and download a Premium or Enhanced voice such as Ava or Zoe. On
           Windows, open Tempo in Microsoft Edge (its Natural voices are built in). On Android, install Google Speech Services voices.

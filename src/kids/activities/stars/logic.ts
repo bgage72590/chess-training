@@ -22,7 +22,8 @@ export interface StarItem extends StarPuzzle {
 export const PIECE_NAME: Record<string, string> = { K: 'king', Q: 'queen', R: 'rook', B: 'bishop', N: 'knight', P: 'pawn' };
 
 /** The rule line (hint level 1) for the pieces in an item. */
-export function ruleFor(item: StarItem): string {
+/** The rule for each piece on the board (one sentence each, so each has its own recording). */
+export function ruleFor(item: StarItem): string[] {
   const types = [...new Set(Object.values(item.pieces).map((p) => p!.toUpperCase()))];
   const line: Record<string, string> = {
     R: 'Rooks go in straight lines.',
@@ -32,8 +33,8 @@ export function ruleFor(item: StarItem): string {
     N: 'Knights hop: two steps and a turn!',
     P: 'Pawns walk straight ahead. Two steps on the first move!',
   };
-  let s = types.map((t) => line[t]).join(' ');
-  if (item.statues && Object.keys(item.statues).length) s += " Don't step in the lava!";
+  const s = types.map((t) => line[t]);
+  if (item.statues && Object.keys(item.statues).length) s.push("Don't step in the lava!");
   return s;
 }
 

@@ -170,13 +170,13 @@ export const W7_STALEMATE: LevelSet<QuizItem> = {
 
 const castleSay = { all: 'Can White castle this way?', champion: 'Is castling legal here?' };
 const cc = (id: string, fen: string, side: 'k' | 'q', answer: boolean, reason?: 'king-moved' | 'in-the-way' | 'path-attacked' | 'in-check', extra: Partial<Q> = {}): Q =>
-  ({ id, kind: 'can-castle', fen, side, answer, ...(reason ? { reason } : {}), bands: EC, say: { all: `Can White castle ${side === 'k' ? 'on the short side' : 'on the long side'}?`, champion: castleSay.champion }, ...extra }) as Q;
+  ({ id, kind: 'can-castle', fen, side, answer, ...(reason ? { reason } : {}), bands: EC, say: { all: side === 'k' ? 'Can White castle on the short side?' : 'Can White castle on the long side?', champion: castleSay.champion }, ...extra }) as Q;
 
 export const W7_CASTLE: LevelSet<QuizItem> = {
   id: 'w7-castle',
   activity: 'quiz',
   intro: [
-    { say: { all: 'Castling: the king takes two big steps toward a rook, and the rook hops over him!', champion: 'Castling: king two squares toward the rook; the rook jumps over.' }, fen: '4k3/8/8/8/8/8/8/R3K2R w KQ - 0 1', move: ['e1', 'g1'], ms: 1400 },
+    { say: { all: 'Castling: the king takes two big steps toward a rook, and the rook hops over him!', champion: 'Castling: king two squares toward the rook. The rook jumps over.' }, fen: '4k3/8/8/8/8/8/8/R3K2R w KQ - 0 1', move: ['e1', 'g1'], ms: 1400 },
   ],
   items: [
     { id: 'm1', kind: 'move', move: { fen: 'r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4', goal: { kind: 'flag', flag: 'k' } }, say: { all: 'Castle your king to safety!', champion: 'Castle kingside.' } },

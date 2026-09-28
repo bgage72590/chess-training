@@ -44,7 +44,7 @@ export function Battle({ item, player, onDone, kid }: ActivityProps<BattleItem>)
   const finish = (o: BattleOutcome) => {
     const outcome: ItemResult['outcome'] = o.winner === null ? 'draw' : o.winner === kidColor ? 'win' : 'loss';
     let text: string;
-    if (seats) text = o.winner === null ? "Stuck! It's a tie" : `${seats[o.winner].name} wins!`;
+    if (seats) text = o.winner === null ? "Stuck! It's a tie." : `${seats[o.winner].name} wins!`;
     else text = outcome === 'win' ? 'You won!' : outcome === 'draw' ? (o.reason === 'stuck' ? "Stuck! It's a tie" : "It's a tie!") : 'Good game!';
     setResult({ o, outcome, text });
     if (outcome === 'win' || seats) {
@@ -52,16 +52,18 @@ export function Battle({ item, player, onDone, kid }: ActivityProps<BattleItem>)
       player.celebrate('big');
     } else player.sound(outcome === 'draw' ? 'chime' : 'boop');
     if (!seats && outcome === 'win' && item.win === 'promote') player.award('st-pawn-war-win');
+    // Spoken as separate recorded sentences; with a friend, Pip says the color (names stay on screen).
+    const said = seats ? (o.winner === 'w' ? 'White wins!' : o.winner === 'b' ? 'Black wins!' : text) : text;
     const line =
       o.reason === 'promote'
         ? o.winner === kidColor || seats
-          ? { all: `${text} The pawn reached the other side and became a queen!`, sprout: `${text} Your pawn is a queen!` }
+          ? [said, { all: 'The pawn reached the other side and became a queen!', sprout: 'Your pawn is a queen!' }]
           : { all: 'Oh! My pawn got to the other side first. Good game! Want a rematch?', sprout: 'My pawn got there first! Good game!' }
         : o.reason === 'stuck'
           ? { all: "Nobody can move. Stuck! It's a tie.", sprout: "Stuck! It's a tie." }
           : outcome === 'win'
-            ? { all: `${text} You caught them all!`, sprout: `${text}` }
-            : { all: `${text} Every game makes you stronger.`, sprout: text };
+            ? [said, { all: 'You caught them all!', sprout: '' }]
+            : [said, { all: 'Every game makes you stronger.', sprout: '' }];
     player.say(line, outcome === 'loss' && !seats ? 'think' : 'cheer');
     const score = (outcome === 'win' ? 3 : outcome === 'draw' ? 2 : 1) as 1 | 2 | 3;
     later(() => onDone({ score, mistakes: 0, hintLevel: player.hintLevel, outcome }), 2400);

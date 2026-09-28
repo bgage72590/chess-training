@@ -9,9 +9,13 @@ public/voice/manifest.json. Two voices can record it:
           environment's credentials (header X-Goog-Api-Key for texttospeech.googleapis.com).
           It is never written anywhere.
 
+Pip's voices are listed in scripts/voice/voices.json (id, friendly name, engine and voice); each is
+recorded into public/voice/<id>/, and public/voice/voices.json (what the app offers) then lists the
+voices that are fully recorded:
+
   npx tsx scripts/voice/collect.ts > /tmp/lines.json
-  python3 scripts/voice/render.py /tmp/lines.json --model DIR                    # Kokoro
-  python3 scripts/voice/render.py /tmp/lines.json --engine google [--voice NAME]   # Google
+  python3 scripts/voice/render.py /tmp/lines.json --id sunny            # one voice from voices.json
+  python3 scripts/voice/render.py /tmp/lines.json --model DIR --out D   # Kokoro, anywhere
 
 To record in several places at once, give each a share of the lines and --part NAME: it records
 only those, writes manifest.NAME.json and removes nothing. The next full run folds the parts in.
@@ -30,6 +34,8 @@ ENGINES = {
 }
 BITRATE = 64
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'public', 'voice')
+MASTER = os.path.join(os.path.dirname(__file__), 'voices.json')
+PUBLIC_ROOT = OUT
 
 ENGINE = 'kokoro'
 VOICE = ENGINES['kokoro']['voice']
@@ -119,8 +125,16 @@ def main():
     ap.add_argument('--model', help='Kokoro model directory')
     ap.add_argument('--jobs', type=int, default=None, help='parallel workers (default: CPUs for Kokoro, 6 for Google)')
     ap.add_argument('--part', help='record only these lines into manifest.PART.json')
-    ap.add_argument('--out', help='output directory (default: public/voice)')
+    ap.add_argument('--out', help='output directory')
+    ap.add_argument('--id', help="a voice from public/voice/voices.json (records into public/voice/<id>)")
     a = ap.parse_args()
+    if a.id:
+        entry = next((v for v in json.load(open(MASTER))['voices'] if v['id'] == a.id), None)
+        if not entry:
+            ap.error(f'no voice {a.id} in voices.json')
+        a.engine, a.voice, a.out = entry['engine'], a.voice or entry['voice'], a.out or os.path.join(OUT, a.id)
+    if not a.out:
+        ap.error('give --id or --out')
     ENGINE = a.engine
     VOICE = a.voice or ENGINES[ENGINE]['voice']
     SPEED = ENGINES[ENGINE]['speed']
@@ -170,6 +184,26 @@ def main():
     with open(mpath, 'w') as f:
         json.dump({**record, 'clips': dict(sorted(clips.items()))}, f, separators=(',', ':'))
     print(f'manifest: {len(clips)} clips', flush=True)
+    if a.id:
+        publish(len(lines))
+
+
+def publish(total):
+    """Offers the app every voice from the master list whose recording is complete."""
+    master = json.load(open(MASTER))
+    done = []
+    for v in master['voices']:
+        mp = os.path.join(PUBLIC_ROOT, v['id'], 'manifest.json')
+        if os.path.exists(mp) and len(json.load(open(mp)).get('clips', {})) >= total:
+            done.append(v)
+    if not done:
+        return
+    ids = [v['id'] for v in done]
+    out = {'default': master['default'] if master['default'] in ids else ids[0], 'voices': done}
+    with open(os.path.join(PUBLIC_ROOT, 'voices.json'), 'w') as f:
+        json.dump(out, f, indent=2)
+        f.write('\n')
+    print('offered voices:', ', '.join(ids), flush=True)
 
 
 if __name__ == '__main__':

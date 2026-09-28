@@ -160,7 +160,7 @@ export function FindMove({ item, player, onDone }: ActivityProps<FindMoveItem>) 
 
     if (goal.kind === 'escape' && ways !== 'any') {
       const way = escapeWay(fen, m);
-      if (!ways.includes(way)) return wrong(m, `That's a way, but not one we need. Try to ${ways.filter((w) => !found.includes(w)).join(' or ')}!`, after);
+      if (!ways.includes(way)) return wrong(m, "That's a way, but not one we need. Try another way!", after);
       if (found.includes(way)) {
         setBusy(true);
         setFen(after);

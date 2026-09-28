@@ -116,7 +116,7 @@ function DbRun({ themes, maxRating, count, streak, fixed, player, onDone, band, 
     const n = run.current;
     updateKid(kid.id, (d) => void (d.puzzle.bestStreak = Math.max(d.puzzle.bestStreak, n)));
     const best = player.best('puzzle-streak', n, 'higher');
-    player.say(n > 0 ? `Great run: ${n}!${best ? ' A new best!' : ''}` : 'Good try! Play again?', 'cheer');
+    player.say(n > 0 ? [`Great run, ${n} in a row!`, best ? 'A new best!' : ''] : 'Good try! Play again?', 'cheer');
     onDone({ score: n >= 5 ? 3 : n >= 2 ? 2 : 1, mistakes: 0, hintLevel: 0, stats: { streak: n } });
   };
 

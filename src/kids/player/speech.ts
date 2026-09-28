@@ -80,9 +80,20 @@ if (typeof window !== 'undefined') {
 
 const words = (t: string) => t.split(/\s+/).filter(Boolean);
 
-// ---------- Pip's recorded voice ----------
-// Every fixed line has a clip recorded with a natural neural voice (scripts/voice). Lines without
-// a clip (built at run time, e.g. with a kid's name) use the best device voice instead.
+// ---------- Pip's recorded voices ----------
+// Every fixed line is recorded in several natural voices (scripts/voice; the list is
+// public/voice/voices.json, each voice's clips in public/voice/<id>/). A kid picks one in the
+// grown-ups area. Lines without a clip (built at run time, e.g. with a kid's name), or the
+// "device voice" choice, use the best voice of the device instead.
+export interface PipVoice {
+  id: string;
+  name: string;
+  blurb: string;
+}
+interface VoiceList {
+  default: string;
+  voices: PipVoice[];
+}
 interface VoiceManifest {
   v: 1;
   voice: string;
@@ -90,41 +101,81 @@ interface VoiceManifest {
   version?: string;
   clips: Record<string, number>; // clip key -> duration (ms)
 }
-let manifest: VoiceManifest | null = null;
-let manifestLoad: Promise<void> | null = null;
+/** The "voice" that means the device's own speech engine. */
+export const DEVICE_VOICE = 'device';
+
+let voiceList: VoiceList | null = null;
+let listLoad: Promise<void> | null = null;
+let pipVoice = ''; // '' = the default voice
+const manifests = new Map<string, VoiceManifest | null>();
+const manifestLoads = new Map<string, Promise<void>>();
 let audioEl: HTMLAudioElement | null = null;
 const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
 const voiceUrl = (file: string) => new URL(`voice/${file}`, document.baseURI).href;
-const clipUrl = (key: string) => voiceUrl(`${key}.mp3${manifest?.version ? `?v=${encodeURIComponent(manifest.version)}` : ''}`);
+const canFetch = () => typeof document !== 'undefined' && typeof fetch !== 'undefined' && typeof Audio !== 'undefined';
 
-function loadManifest(): Promise<void> {
-  if (manifestLoad) return manifestLoad;
-  if (typeof document === 'undefined' || typeof fetch === 'undefined' || typeof Audio === 'undefined') return (manifestLoad = Promise.resolve());
-  manifestLoad = fetch(voiceUrl('manifest.json'))
+function loadList(): Promise<void> {
+  if (listLoad) return listLoad;
+  if (!canFetch()) return (listLoad = Promise.resolve());
+  listLoad = fetch(voiceUrl('voices.json'))
     .then((r) => (r.ok ? r.json() : null))
-    .then((m: VoiceManifest | null) => {
-      if (m?.v === 1 && m.clips) manifest = m;
+    .then((l: VoiceList | null) => {
+      if (l?.voices?.length) voiceList = l;
     })
     .catch(() => undefined);
-  return manifestLoad;
+  return listLoad;
 }
 
-/** The recorded voice is used unless the grown-ups picked a device voice. */
-const recordedOn = () => !voiceURI && !!manifest;
+/** The recorded voice in use: the kid's pick, else the default; null for the device voice. */
+function activeId(): string | null {
+  if (pipVoice === DEVICE_VOICE || !voiceList) return null;
+  return voiceList.voices.some((v) => v.id === pipVoice) ? pipVoice : voiceList.default;
+}
 
-/** Fetches every clip once in the background (the service worker keeps them for offline play). */
-let prefetched = false;
+function loadManifest(id: string): Promise<void> {
+  let p = manifestLoads.get(id);
+  if (!p) {
+    p = fetch(voiceUrl(`${id}/manifest.json`))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((m: VoiceManifest | null) => void manifests.set(id, m?.v === 1 && m.clips ? m : null))
+      .catch(() => void manifestLoads.delete(id)); // offline: try again next time
+    manifestLoads.set(id, p);
+  }
+  return p;
+}
+
+/** Loads the voice list and the active voice's clip list (waits at most `ms`). */
+function ready(ms: number): Promise<void> {
+  if (!canFetch()) return Promise.resolve();
+  const load = loadList().then(() => {
+    const id = activeId();
+    return id ? loadManifest(id) : undefined;
+  });
+  return Promise.race([load, new Promise<void>((r) => setTimeout(r, ms))]);
+}
+
+const activeManifest = (): { id: string; m: VoiceManifest } | null => {
+  const id = activeId();
+  const m = id ? manifests.get(id) : null;
+  return id && m ? { id, m } : null;
+};
+const clipUrl = (id: string, m: VoiceManifest, key: string) => voiceUrl(`${id}/${key}.mp3${m.version ? `?v=${encodeURIComponent(m.version)}` : ''}`);
+
+/** Fetches every clip of the active voice once in the background (the service worker keeps them for offline play). */
+const prefetched = new Set<string>();
 function prefetchClips() {
-  if (prefetched || !manifest || typeof navigator === 'undefined' || !navigator.serviceWorker?.controller) return;
-  // About 20 MB in all: not on metered or cellular connections (clips still load as they are used).
+  const a = activeManifest();
+  if (!a || prefetched.has(a.id) || typeof navigator === 'undefined' || !navigator.serviceWorker?.controller) return;
+  // About 30 MB a voice: not on metered or cellular connections (clips still load as they are used).
   const conn = (navigator as Navigator & { connection?: { saveData?: boolean; type?: string } }).connection;
   if (conn?.saveData || conn?.type === 'cellular') return;
-  prefetched = true;
-  const keys = Object.keys(manifest.clips);
+  prefetched.add(a.id);
+  const keys = Object.keys(a.m.clips);
   let i = 0;
   const step = () => {
-    if (i >= keys.length || !navigator.onLine) return;
-    fetch(clipUrl(keys[i++]))
+    if (i >= keys.length) return;
+    if (!navigator.onLine || activeId() !== a.id) return void prefetched.delete(a.id); // interrupted: resume later
+    fetch(clipUrl(a.id, a.m, keys[i++]))
       .then((r) => r.arrayBuffer())
       .catch(() => undefined)
       .finally(() => setTimeout(step, 60));
@@ -132,7 +183,7 @@ function prefetchClips() {
   setTimeout(step, 4000);
 }
 
-if (typeof window !== 'undefined') void loadManifest().then(prefetchClips);
+if (typeof window !== 'undefined') void ready(10_000).then(prefetchClips);
 
 let runGen = 0;
 
@@ -148,7 +199,7 @@ function timedWords(p: LinePlan, ms: number, live: () => boolean) {
   for (let i = 1; i < p.capWords; i++) timers.push(setTimeout(() => live() && set({ word: p.base + i }), i * per));
 }
 
-function playClip(p: LinePlan, key: string, ms: number, rate: number | undefined, live: () => boolean, done: () => void, fallback: () => void) {
+function playClip(p: LinePlan, src: string, ms: number, rate: number | undefined, live: () => boolean, done: () => void, fallback: () => void) {
   const el = (audioEl ??= new Audio());
   let settled = false;
   const fail = () => {
@@ -162,7 +213,7 @@ function playClip(p: LinePlan, key: string, ms: number, rate: number | undefined
     done();
   };
   el.onerror = fail;
-  el.src = clipUrl(key);
+  el.src = src;
   el.playbackRate = rate ? Math.min(1.2, Math.max(0.7, rate)) : 1;
   el.play()
     .then(() => {
@@ -230,25 +281,61 @@ function run(lines: string[], opts: SpeakOpts, token: number) {
     offset += p.capWords;
     return p;
   });
+  // A line is played from its recording; failing that, sentence by sentence when every sentence
+  // has one (lines put together at run time); failing that, by the device voice.
+  const sentences = (t: string) => t.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const clipsFor = (p: LinePlan, m: VoiceManifest): { p: LinePlan; key: string; ms: number }[] | null => {
+    const whole = clipKey(p.spoken);
+    if (m.clips[whole] !== undefined) return [{ p, key: whole, ms: m.clips[whole] }];
+    const parts = sentences(p.spoken);
+    if (parts.length < 2 || parts.some((x) => m.clips[clipKey(x)] === undefined)) return null;
+    // Share the caption's words among the sentences for the highlight.
+    const total = parts.reduce((n, x) => n + words(x).length, 0);
+    let base = p.base;
+    return parts.map((x, j) => {
+      const capWords = j === parts.length - 1 ? p.base + p.capWords - base : Math.round((words(x).length / total) * p.capWords);
+      const sub = { spoken: x, capWords: Math.max(1, capWords), base };
+      base += capWords;
+      return { p: sub, key: clipKey(x), ms: m.clips[clipKey(x)] };
+    });
+  };
   const next = (i: number) => {
     if (!live()) return;
     clearTimers();
     if (i >= plan.length) return set({ speaking: false, word: -1 });
     const p = plan[i];
-    const key = recordedOn() ? clipKey(p.spoken) : '';
-    const ms = key ? manifest!.clips[key] : undefined;
-    if (key && ms !== undefined) playClip(p, key, ms, opts.clipRate, live, () => next(i + 1), () => speakTts(p, opts, live, () => next(i + 1)));
-    else speakTts(p, opts, live, () => next(i + 1));
+    const a = activeManifest();
+    const clips = a ? clipsFor(p, a.m) : null;
+    if (!a || !clips) return speakTts(p, opts, live, () => next(i + 1));
+    const play = (j: number) => {
+      if (j >= clips.length) return next(i + 1);
+      const c = clips[j];
+      playClip(c.p, clipUrl(a.id, a.m, c.key), c.ms, opts.clipRate, live, () => play(j + 1), () => speakTts(j === 0 ? p : c.p, opts, live, () => (j === 0 ? next(i + 1) : play(j + 1))));
+    };
+    play(0);
   };
   // The clip list loads with Kids mode; give it a moment on the very first line.
-  if (!manifest && manifestLoad) void Promise.race([manifestLoad, new Promise((r) => setTimeout(r, 800))]).then(() => next(0));
+  if (activeId() !== null && !activeManifest()) void ready(800).then(() => next(0));
+  else if (!voiceList && listLoad) void ready(800).then(() => next(0));
   else next(0);
 }
 
 export const speech = {
   supported: () => !!synth() || typeof Audio !== 'undefined',
-  /** Whether Pip's recorded voice is in use (not a device voice). */
-  recorded: () => recordedOn(),
+  /** Whether one of Pip's recorded voices is in use (not the device voice). */
+  recorded: () => !!activeManifest(),
+  /** Pip's recorded voices (empty until the list has loaded). */
+  pipVoices: (): PipVoice[] => voiceList?.voices ?? [],
+  /** The voice used when a kid has not picked one. */
+  defaultPipVoice: () => voiceList?.default ?? '',
+  /** Loads the list of Pip's voices. */
+  loadPipVoices: () => loadList(),
+  /** Picks Pip's voice: a recorded voice id, DEVICE_VOICE, or '' for the default. */
+  setPipVoice(id: string | undefined) {
+    if ((id ?? '') === pipVoice) return;
+    pipVoice = id ?? '';
+    void ready(10_000).then(prefetchClips);
+  },
   /** Call from the first pointerdown (iOS): unlocks audio playback and speech inside the tap. */
   unlock() {
     if (unlocked) return;

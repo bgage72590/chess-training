@@ -106,7 +106,8 @@ export function PlayBot({ item, player, onDone, kid }: ActivityProps<PlayBotItem
       player.say(band === 'champion' ? 'Pass and play. Choose a handicap if you like.' : 'Play with a friend! Pick how to start.');
       return;
     }
-    const who = friend ? 'White goes first!' : `${buddy.name} the ${buddy.animal.toLowerCase()} wants to play. ${INTRO[mission]}`;
+    // Separate sentences, so each is said from its recording.
+    const who = friend ? ['White goes first!'] : [`${buddy.name} wants to play!`, INTRO[mission]];
     player.say(item.say ?? who, 'talk');
     player.setHints([
       { say: 'Is any of your pieces in danger?' },
@@ -180,11 +181,11 @@ export function PlayBot({ item, player, onDone, kid }: ActivityProps<PlayBotItem
       const kidMs = next.filter((p) => p.move.color === kidColor).map((p) => p.move);
       const t = developTicks(kidMs, kidColor);
       if (developOver(t, kidMs.length)) {
-        const n = Object.values(t).filter((x) => x === 'yes').length;
+        const rules = Object.values(t).filter((x) => x === 'yes').length;
         setMissionDone('open');
-        player.sound(n >= 3 ? 'fanfare' : 'chime');
-        if (n >= 5) player.celebrate('big');
-        player.say(band === 'champion' ? `Golden Rules: ${n} of 5.` : `Golden Rules: you got ${n} of 5!`, n >= 3 ? 'cheer' : 'talk');
+        player.sound(rules >= 3 ? 'fanfare' : 'chime');
+        if (rules >= 5) player.celebrate('big');
+        player.say(band === 'champion' ? `${rules} of 5 Golden Rules.` : `You got ${rules} of 5 Golden Rules!`, rules >= 3 ? 'cheer' : 'talk');
       }
     }
     return false;
@@ -307,7 +308,8 @@ export function PlayBot({ item, player, onDone, kid }: ActivityProps<PlayBotItem
     setHintsUsed((n) => n + 1);
     setHintArrow({ from: m.from, to: m.to, color: 'green' });
     player.sound('sparkle');
-    player.say(band === 'champion' ? `Try ${m.san}.` : `Try moving your ${NAME[m.piece]}!`, 'think');
+    // The green arrow shows the move; Pip names the piece.
+    player.say(band === 'champion' ? `Try your ${NAME[m.piece]}.` : `Try moving your ${NAME[m.piece]}!`, 'think');
   };
   const fenRef = useRef(fen);
   fenRef.current = fen;

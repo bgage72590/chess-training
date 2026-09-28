@@ -136,7 +136,7 @@ function QuizCard({ item, player, onDone }: Props) {
   }, [item, countOpts]);
 
   // ---------- explanations ----------
-  const explain = (): { say: BandText; arrows?: Arrow[]; tones?: Partial<Record<Sq, SquareTone>> } => {
+  const explain = (): { say: BandText | BandText[]; arrows?: Arrow[]; tones?: Partial<Record<Sq, SquareTone>> } => {
     switch (item.kind) {
       case 'status2':
       case 'status4': {
@@ -150,15 +150,16 @@ function QuizCard({ item, player, onDone }: Props) {
         return { say: { all: 'Nobody is attacking the king. He is calm!', champion: 'The king is not attacked.' }, tones };
       }
       case 'count':
-        return { say: { all: `Count the dots: ${item.answer}!`, champion: `${item.answer} squares.` } };
+        return { say: { all: `The knight can jump to ${item.answer} squares!`, champion: `${item.answer} squares.` } };
       case 'value': {
         const [a, b] = [item.a.toUpperCase(), item.b.toUpperCase()];
-        return { say: { all: `A ${PIECE_NAME[a]} is ${CANDY[a]} ${CANDY[a] === 1 ? 'candy' : 'candies'}, a ${PIECE_NAME[b]} is ${CANDY[b]}.`, champion: `${cap(PIECE_NAME[a])} ${CANDY[a]}, ${PIECE_NAME[b]} ${CANDY[b]}.` } };
+        // One recorded sentence per piece, said one after the other.
+        return { say: [CANDY_LINE[a], CANDY_LINE[b]] };
       }
       case 'trade': {
         const t = tradeOutcome(item.fen, item.move)!;
         const line = t.loss ? `You win ${t.gain} and give back ${t.loss}.` : `You win ${t.gain}, and nobody can take back!`;
-        return { say: `${line} ${t.net >= 0 ? 'Good trade!' : 'Bad trade!'}`, arrows: t.recapture ? [{ from: t.recapture.from, to: t.recapture.to, color: 'red' }] : [] };
+        return { say: [line, t.net >= 0 ? 'Good trade!' : 'Bad trade!'], arrows: t.recapture ? [{ from: t.recapture.from, to: t.recapture.to, color: 'red' }] : [] };
       }
       case 'can-castle': {
         if (item.answer) return { say: { all: 'The king has not moved, the path is empty and safe. Castle away!', champion: 'All castling rules are met.' } };
@@ -219,7 +220,7 @@ function QuizCard({ item, player, onDone }: Props) {
     later(() => onDone({ score: standardScore(m, hl), mistakes: m, hintLevel: hl }), 1400);
   };
 
-  const oops = (line: BandText, key?: string) => {
+  const oops = (line: BandText | BandText[], key?: string) => {
     mistakesRef.current += 1;
     setMistakes(mistakesRef.current);
     if (key) setWrong((w) => [...w, key]);
@@ -254,7 +255,7 @@ function QuizCard({ item, player, onDone }: Props) {
       playTrade(() => {
         if (right) {
           player.sound('pop');
-          player.say([{ all: 'Yes!', champion: 'Correct.' }, e.say], 'cheer');
+          player.say([{ all: 'Yes!', champion: 'Correct.' }, ...[e.say].flat()], 'cheer');
           finish();
         } else {
           setShownFen(null);
@@ -281,7 +282,7 @@ function QuizCard({ item, player, onDone }: Props) {
       player.say({ all: "Right, you can't! Why not?", champion: 'Correct. Why not?' }, 'cheer');
       return;
     }
-    player.say([{ all: 'Yes!', champion: 'Correct.' }, e.say], 'cheer');
+    player.say([{ all: 'Yes!', champion: 'Correct.' }, ...[e.say].flat()], 'cheer');
     finish();
   };
 
@@ -292,7 +293,7 @@ function QuizCard({ item, player, onDone }: Props) {
     if (!ok) return oops(e.say, `r-${id}`);
     setShown(e);
     player.sound('pop');
-    player.say([{ all: 'Exactly!', champion: 'Correct.' }, e.say], 'cheer');
+    player.say([{ all: 'Exactly!', champion: 'Correct.' }, ...[e.say].flat()], 'cheer');
     finish();
   };
 
@@ -438,6 +439,15 @@ function boardLabel(kind: QuizItem['kind'], phase: Phase): string {
 }
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+
+/** What each piece is worth in candies, one recorded sentence each. */
+const CANDY_LINE: Record<string, BandText> = {
+  P: { all: 'A pawn is 1 candy.', champion: 'A pawn is worth 1.' },
+  N: { all: 'A knight is 3 candies.', champion: 'A knight is worth 3.' },
+  B: { all: 'A bishop is 3 candies.', champion: 'A bishop is worth 3.' },
+  R: { all: 'A rook is 5 candies.', champion: 'A rook is worth 5.' },
+  Q: { all: 'A queen is 9 candies.', champion: 'A queen is worth 9.' },
+};
 
 function fenAfter(fen: string, move: [Sq, Sq]): string {
   // Local import-free helper: chess.js through tradeOutcome would recompute everything.

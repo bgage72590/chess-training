@@ -14,6 +14,9 @@ import { speech } from '../player/speech';
 import { noteInput } from '../player/useSession';
 import { go } from '../routes';
 
+/** Ages said as words (each has a recording). */
+const AGE_WORDS: Record<number, string> = { 4: 'Four!', 5: 'Five!', 6: 'Six!', 7: 'Seven!', 8: 'Eight!', 9: 'Nine!', 10: 'Ten!', 11: 'Eleven!', 12: 'Twelve!' };
+
 const LINES = [
   "What's your name? A grown-up can type it, or pick a fun name!",
   'How old are you?',
@@ -100,7 +103,7 @@ export function NewKid() {
                 className={`k-age${age === a ? ' on' : ''}`}
                 onClick={() => {
                   setAge(a);
-                  speech.speak([String(a)]);
+                  speech.speak([AGE_WORDS[a] ?? String(a)]);
                 }}
               >
                 {a}

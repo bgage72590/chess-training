@@ -47,10 +47,11 @@ self.addEventListener('fetch', (event) => {
   }
   if (url.origin !== self.location.origin) return;
 
-  // Pip's voice: clips are named by their text and the recording version, so a cached clip never
-  // goes stale. The clip list is fetched fresh when online; a new recording clears the old clips.
+  // Pip's voices: clips are named by their text and the recording version, so a cached clip never
+  // goes stale. The voice and clip lists are fetched fresh when online; a new recording clears the
+  // old clips.
   if (req.method === 'GET' && url.pathname.includes('/voice/')) {
-    if (url.pathname.endsWith('/manifest.json')) {
+    if (url.pathname.endsWith('.json')) {
       const fresh = fetch(req);
       event.respondWith(fresh.then((res) => res.clone()).catch(() => caches.open(VOICE).then((c) => c.match(req)).then((hit) => hit ?? Response.error())));
       event.waitUntil(
@@ -60,7 +61,7 @@ self.addEventListener('fetch', (event) => {
             const next = await res.clone().json();
             const cache = await caches.open(VOICE);
             const prev = await cache.match(req).then((hit) => (hit ? hit.json() : null));
-            if (prev && prev.version !== next.version) await caches.delete(VOICE);
+            if (prev && prev.version && prev.version !== next.version) await caches.delete(VOICE);
             await (await caches.open(VOICE)).put(req, res);
           })
           .catch(() => undefined),

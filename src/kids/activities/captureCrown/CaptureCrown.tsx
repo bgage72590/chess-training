@@ -55,6 +55,8 @@ export function CaptureCrown({ item, player, onDone, kid }: ActivityProps<CrownI
           ? "It's a tie!"
           : 'Good game!';
     setResult({ outcome, text });
+    // With a friend, Pip says the color (names stay on screen), so every line has a recording.
+    const said = seats && o.winner ? (o.winner === 'w' ? 'White wins!' : 'Black wins!') : text;
     if (outcome === 'win' || (seats && o.winner)) {
       player.sound('crown');
       player.celebrate('big');
@@ -63,7 +65,7 @@ export function CaptureCrown({ item, player, onDone, kid }: ActivityProps<CrownI
     player.say(
       o.reason === 'crown'
         ? outcome === 'win' || seats
-          ? { all: `${text} The king was captured!`, sprout: text }
+          ? [said, { all: 'The king was captured!', sprout: '' }]
           : { all: 'I captured your king! Good game. Keep your king safe next time!', sprout: 'I got your king! Good game!' }
         : o.reason === 'stuck'
           ? "Nobody can move. It's a tie!"

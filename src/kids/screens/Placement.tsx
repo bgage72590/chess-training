@@ -71,7 +71,7 @@ export function Placement({ kid, single }: { kid: KidProfile; single?: number })
   // The last card is read aloud too (a Sprout who "knows the moves" may not read yet).
   const sw = WORLDS[Math.min(8, state.startWorld) - 1];
   const opened = !!single && singlePassed && worldUnlocked(getKid(kid.id) ?? kid, sw.id, REGISTRY);
-  const doneText = !state.done ? '' : single ? (opened ? `Rank ${sw.rank}: ${sw.title} is open!` : singlePassed ? 'Great playing! Keep going on the map.' : 'Good try! Keep playing to get there.') : `You start at Rank ${sw.rank}: ${sw.title}!`;
+  const doneText = !state.done ? '' : single ? (opened ? `${sw.title} is open!` : singlePassed ? 'Great playing! Keep going on the map.' : 'Good try! Keep playing to get there.') : `You start in ${sw.title}!`;
   useEffect(() => {
     if (doneText) sayAs(getKid(kid.id) ?? kid, [doneText]);
     // eslint-disable-next-line react-hooks/exhaustive-deps

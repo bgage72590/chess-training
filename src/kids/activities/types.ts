@@ -47,7 +47,8 @@ export interface ItemMeta {
   rule?: BandText; // hint level 1 line
 }
 export interface HintStep {
-  say?: BandText;
+  /** One line, or several spoken one after another (each can then have its own recording). */
+  say?: BandText | BandText[];
   tones?: Record<Sq, SquareTone>;
   arrows?: Arrow[];
   art?: Record<Sq, ArtKey>;
@@ -77,7 +78,7 @@ export interface PlayerApi {
   readonly kid: KidProfile;
   readonly mode: PlayMode;
   say(text: BandText | BandText[], mood?: PipMood): void; // bubble + speech per band voice rules
-  mistake(text?: BandText): void; // counts a mistake; boop; Pip 'oops'; advances hint ladder; may offer "Easier one?"
+  mistake(text?: BandText | BandText[]): void; // counts a mistake; boop; Pip 'oops'; advances hint ladder; may offer "Easier one?"
   setHints(steps: HintStep[]): void; // ladder levels 1..4 for the current item (missing levels use generic fallbacks)
   readonly hint: HintStep | null; // currently shown hint step (activity renders tones/arrows/art from it)
   readonly hintLevel: 0 | 1 | 2 | 3 | 4;

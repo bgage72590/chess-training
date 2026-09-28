@@ -81,6 +81,7 @@ export function KidsApp({ route }: { route: string }) {
   useEffect(() => () => speech.cancel(), []);
   useEffect(() => kidsSound.setEnabled(kid ? kid.settings.sound && !kid.settings.muted : true), [kid]);
   useEffect(() => speech.setVoice(s.device.voiceURI), [s.device.voiceURI]);
+  useEffect(() => speech.setPipVoice(kid?.settings.pipVoice), [kid?.settings.pipVoice]);
   useEffect(() => {
     const prev = document.title;
     document.title = "Pip's Chess Quest";

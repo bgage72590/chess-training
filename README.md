@@ -69,17 +69,20 @@ check so older or experienced kids skip what they know. Each child gets a profil
 area (behind a simple parent check or a PIN) has progress reports, session limits, read-aloud and
 sound settings, and can lock the device to Kids mode.
 
-Pip's lines are pre-recorded with a natural neural voice, so they sound the same on every device;
-lines made up on the fly fall back to the device's most natural voice. To re-record after changing
-the Kids copy, with Kokoro (runs locally: `pip install kokoro-onnx lameenc` and the model files) or
-Google Cloud Text-to-Speech (a key in `GOOGLE_TTS_API_KEY`); details in `scripts/voice/render.py`:
+Pip speaks in one of eight recorded voices (Sunny, Breezy, Sparkle, Honey, Pepper, Willow, Bella
+and Rocket), chosen per child in the grown-ups area, where tapping a voice plays a sample. Every
+fixed line, and every version of lines with a few known values (pieces, squares, numbers, buddy
+and world names), is recorded, so Pip sounds the same on every device; a line made up on the spot
+is said sentence by sentence from recordings where possible, and otherwise by the device's most
+natural voice. The voices are listed in `scripts/voice/voices.json`. To record after changing the
+Kids copy (Google Cloud Text-to-Speech, key in `GOOGLE_TTS_API_KEY` or added to requests by the
+environment; Kokoro also works, locally), see `scripts/voice/render.py`:
 
 ```
 npx tsx scripts/voice/collect.ts > /tmp/lines.json
-python3 scripts/voice/render.py /tmp/lines.json --model /path/to/kokoro      # or: --engine google
-python3 scripts/voice/try_voices.py /tmp/voices --engine google Leda Aoede   # audition voices
+python3 scripts/voice/render.py /tmp/lines.json --id sunny            # once per voice
+python3 scripts/voice/try_voices.py /tmp/try --engine google Leda Puck   # audition voices
 ```
-
 ## Getting started
 
 ```bash

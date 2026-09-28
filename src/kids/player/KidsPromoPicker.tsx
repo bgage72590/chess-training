@@ -3,10 +3,10 @@ import { useEffect, useRef } from 'react';
 import { speech } from './speech';
 
 const CHOICES = [
-  { p: 'q', name: 'Queen' },
-  { p: 'r', name: 'Rook' },
-  { p: 'b', name: 'Bishop' },
-  { p: 'n', name: 'Knight' },
+  { p: 'q', name: 'Queen', say: 'Queen!' },
+  { p: 'r', name: 'Rook', say: 'Rook!' },
+  { p: 'b', name: 'Bishop', say: 'Bishop!' },
+  { p: 'n', name: 'Knight', say: 'Knight!' },
 ] as const;
 
 export function KidsPromoPicker({ color, onPick, onCancel, speak }: { color: 'w' | 'b'; onPick(p: 'q' | 'r' | 'b' | 'n'): void; onCancel(): void; speak: boolean }) {
@@ -24,7 +24,7 @@ export function KidsPromoPicker({ color, onPick, onCancel, speak }: { color: 'w'
               type="button"
               className={`k-promo-btn${i === 0 ? ' best' : ''}`}
               onClick={() => onPick(c.p)}
-              onFocus={() => speak && speech.speak([c.name])}
+              onFocus={() => speak && speech.speak([c.say])}
             >
               <span className={`k-promo-piece pc-${color}${c.p.toUpperCase()}`} aria-hidden="true" />
               <span>{c.name}</span>
