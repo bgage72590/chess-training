@@ -521,6 +521,10 @@
     padding: 10px 16px;
   }
 }
+/* A result scrolled into view (useReveal) stops clear of the sticky nav. */
+.main:has(.lesson-nav) {
+  scroll-padding-bottom: 88px;
+}
 /* Opacity only: .step-wrap wraps the board column. */
 .step-wrap {
   animation: fade-in 200ms var(--ease);
@@ -621,6 +625,12 @@
 }
 .demo-move.future {
   opacity: 0.45;
+}
+@media (pointer: coarse) {
+  .demo-move {
+    min-height: 40px;
+    align-items: center;
+  }
 }
 .note-card {
   display: flex;
@@ -772,7 +782,7 @@
 }
 @media (pointer: coarse) {
   .theme-chip {
-    min-height: 34px;
+    min-height: 40px;
   }
 }
 .rush-intro {
@@ -1168,6 +1178,11 @@
 }
 .moment .faint {
   text-align: right;
+}
+@media (pointer: coarse) {
+  .moment {
+    min-height: 40px;
+  }
 }
 .game-list {
   display: flex;

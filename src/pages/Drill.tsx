@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Chess, type Move } from 'chess.js';
 import { endgameDrills, type EndgameDrill } from '../content';
 import { navigate } from '../router';
@@ -27,8 +27,16 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
   const [arrows, setArrows] = useState<Arrow[]>([]);
   const [hints, setHints] = useState(0);
   const engineStatus = useEngineStatus();
+  /** Bumped by restart, take-back and leaving, so a reply still being "thought" about is dropped. */
+  const runRef = useRef(0);
   // Leaving cancels any search; cancelled searches resolve null and their callers stop.
-  useEffect(() => () => engine.cancelAll(), []);
+  useEffect(
+    () => () => {
+      engine.cancelAll();
+      runRef.current++;
+    },
+    [],
+  );
 
   const fen = moves.length ? moves[moves.length - 1].after : drill.fen;
   const learnerMoves = moves.filter((m) => m.color === learner).length;
@@ -73,6 +81,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
     }
 
     setStatus('thinking');
+    const run = runRef.current;
     const startedAt = performance.now();
     let res;
     try {
@@ -81,7 +90,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
       setStatus('playing');
       return;
     }
-    if (!res) return;
+    if (!res || run !== runRef.current) return;
     // The score is from the engine's side (to move); flip it to the learner.
     const evalLearner = -scoreToCp(res.lines[0]?.score ?? { cp: 0 });
 
@@ -101,6 +110,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
 
     const reply = res.best && playUci(afterLearner, res.best);
     if (reply) await waitUntil(startedAt, thinkTimeMs({ fen: afterLearner, moveNumber: used, afterCapture: !!mv.captured }));
+    if (run !== runRef.current) return; // restarted, taken back or left meanwhile
     if (!reply) {
       setStatus('playing');
       return;
@@ -119,6 +129,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
 
   const takeBack = () => {
     engine.cancelAll();
+    runRef.current++;
     // Back to the position before the learner's last move.
     setMoves(moves.slice(0, takeBackTo(moves, learner)));
     setStatus('playing');
@@ -128,6 +139,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
 
   const restart = () => {
     engine.cancelAll();
+    runRef.current++;
     setMoves([]);
     setStatus('playing');
     setMessage(null);
@@ -173,7 +185,7 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
           <RichText text={drill.brief} />
         </div>
         <EngineNotice />
-        {message && <Feedback tone={status === 'success' ? 'good' : 'bad'} icon={status === 'success' ? 'trophy' : 'x'} title={message.title} body={message.body} />}
+        {message && <Feedback tone={status === 'success' ? 'good' : 'bad'} icon={status === 'success' ? 'trophy' : 'x'} title={message.title} body={message.body} reveal />}
         <div className="btn-row">
           {status === 'success' ? (
             <>

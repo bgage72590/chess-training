@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Icon } from './Icon';
 import { sound } from '../chess/sound';
+import { useReveal } from '../lib/hooks';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
@@ -166,11 +167,28 @@ function inline(s: string): ReactNode[] {
 
 /**
  * A feedback banner: an icon, a bold title and an optional body line. Extra lines can be
- * passed as children (give them the `feedback-body` class).
+ * passed as children (give them the `feedback-body` class). `reveal` scrolls it into view when
+ * it appears: on phones the panel sits under the board, so a move's result can land below the fold.
  */
-export function Feedback({ tone, icon, title, body, children }: { tone: 'good' | 'bad' | 'warn' | 'info'; icon: string | ReactNode; title?: ReactNode; body?: ReactNode; children?: ReactNode }) {
+export function Feedback({
+  tone,
+  icon,
+  title,
+  body,
+  children,
+  reveal,
+}: {
+  tone: 'good' | 'bad' | 'warn' | 'info';
+  icon: string | ReactNode;
+  title?: ReactNode;
+  body?: ReactNode;
+  children?: ReactNode;
+  reveal?: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useReveal(ref, !!reveal);
   return (
-    <div className={`feedback feedback-${tone}`}>
+    <div ref={ref} className={`feedback feedback-${tone}`}>
       {typeof icon === 'string' ? <Icon name={icon} /> : icon}
       <div>
         {title && <strong>{title}</strong>}

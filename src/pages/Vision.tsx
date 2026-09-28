@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Chess, type Move } from 'chess.js';
 import { Board, type SquareTone } from '../chess/Board';
 import { FILES, playUci, randomItem, shuffle, colorName, turnOf } from '../chess/utils';
 import { puzzles } from '../data/puzzles';
 import { getProfile, logActivity, updateProfile, useProfile } from '../store/profile';
-import { useTimeouts } from '../lib/hooks';
+import { useReveal, useScrollTopOn, useTimeouts } from '../lib/hooks';
 import { navigate } from '../router';
 import { BoardColumn } from '../components/BoardColumn';
 import { Button, Countdown, Feedback, PageHeader, Pill, Segmented } from '../components/ui';
@@ -38,7 +38,12 @@ function CoordsDrill({ mode }: { mode: 'find' | 'name' }) {
   const [options, setOptions] = useState<string[]>([]);
   const [newBest, setNewBest] = useState(false);
   const { later } = useTimeouts();
+  const optionsRef = useRef<HTMLDivElement>(null);
   const key = `coords-${mode}-${side}`;
+
+  // A run shows the board from its top, with the name buttons in view under it on phones.
+  useScrollTopOn(phase === 'run');
+  useReveal(optionsRef, phase === 'run');
 
   const nextTarget = (prev?: string) => {
     let t = randomItem(ALL_SQUARES);
@@ -97,10 +102,12 @@ function CoordsDrill({ mode }: { mode: 'find' | 'name' }) {
         />
       </BoardColumn>
       <aside className="panel">
-        <div className="panel-section">
-          <h2>{mode === 'find' ? 'Find the square' : 'Name the square'}</h2>
-          <p className="muted">Strong players see squares as names without thinking. Thirty seconds, as many as you can. Train both sides of the board.</p>
-        </div>
+        {phase !== 'run' && (
+          <div className="panel-section">
+            <h2>{mode === 'find' ? 'Find the square' : 'Name the square'}</h2>
+            <p className="muted">Strong players see squares as names without thinking. Thirty seconds, as many as you can. Train both sides of the board.</p>
+          </div>
+        )}
         {phase === 'run' && (
           <div className="rush-head">
             <div>
@@ -118,7 +125,7 @@ function CoordsDrill({ mode }: { mode: 'find' | 'name' }) {
           </div>
         )}
         {phase === 'run' && mode === 'name' && (
-          <div className="name-options">
+          <div className="name-options" ref={optionsRef}>
             {options.map((o) => (
               <button key={o} className="name-option mono" onClick={() => answer(o)}>
                 {o}
@@ -132,6 +139,7 @@ function CoordsDrill({ mode }: { mode: 'find' | 'name' }) {
             icon={newBest ? 'trophy' : 'check'}
             title={`${score} correct${newBest ? ' · new best' : ''}`}
             body={`${misses ? `${misses} miss${misses > 1 ? 'es' : ''}. ` : 'No misses. '}Best as ${side}: ${Math.max(best, score)}`}
+            reveal
           />
         )}
         {phase !== 'run' && (

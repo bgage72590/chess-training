@@ -81,8 +81,14 @@ export function MoveList({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const el = ref.current?.querySelector('.cur');
-    el?.scrollIntoView({ block: 'nearest' });
+    const list = ref.current;
+    const el = list?.querySelector('.cur');
+    if (!list || !el) return;
+    // Scroll the list only: scrollIntoView would also scroll the page, sliding the board away on phones.
+    const l = list.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    if (r.top < l.top) list.scrollTop -= l.top - r.top;
+    else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
   }, [current, sans.length]);
   const cells: React.ReactNode[] = [];
   for (let row = 0; row * 2 < sans.length; row++) {

@@ -505,7 +505,7 @@ button {
 }
 @media (pointer: coarse) {
   .btn-s {
-    min-height: 36px;
+    min-height: 40px;
   }
   .btn-m {
     min-height: 42px;
@@ -621,6 +621,9 @@ button {
     width: 40px !important;
     height: 40px !important;
   }
+  .topbar .brand {
+    min-height: 40px;
+  }
   .topbar {
     /* Same 54px bar with the 40px touch targets. */
     padding-block: 7px;
@@ -659,7 +662,7 @@ button {
 }
 @media (pointer: coarse) {
   .segmented button {
-    min-height: 34px;
+    min-height: 40px;
   }
 }
 .pill {
@@ -790,6 +793,11 @@ textarea::placeholder {
 }
 .switch input:checked::after {
   transform: translateX(16px);
+}
+@media (pointer: coarse) {
+  .switch {
+    min-height: 40px;
+  }
 }
 
 /* ---------- Page scaffolding ---------- */
@@ -1169,6 +1177,11 @@ button.feedback:hover {
 .moves button:hover {
   background: var(--surface-3);
 }
+@media (pointer: coarse) {
+  .moves button {
+    min-height: 40px;
+  }
+}
 .moves button.cur {
   background: var(--accent-soft);
   color: var(--accent-strong);
@@ -1469,4 +1482,14 @@ button.feedback:hover {
   height: 30px;
   margin-left: 2px;
   flex: none;
+}
+@media (pointer: coarse) {
+  /* This rule outranks the touch-sized .icon-btn, so it restates the 40px. */
+  .board-caption .sound-toggle {
+    width: 40px;
+    height: 40px;
+  }
+  .volume-row input[type='range'] {
+    min-height: 40px;
+  }
 }

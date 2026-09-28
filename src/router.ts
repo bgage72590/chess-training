@@ -14,6 +14,7 @@ if (typeof window !== 'undefined') {
     if (next !== route) {
       route = next;
       emit();
+      scrollToTop();
     }
   };
   window.addEventListener('hashchange', sync);
@@ -30,6 +31,11 @@ export function navigate(to: string, opts: { replace?: boolean } = {}) {
     /* sandboxed frame: keep in-memory route */
   }
   emit();
+  scrollToTop();
+}
+
+/** Scrolls the page to the top; also for a new view inside the same route (a lesson step, a game). */
+export function scrollToTop() {
   try {
     window.scrollTo({ top: 0 });
     document.querySelector('.main')?.scrollTo({ top: 0 });

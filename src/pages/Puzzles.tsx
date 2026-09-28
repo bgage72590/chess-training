@@ -147,8 +147,8 @@ function PanelBody({ api, puzzle, onNext, nextLabel = 'Next puzzle' }: { api: So
         <span className={`side-dot ${api.solverColor}`} />
         {api.status === 'intro' ? 'Get ready…' : api.goal}
       </div>
-      <PuzzleFeedback api={api} />
-      {api.status === 'solving' && api.mistakes > 0 && <Feedback tone="warn" icon="refresh" title="Try again" body="This one no longer counts for rating, so take your time." />}
+      <PuzzleFeedback api={api} reveal />
+      {api.status === 'solving' && api.mistakes > 0 && <Feedback tone="warn" icon="refresh" title="Try again" body="This one no longer counts for rating, so take your time." reveal />}
       {finished && <ThemeList themes={puzzle.themes} />}
       {finished && (
         <p className="faint" style={{ fontSize: '0.82rem' }}>

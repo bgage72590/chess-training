@@ -154,6 +154,7 @@ for (const f of 'abcdefgh')
     PST_MINOR[f + r] = d <= 1 ? 0.3 : d <= 2 ? 0.2 : d <= 3 ? 0.1 : 0;
   }
 
+/** Material, centralised minor pieces, pawn advance, and 0.2 per pawn on d4/e4/d5/e5 (the opening fights for the centre). */
 export function oliveEval(c: Chess, me: 'w' | 'b'): number {
   let s = 0;
   const board = c.board();
@@ -162,7 +163,7 @@ export function oliveEval(c: Chess, me: 'w' | 'b'): number {
       if (!p) continue;
       let v = MAT[p.type];
       if (p.type === 'n' || p.type === 'b') v += PST_MINOR[p.square];
-      else if (p.type === 'p') v += 0.05 * (p.color === 'w' ? Number(p.square[1]) - 2 : 7 - Number(p.square[1]));
+      else if (p.type === 'p') v += 0.05 * (p.color === 'w' ? Number(p.square[1]) - 2 : 7 - Number(p.square[1])) + (CENTER.has(p.square) ? 0.2 : 0);
       s += p.color === me ? v : -v;
     }
   return s;
@@ -207,11 +208,12 @@ function negamax(c: Chess, depth: number, alpha: number, beta: number, ply: numb
 }
 
 /**
- * Olive's search. `noise` is a uniform root bonus in ±noise per move (0 for hints).
+ * Olive's search. `noise` is a uniform root bonus in ±noise per move (0 for hints). For the first
+ * eight moves it is at most 0.1, under the centre-pawn bonus, so her openings are not random (1.h4, 1...g5).
  * Returns the deepest completed iteration's best move within `budgetMs`.
  */
 export function oliveMove(chess: Chess, rng: () => number, opts: { noise?: number; budgetMs?: number; maxDepth?: number } = {}): Move {
-  const noise = opts.noise ?? 0.3;
+  const noise = Math.min(opts.noise ?? 0.3, chess.moveNumber() <= 8 ? 0.1 : Infinity);
   const deadline = now() + (opts.budgetMs ?? 400);
   const mates = matingMoves(chess);
   if (mates.length) return mates[0];

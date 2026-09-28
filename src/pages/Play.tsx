@@ -6,7 +6,7 @@ import { colorName, drawReason, nullMoveFen, other, parseUci, playUci, pvToSan, 
 import { logActivity, playerWon, updateProfile, type GameRecord } from '../store/profile';
 import { winFor } from '../lib/analysis';
 import { thinkTimeMs, waitUntil } from '../lib/thinkTime';
-import { navigate } from '../router';
+import { navigate, scrollToTop } from '../router';
 import { BoardColumn } from '../components/BoardColumn';
 import { Button, Feedback, PageHeader, Pill, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
@@ -208,6 +208,7 @@ export function PlayPage() {
     setPending(false);
     setResult(null);
     setPhase('playing');
+    scrollToTop(); // the Start button sits below the fold on phones
     if (c === 'b') void engineMove([], c);
     else void analyseForPlayer(START_FEN);
   };
@@ -464,7 +465,13 @@ export function PlayPage() {
             <Button icon="refresh" onClick={start}>
               Rematch
             </Button>
-            <Button variant="ghost" onClick={() => setPhase('setup')}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setPhase('setup');
+                scrollToTop();
+              }}
+            >
               Change opponent
             </Button>
           </div>

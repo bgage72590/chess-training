@@ -239,12 +239,12 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
   );
 }
 
-export function PuzzleFeedback({ api }: { api: SolverApi }) {
-  if (api.status === 'failed') return <Feedback tone="bad" icon="x" title="Not the move" body="Look again at checks, captures and threats." />;
+export function PuzzleFeedback({ api, reveal }: { api: SolverApi; reveal?: boolean }) {
+  if (api.status === 'failed') return <Feedback tone="bad" icon="x" title="Not the move" body="Look again at checks, captures and threats." reveal={reveal} />;
   if (api.status !== 'solved' && api.status !== 'viewing') return null;
   const solved = api.status === 'solved';
   return (
-    <Feedback tone={solved ? 'good' : 'info'} icon={solved ? 'check' : 'eye'} title={solved ? (api.mistakes ? 'Solved, after a retry' : 'Solved') : 'Solution'}>
+    <Feedback tone={solved ? 'good' : 'info'} icon={solved ? 'check' : 'eye'} title={solved ? (api.mistakes ? 'Solved, after a retry' : 'Solved') : 'Solution'} reveal={reveal}>
       <span className="feedback-body mono">{api.solutionSan.slice(1).join('  ')}</span>
       {api.contSan.length > 0 && <span className="feedback-body faint">Then {api.contSan.join(' ')}</span>}
     </Feedback>

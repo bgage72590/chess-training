@@ -4,7 +4,7 @@ import { openings, type Opening, type OpeningLine } from '../content';
 import { navigate } from '../router';
 import { getProfile, logActivity, updateProfile, useProfile } from '../store/profile';
 import { review, isDue, MASTERED_BOX, DAY } from '../lib/srs';
-import { useTimeouts } from '../lib/hooks';
+import { useScrollTopOn, useTimeouts } from '../lib/hooks';
 import { Board, playMoveSound, type SquareTone } from '../chess/Board';
 import { colorName, moveNumberLabel, START_FEN, turnOf, uciOf } from '../chess/utils';
 import { BoardColumn } from '../components/BoardColumn';
@@ -181,6 +181,7 @@ export function OpeningPage({ id }: { id: string }) {
   });
   /** Starts a learn or drill session over the given lines. */
   const start = (mode: Mode, queue: string[]) => setSession((s) => ({ mode, queue, i: 0, key: (s?.key ?? 0) + 1, finished: false }));
+  useScrollTopOn(session?.key);
 
   if (!opening) return <div className="empty">Opening not found.</div>;
 

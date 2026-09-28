@@ -3,7 +3,7 @@ import { Chess, type Move } from 'chess.js';
 import { units, type DemoStep, type Lesson, type LessonStep, type MoveStep, type QuizStep, type Unit } from '../content';
 import { Board, playMoveSound, type SquareTone } from '../chess/Board';
 import { acceptsMove, colorName, fullMoveOf, moveNumberLabel, parseUci, sanToUci, turnOf, uciOf } from '../chess/utils';
-import { useKeydown, useTimeouts } from '../lib/hooks';
+import { useKeydown, useScrollTopOn, useTimeouts } from '../lib/hooks';
 import { BoardColumn } from '../components/BoardColumn';
 import { Button, Feedback, ProgressBar, RichText } from '../components/ui';
 import { Icon } from '../components/Icon';
@@ -126,11 +126,11 @@ function MoveStepView({ step, onDone }: { step: MoveStep; onDone: (r: StepResult
       {step.title && <h2>{step.title}</h2>}
       <RichText text={step.text} />
       {state === 'done' ? (
-        <Feedback tone="good" icon="check" title="Correct" body={<RichText text={step.success} />} />
+        <Feedback tone="good" icon="check" title="Correct" body={<RichText text={step.success} />} reveal />
       ) : (
         <>
-          {state === 'wrong' && <Feedback tone="bad" icon="x" title="Not quite" />}
-          {showHint && state !== 'wrong' && <Feedback tone="info" icon="bulb" title="Hint" body={step.hint} />}
+          {state === 'wrong' && <Feedback tone="bad" icon="x" title="Not quite" reveal />}
+          {showHint && state !== 'wrong' && <Feedback tone="info" icon="bulb" title="Hint" body={step.hint} reveal />}
           <div className="btn-row">
             {!showHint && (
               <Button icon="bulb" onClick={() => setShowHint(true)}>
@@ -247,7 +247,7 @@ function QuizStepView({ step, onDone }: { step: QuizStep; onDone: (r: StepResult
         })}
       </div>
       {last !== undefined && (
-        <Feedback tone={last === correct ? 'good' : 'bad'} icon={last === correct ? 'check' : 'x'} title={last === correct ? 'Right' : 'Not this one'} body={step.choices[last].why} />
+        <Feedback key={last} tone={last === correct ? 'good' : 'bad'} icon={last === correct ? 'check' : 'x'} title={last === correct ? 'Right' : 'Not this one'} body={step.choices[last].why} reveal />
       )}
     </>
   );
@@ -302,6 +302,7 @@ export function LessonPage({ id }: { id: string }) {
   useKeydown((e) => {
     if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement) && !(e.target instanceof HTMLInputElement)) enterRef.current?.();
   });
+  useScrollTopOn(xpGained === null ? stepIdx : 'done');
 
   if (!found) {
     return (

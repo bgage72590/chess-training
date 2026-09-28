@@ -6,7 +6,7 @@ import { summarize, winFor } from '../lib/analysis';
 import { Board, playMoveSound } from '../chess/Board';
 import { moveNumberLabel, parseUci, pvToSan, turnOf, uciOf } from '../chess/utils';
 import { useKeydown } from '../lib/hooks';
-import { navigate } from '../router';
+import { navigate, scrollToTop } from '../router';
 import { BoardColumn } from '../components/BoardColumn';
 import { Button, Feedback, Pill, ProgressBar } from '../components/ui';
 import { Icon } from '../components/Icon';
@@ -125,6 +125,7 @@ export function ReviewPage({ id }: { id: string }) {
   const startRetry = (i: number) => {
     setPly(i);
     setRetry({ ply: i, fen: fenAt(i), state: 'try' });
+    scrollToTop(); // the key moments sit below the board on phones
   };
 
   const onRetryMove = async (mv: Move) => {
@@ -147,7 +148,8 @@ export function ReviewPage({ id }: { id: string }) {
     setRetry({ ...tried, state: 'bad', msg: `${mv.san} still costs you. Try again or reveal the best move.` });
   };
 
-  const nextMoment = keyMoments.find(({ i }) => i > (retry?.ply ?? ply) - 1);
+  /** The first key moment after the one being retried. */
+  const nextMoment = retry && keyMoments.find(({ i }) => i > retry.ply);
 
   return (
     <>
@@ -227,7 +229,7 @@ export function ReviewPage({ id }: { id: string }) {
             <div className="panel-section">
               <div className="eyebrow">Retry the moment</div>
               <p>Find a better move than the one you played.</p>
-              {retry.msg && <Feedback tone={retry.state === 'good' ? 'good' : 'bad'} icon={retry.state === 'good' ? 'check' : 'x'} body={retry.msg} />}
+              {retry.msg && <Feedback tone={retry.state === 'good' ? 'good' : 'bad'} icon={retry.state === 'good' ? 'check' : 'x'} body={retry.msg} reveal />}
               <div className="btn-row">
                 {retry.state === 'bad' && (
                   <Button onClick={() => startRetry(retry.ply)} icon="refresh">

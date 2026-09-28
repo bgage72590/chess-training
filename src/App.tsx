@@ -150,7 +150,7 @@ function useLevelWatcher() {
     updateProfile((d) => {
       d.levelSeen = level;
     });
-    toast({ title: `Level ${level} reached`, body: `You are now a ${title}.`, icon: 'star', tone: 'accent' }, 5000);
+    toast({ title: `Level ${level} reached`, body: `You are now ${/^[AEIOU]/.test(title) ? 'an' : 'a'} ${title}.`, icon: 'star', tone: 'accent' }, 5000);
   }, [level, p.levelSeen, title]);
 }
 
