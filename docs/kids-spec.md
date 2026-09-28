@@ -1415,8 +1415,8 @@ interface FindMoveItem {
 | id | fen | solutions | bands, tier |
 |---|---|---|---|
 | m1 | `k7/2Q5/2K5/8/8/8/8/8 w - - 0 1` | Qb7# ("the Queen's kiss") | all, 1 |
-| m2 | `k7/8/1K6/8/8/8/8/7Q w - - 0 1` | Qb7#, Qh8# (Qc7 is stalemate, the teaching moment) | all, 1 |
-| m3 | `7k/8/6K1/8/8/8/8/Q7 w - - 0 1` | Qa8#, Qg7# | all, 2 |
+| m2 | `k7/8/1K6/8/8/8/8/6Q1 w - - 0 1` | Qg8# (the old `.../7Q` position had Black already in check) | all, 1 |
+| m3 | `7k/8/6K1/8/8/8/8/1Q6 w - - 0 1` | Qb8# (the old `.../Q7` position had Black already in check) | all, 2 |
 | m4 | `6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1` | Ra8# (back rank) | all, 2 |
 | m5 | `k7/7R/1K6/8/8/8/8/8 w - - 0 1` | Rh8# | E C, 2 |
 | m6 | `1k6/7R/8/8/8/8/8/6RK w - - 0 1` | Rg8# (ladder) | E C, 2 |
@@ -1615,7 +1615,7 @@ Verified data (content/rules.ts):
   - Plus find-move items `{fen:'r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4', goal:{kind:'flag', flag:'k'}}` (O-O) and `{fen:'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1', goal:{kind:'flag', flag:'q'}}`. **Sprouts get only the find-move items.**
   - **Mixed nodes, one activity.** The player runs exactly one activity per node. So the quiz supports a seventh kind, `{kind: 'move', move: FindMoveItem}`, which renders the framework's exported `FindMove` component (from `activities/findMove`, read-only for packs) with the same `player` and `onDone`. `w7-castle` and `w7-stalemate` are quiz level sets that mix quiz cards and `move` items. The quiz's validate delegates `move` items to the find-move validate.
 - `w2-bishop-color` (bishop-reach): c1 to c2 No; c1 to h6 Yes; c1 to d3 No; f1 to a6 Yes; c1 to e3 Yes; f1 to f2 No.
-- `w7-stalemate` (quiz with embedded find-move): status4 stalemate cards `7k/5Q2/6K1/...`, `k7/2Q5/1K6/...`; move item `k7/8/1K6/8/8/8/8/7Q w` with goal mate ("Checkmate, not stalemate!"; Qc7 is stalemate and is answered with the stalemate line).
+- `w7-stalemate` (quiz with embedded find-move): status4 stalemate cards `7k/5Q2/6K1/...`, `k7/2Q5/1K6/...`; move item `k7/8/1K6/8/8/8/7Q/8 w` with goal mate ("Checkmate, not stalemate!"; Qc7 is stalemate and is answered with the stalemate line).
 
 ### 13.10 FIND-MOVE CONTENT OWNED BY PACK C (uses the framework `find-move` activity)
 - `w6-protect`: s1 and s2 from 13.2, plus `4k3/8/8/7b/8/8/8/3R1NK1 w - - 0 1` protect d1 (the only solution is Ne3). Author 3 more with the same validate rule.
@@ -1735,7 +1735,7 @@ Verified data (content/rules.ts):
 
 **Level sets (content/tactics.ts)**
 - `w8-mate-hunt`:
-  - S `{source:'hand'}` 3 items: `k7/2Q5/2K5/8/8/8/8/8 w` (Qb7#), `k7/8/1K6/8/8/8/8/7Q w` (Qb7# or Qh8#), `7k/8/6K1/8/8/8/8/Q7 w` (Qa8# or Qg7#)
+  - S `{source:'hand'}` 3 items: `k7/2Q5/2K5/8/8/8/8/8 w` (Qb7#), `k7/8/1K6/8/8/8/8/6Q1 w` (Qg8#), `7k/8/6K1/8/8/8/8/1Q6 w` (Qb8#)
   - E `{source:'db', themes:['mateIn1'], maxRating:800, count:5}`
   - C `{source:'db', themes:['mateIn1'], maxRating:1000, count:6}`
 - `w8-forks` (E C) `{source:'hand'}`: **20 hand-authored forks, budgeted at about 2 hours of Pack E time** (the database has only 4 forks at 1100 or below). Each fork item is a find-move `line` item. **validate for forks**:
