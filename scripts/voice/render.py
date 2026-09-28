@@ -25,7 +25,7 @@ Only lines without a clip of this VERSION are recorded; clips for lines that are
 Each clip keeps PAD of quiet before and after the words (voices can start with a second of silence,
 which puts the read-along highlight ahead of the voice); retrim.py trims clips recorded before that.
 """
-import argparse, base64, io, json, os, sys, time, wave
+import argparse, base64, io, json, os, random, sys, threading, time, wave
 from multiprocessing import Pool
 from multiprocessing.pool import ThreadPool
 
@@ -73,6 +73,21 @@ def speak_kokoro(text):
     return _k.create(text, voice=VOICE, speed=SPEED, lang='en-us')
 
 
+_pace = {'lock': threading.Lock(), 'next': 0.0, 'gap': 0.0}
+
+
+def pace():
+    """Spaces requests evenly across threads (--rpm), so several recordings at once stay under Google's quota."""
+    if not _pace['gap']:
+        return
+    with _pace['lock']:
+        now = time.monotonic()
+        wait = max(0.0, _pace['next'] - now)
+        _pace['next'] = max(now, _pace['next']) + _pace['gap']
+    if wait:
+        time.sleep(wait)
+
+
 def speak_google(text, use_rate=True):
     import urllib.error, urllib.request
     import numpy as np
@@ -84,7 +99,8 @@ def speak_google(text, use_rate=True):
     if os.environ.get('GOOGLE_TTS_API_KEY'):
         headers['X-Goog-Api-Key'] = os.environ['GOOGLE_TTS_API_KEY']
     req = urllib.request.Request('https://texttospeech.googleapis.com/v1/text:synthesize', data=json.dumps(body).encode(), headers=headers)
-    for attempt in range(7):
+    for attempt in range(12):
+        pace()
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
                 data = json.load(r)
@@ -93,8 +109,8 @@ def speak_google(text, use_rate=True):
             msg = e.read()[:400].decode('utf8', 'replace')
             if e.code == 400 and use_rate and 'rate' in msg.lower():
                 return speak_google(text, use_rate=False)  # a voice without pace control
-            if e.code in (429, 500, 502, 503, 504) and attempt < 6:
-                time.sleep(2 ** attempt)
+            if e.code in (429, 500, 502, 503, 504) and attempt < 11:
+                time.sleep(min(2 ** attempt, 30) + random.random() * 3)  # a quota is per minute: wait it out
                 continue
             hint = ' (no key reached Google: set GOOGLE_TTS_API_KEY or add an X-Goog-Api-Key credential for texttospeech.googleapis.com)' if e.code in (401, 403) or 'API key' in msg else ''
             raise RuntimeError(f'Google TTS {e.code}: {msg}{hint}') from None
@@ -166,6 +182,7 @@ def main():
     ap.add_argument('--model', help='Kokoro model directory')
     ap.add_argument('--jobs', type=int, default=None, help='parallel workers (default: CPUs for Kokoro, 6 for Google)')
     ap.add_argument('--speed', type=float, help="speaking pace (default: the engine's); a new pace records every clip again")
+    ap.add_argument('--rpm', type=float, default=0, help='most requests per minute (Google allows about 200 in all: give each of several recordings a share)')
     ap.add_argument('--part', help='record only these lines into manifest.PART.json')
     ap.add_argument('--out', help='output directory')
     ap.add_argument('--id', help="a voice from public/voice/voices.json (records into public/voice/<id>)")
@@ -178,6 +195,7 @@ def main():
     if not a.out:
         ap.error('give --id or --out')
     ENGINE = a.engine
+    _pace['gap'] = 60.0 / a.rpm if a.rpm else 0.0
     VOICE = a.voice or ENGINES[ENGINE]['voice']
     SPEED = a.speed or ENGINES[ENGINE]['speed']
     if a.out:
@@ -204,6 +222,15 @@ def main():
     jobs = a.jobs or ((os.cpu_count() or 2) if ENGINE == 'kokoro' else 6)
     print(f'{len(lines)} lines, {len(todo)} to record with {ENGINE} {VOICE} ({jobs} workers)', flush=True)
     done = 0
+    record = {'v': 1, 'voice': VOICE, 'version': VERSION}
+
+    def checkpoint():
+        """Saves the clips so far: a recording that stops (a quota, a network error) carries on from here."""
+        tmp = mpath + '.tmp'
+        with open(tmp, 'w') as f:
+            json.dump({**record, 'clips': dict(sorted(clips.items()))}, f, separators=(',', ':'))
+        os.replace(tmp, mpath)
+
     pool = Pool(jobs, initializer=init_kokoro, initargs=(a.model,)) if ENGINE == 'kokoro' else ThreadPool(jobs)
     with pool:
         for key, ms in pool.imap_unordered(render, todo, chunksize=2 if ENGINE == 'kokoro' else 1):
@@ -211,7 +238,8 @@ def main():
             done += 1
             if done % 25 == 0:
                 print(f'  {done}/{len(todo)}', flush=True)
-    record = {'v': 1, 'voice': VOICE, 'version': VERSION}
+                if not a.part:
+                    checkpoint()
     if a.part:
         with open(os.path.join(OUT, f'manifest.{a.part}.json'), 'w') as f:
             json.dump({**record, 'clips': dict(sorted(clips.items()))}, f, separators=(',', ':'))
