@@ -130,4 +130,51 @@ describe("Pip's read-aloud", () => {
     expect(synth.spoken.at(-1)?.text).toBe('Your turn!'); // at once: no wait for a voice list
     expect(fetch).not.toHaveBeenCalled();
   });
+  it('leaves a pause between recorded sentences and lines, but not after the last one', async () => {
+    vi.useFakeTimers();
+    try {
+      const { clipKey, spokenText } = await import('../src/kids/lib/clipKey');
+      const key = (t: string) => clipKey(spokenText(t));
+      const played: string[] = [];
+      let ended: (() => void) | undefined;
+      class Clip {
+        src = '';
+        playbackRate = 1;
+        onended: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        play = () => {
+          if (this.src.includes('.mp3')) {
+            played.push(this.src.split('/').pop()!.split('?')[0]);
+            ended = () => this.onended?.();
+          } // (unlock() plays a silent data clip first)
+          return Promise.resolve();
+        };
+        pause = () => undefined;
+      }
+      const clips = { [key('Hello there.')]: 900, [key('Tap the star!')]: 1200, [key('Well done!')]: 800 };
+      const fetch = async (url: string) => (url.endsWith('voices.json') ? Response.json({ default: 'sunny', voices: [{ id: 'sunny', name: 'Sunny', blurb: '' }] }) : Response.json({ v: 1, voice: 'x', version: '1', clips }));
+      const m = await load({ window: { addEventListener: () => undefined }, document: { baseURI: 'https://app.test/' }, fetch, Audio: Clip });
+      await m.speech.loadPipVoices();
+      m.speech.unlock();
+      const onEnd = vi.fn();
+      // The first line is two sentences, each recorded on its own; the second line is one clip.
+      m.speech.speak(['Hello there. Tap the star!', 'Well done!'], { onEnd });
+      await vi.advanceTimersByTimeAsync(900);
+      expect(played).toEqual([`${key('Hello there.')}.mp3`]);
+      ended!();
+      await vi.advanceTimersByTimeAsync(m.SENTENCE_GAP_MS - 1);
+      expect(played).toHaveLength(1); // still in the pause between the sentences
+      await vi.advanceTimersByTimeAsync(1);
+      expect(played).toHaveLength(2);
+      ended!();
+      await vi.advanceTimersByTimeAsync(m.LINE_GAP_MS - 1);
+      expect(played).toHaveLength(2); // the longer pause between the lines
+      await vi.advanceTimersByTimeAsync(1);
+      expect(played.at(-1)).toBe(`${key('Well done!')}.mp3`);
+      ended!();
+      expect(onEnd).toHaveBeenCalledTimes(1); // no pause after the last line
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

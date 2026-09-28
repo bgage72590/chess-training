@@ -1,0 +1,267 @@
+<title>Pip Voice Audition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,400&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" />
+<style>
+  :root {
+    --bg: #f5efe3;
+    --surface: #fffaf0;
+    --surface-2: #f1e8d6;
+    --ink: #2b2117;
+    --ink-2: #6b5a45;
+    --line: #e0d3bb;
+    --brass: #a8741b;
+    --brass-strong: #8a5c10;
+    --brass-soft: #f4e4c1;
+    --brass-ink: #fff8e8;
+    --sage: #3f7a52;
+    --sage-soft: #dcecdc;
+    --shadow: 0 1px 2px rgb(60 40 15 / 0.08), 0 8px 24px rgb(60 40 15 / 0.07);
+    --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
+    --font-body: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      color-scheme: dark;
+      --bg: #17120d;
+      --surface: #221b13;
+      --surface-2: #2d241a;
+      --ink: #f0e6d2;
+      --ink-2: #b3a288;
+      --line: #3a2f22;
+      --brass: #e0ac4c;
+      --brass-strong: #f0c675;
+      --brass-soft: #3a2c14;
+      --brass-ink: #1d1407;
+      --sage: #86c496;
+      --sage-soft: #1d3324;
+      --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+    }
+  }
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --bg: #17120d;
+    --surface: #221b13;
+    --surface-2: #2d241a;
+    --ink: #f0e6d2;
+    --ink-2: #b3a288;
+    --line: #3a2f22;
+    --brass: #e0ac4c;
+    --brass-strong: #f0c675;
+    --brass-soft: #3a2c14;
+    --brass-ink: #1d1407;
+    --sage: #86c496;
+    --sage-soft: #1d3324;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding-inline: 16px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 400 1rem/1.55 var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding-block: 32px 72px; display: flex; flex-direction: column; gap: 28px; }
+  header { display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow { font-weight: 700; font-size: 0.74rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass-strong); }
+  h1 { margin: 0; font: 600 clamp(2rem, 1.4rem + 2.6vw, 3.1rem)/1.05 var(--font-display); letter-spacing: -0.015em; text-wrap: balance; }
+  .lede { margin: 0; max-width: 60ch; color: var(--ink-2); font-size: 1.06rem; }
+  .controls { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: flex-end; }
+  .group { display: flex; flex-direction: column; gap: 6px; }
+  .group > span { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); }
+  .seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; }
+  .seg button { border: 0; background: none; color: var(--ink-2); font: 600 0.92rem var(--font-body); padding: 7px 13px; border-radius: 7px; cursor: pointer; min-height: 36px; }
+  .seg button[aria-pressed='true'] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  button:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+  .scenes { display: flex; flex-direction: column; gap: 18px; }
+  .scene { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .scene h2 { margin: 0; font: 600 1.25rem/1.2 var(--font-display); }
+  .lines { display: flex; flex-direction: column; gap: 6px; }
+  .line { margin: 0; padding: 4px 10px; border-radius: 8px; font: italic 400 1.14rem/1.4 var(--font-display); color: var(--ink); transition: background 0.15s; }
+  .line.now { background: var(--brass-soft); }
+  .rows { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+  .row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 6px 14px; padding: 12px 8px; border-bottom: 1px solid var(--line); border-radius: 10px; }
+  .row.picked { background: var(--sage-soft); }
+  .play { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--brass); color: var(--brass-ink); display: grid; place-items: center; cursor: pointer; }
+  .play:hover { background: var(--brass-strong); }
+  .play svg { width: 20px; height: 20px; fill: currentColor; }
+  .name { display: flex; flex-direction: column; min-width: 0; }
+  .name strong { font-weight: 700; }
+  .name small { font: 400 0.8rem var(--font-mono); color: var(--ink-2); }
+  .len { font: 500 0.86rem var(--font-mono); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .choose { border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 0.88rem var(--font-body); padding: 8px 14px; border-radius: 9px; cursor: pointer; min-height: 38px; }
+  .choose[aria-pressed='true'] { background: var(--sage); border-color: var(--sage); color: var(--surface); }
+  .pick { background: var(--surface); border: 1px solid var(--brass); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow); }
+  .pick h2 { margin: 0; font: 600 1.25rem/1.2 var(--font-display); }
+  .summary { margin: 0; font: 500 1rem/1.5 var(--font-mono); background: var(--surface-2); border-radius: 10px; padding: 12px 14px; overflow-wrap: anywhere; }
+  .pick p { margin: 0; color: var(--ink-2); }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .copy { border: 0; background: var(--brass); color: var(--brass-ink); font: 700 0.95rem var(--font-body); padding: 10px 18px; border-radius: 10px; cursor: pointer; min-height: 42px; }
+  .copy:hover { background: var(--brass-strong); }
+  .status { font-size: 0.9rem; color: var(--sage); font-weight: 600; }
+  @media (max-width: 560px) {
+    .scene { padding: 16px; }
+    .row { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .row .len { grid-column: 2; grid-row: 2; }
+    .row .choose { grid-column: 3; grid-row: 1 / span 2; }
+  }
+  @media (prefers-reduced-motion: reduce) { .line { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Pip's voice</span>
+    <h1>Pip Voice Audition</h1>
+    <p class="lede">The same lines, four ways. Play each one, then choose the version that sounds right for a six year old. The pause selector changes the gap between lines, the way the app will play them.</p>
+  </header>
+
+  <div class="controls">
+    <div class="group" role="group" aria-labelledby="g-voice"><span id="g-voice">Voice</span><div class="seg" id="voices"></div></div>
+    <div class="group" role="group" aria-labelledby="g-gap"><span id="g-gap">Pause between lines</span><div class="seg" id="gaps"></div></div>
+  </div>
+
+  <div class="scenes" id="scenes"></div>
+
+  <section class="pick" aria-labelledby="pick-h">
+    <h2 id="pick-h">Your pick</h2>
+    <p class="summary" id="summary" aria-live="polite"></p>
+    <p>Choose a row above, then copy this and send it to Claude. The app records all eight voices in the pace you pick, which takes about an hour and a half.</p>
+    <div class="actions"><button class="copy" id="copy" type="button">Copy my pick</button><span class="status" id="status" role="status"></span></div>
+  </section>
+</div>
+
+<script type="application/json" id="data">__DATA__</script>
+<script>
+(function () {
+  var data = JSON.parse(document.getElementById('data').textContent);
+  var GAPS = [{ ms: 0, label: 'None (today)' }, { ms: 300, label: 'Short' }, { ms: 500, label: 'Medium' }, { ms: 800, label: 'Long' }];
+  var LABEL = {
+    'p0.95': ['Today', 'pace 0.95'],
+    'p0.85': ['A little slower', 'pace 0.85'],
+    'p0.75': ['Slower', 'pace 0.75'],
+    'p0.75-pauses': ['Slower, with pauses inside lines', 'pace 0.75 + pause tags'],
+  };
+  var PAD_MS = 160; // the quiet kept at both ends of every clip
+  var state = { voice: data.voices[0].id, gap: 500, pick: null, playing: null };
+  try {
+    var saved = JSON.parse(localStorage.getItem('pip-audition') || '{}');
+    if (saved.voice && data.voices.some(function (v) { return v.id === saved.voice; })) state.voice = saved.voice;
+    if (GAPS.some(function (g) { return g.ms === saved.gap; })) state.gap = saved.gap;
+    if (saved.pick && LABEL[saved.pick]) state.pick = saved.pick;
+  } catch (e) { /* no storage */ }
+  var save = function () { try { localStorage.setItem('pip-audition', JSON.stringify({ voice: state.voice, gap: state.gap, pick: state.pick })); } catch (e) { /* no storage */ } };
+
+  var el = function (tag, attrs, kids) {
+    var n = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) { if (k === 'text') n.textContent = attrs[k]; else n.setAttribute(k, attrs[k]); });
+    (kids || []).forEach(function (c) { n.appendChild(c); });
+    return n;
+  };
+  var PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
+  var STOP = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+
+  var clip = function (si, li, ver) { return data.clips[state.voice + '/' + ver + '/' + si + '/' + li]; };
+  var seconds = function (si, ver) {
+    var lines = data.scenes[si].lines, ms = 0;
+    lines.forEach(function (_, li) { ms += clip(si, li, ver).ms; });
+    ms += (lines.length - 1) * state.gap;
+    return (ms / 1000).toFixed(1) + ' s';
+  };
+
+  var token = 0, audio = null, timer = null;
+  function stop() {
+    token++;
+    clearTimeout(timer);
+    if (audio) { audio.pause(); audio = null; }
+    state.playing = null;
+    paint();
+  }
+  function play(si, ver) {
+    var same = state.playing && state.playing.si === si && state.playing.ver === ver;
+    stop();
+    if (same) return;
+    var my = token, li = 0;
+    var next = function () {
+      if (my !== token) return;
+      var lines = data.scenes[si].lines;
+      if (li >= lines.length) { state.playing = null; paint(); return; }
+      state.playing = { si: si, ver: ver, li: li };
+      paint();
+      audio = new Audio('data:audio/mpeg;base64,' + clip(si, li, ver).mp3);
+      audio.onended = function () { li++; timer = setTimeout(next, state.gap); };
+      audio.play().catch(function () { stop(); });
+    };
+    next();
+  }
+
+  function paint() {
+    var vs = document.getElementById('voices');
+    vs.textContent = '';
+    data.voices.forEach(function (v) {
+      var b = el('button', { type: 'button', 'aria-pressed': String(state.voice === v.id), text: v.name });
+      b.onclick = function () { stop(); state.voice = v.id; save(); paint(); };
+      vs.appendChild(b);
+    });
+    var gs = document.getElementById('gaps');
+    gs.textContent = '';
+    GAPS.forEach(function (g) {
+      var b = el('button', { type: 'button', 'aria-pressed': String(state.gap === g.ms), text: g.ms ? g.label + ' ' + (g.ms / 1000) + ' s' : g.label });
+      b.onclick = function () { state.gap = g.ms; save(); paint(); };
+      gs.appendChild(b);
+    });
+
+    var root = document.getElementById('scenes');
+    root.textContent = '';
+    data.scenes.forEach(function (sc, si) {
+      var lines = el('div', { class: 'lines' });
+      sc.lines.forEach(function (t, li) {
+        var now = state.playing && state.playing.si === si && state.playing.li === li;
+        lines.appendChild(el('p', { class: 'line' + (now ? ' now' : ''), text: t }));
+      });
+      var rows = el('div', { class: 'rows' });
+      data.versions.forEach(function (ver) {
+        var playing = state.playing && state.playing.si === si && state.playing.ver === ver.id;
+        var label = LABEL[ver.id];
+        var pb = el('button', { type: 'button', class: 'play', 'aria-label': (playing ? 'Stop ' : 'Play ') + sc.title + ', ' + label[0] });
+        pb.innerHTML = playing ? STOP : PLAY;
+        pb.onclick = function () { play(si, ver.id); };
+        var ch = el('button', { type: 'button', class: 'choose', 'aria-pressed': String(state.pick === ver.id), text: state.pick === ver.id ? 'Chosen' : 'Choose' });
+        ch.onclick = function () { state.pick = ver.id; save(); paint(); };
+        rows.appendChild(el('div', { class: 'row' + (state.pick === ver.id ? ' picked' : '') }, [
+          pb,
+          el('div', { class: 'name' }, [el('strong', { text: label[0] }), el('small', { text: label[1] })]),
+          el('span', { class: 'len', text: seconds(si, ver.id) }),
+          ch,
+        ]));
+      });
+      root.appendChild(el('article', { class: 'scene' }, [el('h2', { text: sc.title }), lines, rows]));
+    });
+
+    var g = GAPS.filter(function (x) { return x.ms === state.gap; })[0];
+    var s = document.getElementById('summary');
+    s.textContent = state.pick
+      ? 'Pace ' + (state.pick.indexOf('p0.85') === 0 ? '0.85' : state.pick.indexOf('p0.75') === 0 ? '0.75' : '0.95') + ', pause tags ' + (state.pick.indexOf('pauses') > -1 ? 'on' : 'off') + ', extra pause between lines ' + (state.gap / 1000) + ' s (' + g.label.toLowerCase() + '), voice heard: ' + data.voices.filter(function (v) { return v.id === state.voice; })[0].name
+      : 'Nothing chosen yet. Press Choose on the row that sounds best.';
+  }
+
+  document.getElementById('copy').onclick = function () {
+    var text = document.getElementById('summary').textContent;
+    var status = document.getElementById('status');
+    var done = function (msg) { status.textContent = msg; setTimeout(function () { status.textContent = ''; }, 3000); };
+    var select = function () {
+      var r = document.createRange();
+      r.selectNodeContents(document.getElementById('summary'));
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      done('Select and copy the text above.');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { done('Copied.'); }, select);
+    else select();
+  };
+  paint();
+})();
+</script>

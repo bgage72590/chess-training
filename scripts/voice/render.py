@@ -33,6 +33,7 @@ ENGINES = {
     # A touch slower than normal, for young listeners. The voice speaks at this pace itself;
     # slowing clips down in the browser instead (time-stretching) makes speech sound robotic.
     'kokoro': {'voice': 'af_heart', 'model': 'kokoro-v1.0.onnx', 'speed': 0.94},  # full precision: int8 is buzzier
+    # (Chirp 3 HD ignores a pace close to 1: 0.95 sounds like 1.0, 0.85 is 5-19% slower, 0.75 19-33%.)
     'google': {'voice': 'en-US-Chirp3-HD-Leda', 'speed': 0.95},
 }
 BITRATE = 64
@@ -163,6 +164,7 @@ def main():
     ap.add_argument('--voice', help='voice name (default: the engine\'s)')
     ap.add_argument('--model', help='Kokoro model directory')
     ap.add_argument('--jobs', type=int, default=None, help='parallel workers (default: CPUs for Kokoro, 6 for Google)')
+    ap.add_argument('--speed', type=float, help="speaking pace (default: the engine's); a new pace records every clip again")
     ap.add_argument('--part', help='record only these lines into manifest.PART.json')
     ap.add_argument('--out', help='output directory')
     ap.add_argument('--id', help="a voice from public/voice/voices.json (records into public/voice/<id>)")
@@ -176,7 +178,7 @@ def main():
         ap.error('give --id or --out')
     ENGINE = a.engine
     VOICE = a.voice or ENGINES[ENGINE]['voice']
-    SPEED = ENGINES[ENGINE]['speed']
+    SPEED = a.speed or ENGINES[ENGINE]['speed']
     if a.out:
         OUT = a.out
     if ENGINE == 'kokoro' and not a.model:

@@ -287,10 +287,19 @@ function speakTts(p: LinePlan, opts: SpeakOpts, live: () => boolean, done: () =>
   }
 }
 
+/**
+ * Quiet between recorded clips, on top of the 0.16 s each clip keeps at its two ends: a person
+ * pauses a moment between sentences and a little longer between lines, and clips played back to
+ * back sound rushed. A grown-up's slower pace lengthens them too.
+ */
+export const SENTENCE_GAP_MS = 300;
+export const LINE_GAP_MS = 500;
+
 /** Says the lines one after another: recorded clips where there are some, the device voice otherwise. */
 function run(lines: string[], opts: SpeakOpts, token: number) {
   const gen = ++runGen;
   const live = () => token === state.token && gen === runGen;
+  const pause = (ms: number, fn: () => void) => timers.push(setTimeout(() => live() && fn(), ms / Math.min(1.2, Math.max(0.7, opts.clipRate ?? 1))));
   let offset = 0;
   const plan: LinePlan[] = lines.map((caption) => {
     const p = { spoken: spokenText(caption), capWords: words(caption).length, base: offset };
@@ -327,9 +336,9 @@ function run(lines: string[], opts: SpeakOpts, token: number) {
     const clips = a ? clipsFor(p, a.m) : null;
     if (!a || !clips) return speakTts(p, opts, live, () => next(i + 1));
     const play = (j: number) => {
-      if (j >= clips.length) return next(i + 1);
+      if (j >= clips.length) return i + 1 < plan.length ? pause(LINE_GAP_MS, () => next(i + 1)) : next(i + 1);
       const c = clips[j];
-      playClip(c.p, clipUrl(a.id, a.m, c.key), c.ms, opts.clipRate, live, () => play(j + 1), () => speakTts(j === 0 ? p : c.p, opts, live, () => (j === 0 ? next(i + 1) : play(j + 1))));
+      playClip(c.p, clipUrl(a.id, a.m, c.key), c.ms, opts.clipRate, live, () => (j + 1 < clips.length ? pause(SENTENCE_GAP_MS, () => play(j + 1)) : play(j + 1)), () => speakTts(j === 0 ? p : c.p, opts, live, () => (j === 0 ? next(i + 1) : play(j + 1))));
     };
     play(0);
   };
