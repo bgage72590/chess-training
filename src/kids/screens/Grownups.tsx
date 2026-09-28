@@ -11,12 +11,13 @@ import { REGISTRY } from '../packs';
 import { defaultKidsState, defaultSettings, getKids, normalizeKids, replaceKids, updateKid, updateKids, useKids, useSaveFailed, kidsRecovered, type KidProfile, type KidSettings } from '../store/kidsStore';
 import { canDo, canGraduate, currentWorld, minutesLast7, neededHelp, startAtRank, totalStars } from '../store/progress';
 import { kidSinceReset } from '../store/syncKids';
-import { syncAvailable, useSync } from '../../sync';
+import { embedded, syncAvailable, useSync } from '../../sync';
+import { APP_ADDRESS } from '../../components/InstallCard';
 import { isKidsLocked, setKidsLocked } from '../lock';
 import { hashPin, newSalt, pinSupported, clearGatePass } from '../ui/ParentGate';
 import { PawnBuddy } from '../ui/PawnBuddy';
 import { KidsIcon } from '../ui/KidsIcon';
-import { DEVICE_VOICE, speech } from '../player/speech';
+import { DEVICE_VOICE, RECORDED, speech } from '../player/speech';
 import { voiceNote, voiceScore } from '../player/voices';
 import { toast } from '../../lib/toast';
 import { go } from '../routes';
@@ -170,12 +171,19 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
   }, []);
   const device = useKids().device;
   const [pipVoices, setPipVoices] = useState(speech.pipVoices());
+  const [listLoaded, setListLoaded] = useState(false);
   useEffect(() => {
     let live = true;
-    void speech.loadPipVoices().then(() => live && setPipVoices(speech.pipVoices()));
+    void speech.loadPipVoices().then(() => {
+      if (!live) return;
+      setPipVoices(speech.pipVoices());
+      setListLoaded(true);
+    });
     return () => void (live = false);
   }, []);
-  const pipVoice = st.pipVoice || speech.defaultPipVoice();
+  // Without recorded voices (the single-file copy, or a list that did not load), Pip reads with the device's voice.
+  const noRecorded = listLoaded && !pipVoices.length;
+  const pipVoice = noRecorded ? DEVICE_VOICE : st.pipVoice || speech.defaultPipVoice();
   const preview = () => speech.speak(["Hi! I'm Pip. Let's play chess together!"], { rate: st.rate ?? 1, clipRate: st.rate ?? undefined });
   const pickVoice = (id: string) => {
     set('pipVoice', id);
@@ -190,17 +198,38 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
     },
     [],
   );
+  // A new age group then offers that age's settings, asked here: a browser dialog is blocked
+  // inside the claude.ai viewer.
+  const [offerReset, setOfferReset] = useState<{ kid: string; band: AgeBand } | null>(null);
   const changeBand = (b: AgeBand) => {
     if (b === kid.band) return;
-    const reset = window.confirm("Reset this kid's settings to the new age defaults?");
-    updateKid(kid.id, (d) => {
-      d.band = b;
-      if (reset) d.settings = { ...defaultSettings(b), unlockAll: d.settings.unlockAll };
-    });
+    updateKid(kid.id, (d) => void (d.band = b));
+    setOfferReset({ kid: kid.id, band: b });
+  };
+  const resetToBand = () => {
+    updateKid(kid.id, (d) => void (d.settings = { ...defaultSettings(d.band), unlockAll: d.settings.unlockAll }));
+    setOfferReset(null);
+    toast({ title: `${kid.name}'s settings were reset.` }, 2500);
   };
   return (
     <Section title="Settings" icon="gear">
       <Seg<AgeBand> label="Age group" value={kid.band} options={BANDS.map((b) => [b, BAND_LABEL[b]])} onChange={changeBand} />
+      {offerReset?.kid === kid.id && offerReset.band === kid.band && (
+        <div className="k-gu-row">
+          <span className="k-gu-label">
+            Reset {kid.name}&rsquo;s settings too?
+            <small>To the defaults for {BAND_LABEL[kid.band]}. Progress stays.</small>
+          </span>
+          <div className="k-gu-inline">
+            <button type="button" className="k-gu-btn danger" onClick={resetToBand}>
+              Yes, reset settings
+            </button>
+            <button type="button" className="k-gu-btn" onClick={() => setOfferReset(null)}>
+              Keep settings
+            </button>
+          </div>
+        </div>
+      )}
       <Seg label="Read aloud" value={st.voice} options={[['auto', 'Every line'], ['first', 'New ideas'], ['off', 'Speaker button only']]} onChange={(v) => set('voice', v)} />
       {speech.supported() && (
         <div className="k-gu-row k-gu-voice-row">
@@ -220,6 +249,17 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
             </button>
           </div>
         </div>
+      )}
+      {speech.supported() && noRecorded && (
+        <p className="k-gu-note">
+          {RECORDED ? (
+            "Pip's recorded voices could not be loaded right now, so Pip reads with this device's voice."
+          ) : (
+            <>
+              Pip&rsquo;s recorded voices come with the full app at <strong className="k-gu-address">{APP_ADDRESS}</strong>. Here Pip reads with this device&rsquo;s voice.
+            </>
+          )}
+        </p>
       )}
       {speech.supported() && pipVoice === DEVICE_VOICE && (
         <div className="k-gu-row">
@@ -371,13 +411,27 @@ function Device() {
   const [pin, setPin] = useState('');
   const [locked, setLocked] = useState(isKidsLocked());
   const file = useRef<HTMLInputElement>(null);
+  const [exported, setExported] = useState<string | null>(null);
+  const exportBox = useRef<HTMLTextAreaElement>(null);
   const exportData = () => {
-    const blob = new Blob([JSON.stringify(getKids(), null, 2)], { type: 'application/json' });
+    const text = JSON.stringify(getKids(), null, 2);
+    // Downloads are blocked in the single-file and embedded copies: the data is shown to copy instead.
+    if (embedded) return setExported(text);
+    const blob = new Blob([text], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'tempo-kids.json';
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  const copyExport = async () => {
+    try {
+      await navigator.clipboard.writeText(exported ?? '');
+      toast({ title: 'Kids data copied.' }, 2500);
+    } catch {
+      exportBox.current?.select();
+      toast({ title: 'Copy blocked: copy the selected text by hand.', tone: 'bad' }, 3000);
+    }
   };
   const importData = async (f: File) => {
     try {
@@ -470,6 +524,23 @@ function Device() {
           <KidsIcon name="door" size={18} /> Exit to Tempo
         </button>
       </div>
+      {exported !== null && (
+        <div className="k-gu-export">
+          <label htmlFor="k-gu-export" className="k-gu-label">
+            Kids data
+            <small>Copy it and save it as a .json file to bring it into another copy of Tempo with Import kids data.</small>
+          </label>
+          <textarea id="k-gu-export" ref={exportBox} readOnly rows={6} spellCheck={false} value={exported} />
+          <div className="k-gu-inline">
+            <button type="button" className="k-gu-btn" onClick={() => void copyExport()}>
+              Copy
+            </button>
+            <button type="button" className="k-gu-btn" onClick={() => setExported(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
       <p className="k-gu-fine">
         {linked
           ? "Kids' names, settings and progress are shared with your linked devices through your sync code. The PIN and the Kids-mode lock stay on this device."

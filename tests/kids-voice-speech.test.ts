@@ -24,7 +24,16 @@ async function load(globals: Record<string, unknown>) {
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
-afterEach(() => void vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
+
+const Audio = class {
+  src = '';
+  play = () => Promise.resolve();
+  pause = () => undefined;
+};
 
 describe("Pip's read-aloud", () => {
   async function withKid() {
@@ -76,12 +85,7 @@ describe("Pip's read-aloud", () => {
       urls.push(url.replace('https://app.test/voice/', ''));
       if (!online) throw new TypeError('Failed to fetch');
       const body = url.endsWith('voices.json') ? { default: 'sunny', voices: [{ id: 'sunny', name: 'Sunny', blurb: 'Bright and cheerful' }] } : { v: 1, voice: 'x', version: '1', clips: {} };
-      return new Response(JSON.stringify(body));
-    };
-    const Audio = class {
-      src = '';
-      play = () => Promise.resolve();
-      pause = () => undefined;
+      return Response.json(body);
     };
     const m = await load({ document: { baseURI: 'https://app.test/' }, fetch, Audio });
     await m.speech.loadPipVoices();
@@ -92,5 +96,38 @@ describe("Pip's read-aloud", () => {
     m.speech.speak(['Your turn!']);
     await vi.waitFor(() => expect(urls).toEqual(['voices.json', 'voices.json', 'sunny/manifest.json']));
     expect(m.speech.pipVoices().map((v) => v.id)).toEqual(['sunny']);
+  });
+
+  it('keeps the device voice without asking again when the server answers with something else', async () => {
+    const urls: string[] = [];
+    const fetch = async (url: string) => {
+      urls.push(url.replace('https://app.test/voice/', ''));
+      return new Response('<!doctype html><title>Tempo</title>', { headers: { 'content-type': 'text/html' } });
+    };
+    const synth = fakeSynth();
+    const m = await load({ window: { speechSynthesis: synth, addEventListener: () => undefined }, SpeechSynthesisUtterance: FakeUtterance, document: { baseURI: 'https://app.test/' }, fetch, Audio });
+    await m.speech.loadPipVoices();
+    expect(m.speech.pipVoices()).toEqual([]);
+    m.speech.unlock();
+    m.speech.speak(['Your turn!']);
+    await vi.waitFor(() => expect(synth.spoken.at(-1)?.text).toBe('Your turn!'));
+    m.speech.speak(['Well done!']);
+    await vi.waitFor(() => expect(synth.spoken.at(-1)?.text).toBe('Well done!'));
+    expect(urls).toEqual(['voices.json']);
+  });
+
+  it('reads with the device voice in the single-file copy, fetching nothing', async () => {
+    vi.stubEnv('MODE', 'single');
+    const fetch = vi.fn(async () => Response.json({}));
+    const synth = fakeSynth();
+    const m = await load({ window: { speechSynthesis: synth, addEventListener: () => undefined }, SpeechSynthesisUtterance: FakeUtterance, document: { baseURI: 'https://app.test/' }, fetch, Audio });
+    expect(m.RECORDED).toBe(false);
+    expect(m.speech.defaultPipVoice()).toBe(m.DEVICE_VOICE);
+    await m.speech.loadPipVoices();
+    expect(m.speech.pipVoices()).toEqual([]);
+    m.speech.unlock();
+    m.speech.speak(['Your turn!']);
+    expect(synth.spoken.at(-1)?.text).toBe('Your turn!'); // at once: no wait for a voice list
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

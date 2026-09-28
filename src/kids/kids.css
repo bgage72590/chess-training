@@ -3685,6 +3685,25 @@
   font-size: 13px;
   color: var(--k-ink-soft);
 }
+.k-gu-address {
+  overflow-wrap: anywhere;
+}
+/* Kids data shown to copy where downloads are blocked (the single-file and embedded copies). */
+.k-gu-export {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.k-gu-export textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--k-line);
+  background: var(--k-card-2);
+  color: var(--k-ink);
+  font: 13px/1.4 var(--font-mono, ui-monospace, monospace);
+  resize: vertical;
+}
 
 /* ================= Break, graduation, certificate ================= */
 .k-break-wrap {

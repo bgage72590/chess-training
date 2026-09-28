@@ -108,6 +108,9 @@ interface VoiceManifest {
 }
 /** The "voice" that means the device's own speech engine. */
 export const DEVICE_VOICE = 'device';
+/** Pip's recorded clips come with the full app only. The single-file copy (a claude.ai Artifact)
+ *  has just its own page, so there Pip reads with the device's voice and nothing is fetched. */
+export const RECORDED = import.meta.env.MODE !== 'single';
 
 let voiceList: VoiceList | null = null;
 let listLoad: Promise<void> | null = null;
@@ -117,17 +120,21 @@ const manifestLoads = new Map<string, Promise<void>>();
 let audioEl: HTMLAudioElement | null = null;
 const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
 const voiceUrl = (file: string) => new URL(`voice/${file}`, document.baseURI).href;
-const canFetch = () => typeof document !== 'undefined' && typeof fetch !== 'undefined' && typeof Audio !== 'undefined';
+const canFetch = () => RECORDED && typeof document !== 'undefined' && typeof fetch !== 'undefined' && typeof Audio !== 'undefined';
 
 function loadList(): Promise<void> {
   if (listLoad) return listLoad;
   if (!canFetch()) return (listLoad = Promise.resolve());
+  // Anything but the list (e.g. a page a server sends for every address) means no recorded voices,
+  // and is not asked for again.
   listLoad = fetch(voiceUrl('voices.json'))
-    .then((r) => (r.ok ? r.json() : null))
+    .then((r) => (r.ok && /json/i.test(r.headers.get('content-type') ?? '') ? r.json() : null))
     .then((l: VoiceList | null) => {
       if (l?.voices?.length) voiceList = l;
     })
-    .catch(() => void (listLoad = null)); // offline: try again next time
+    .catch((e) => {
+      if (!(e instanceof SyntaxError)) listLoad = null; // offline: try again next time
+    });
   return listLoad;
 }
 
@@ -188,7 +195,7 @@ function prefetchClips() {
   setTimeout(step, 4000);
 }
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && RECORDED) {
   const warm = () => void ready(10_000).then(prefetchClips);
   warm();
   window.addEventListener('online', warm); // a list that failed to load, or a prefetch cut off, picks up again
@@ -328,7 +335,7 @@ function run(lines: string[], opts: SpeakOpts, token: number) {
   };
   // The clip list loads with Kids mode; give it a moment on the very first line.
   if (activeId() !== null && !activeManifest()) void ready(800).then(() => next(0));
-  else if (!voiceList && pipVoice !== DEVICE_VOICE) void ready(800).then(() => next(0));
+  else if (RECORDED && !voiceList && pipVoice !== DEVICE_VOICE) void ready(800).then(() => next(0));
   else next(0);
 }
 
@@ -339,7 +346,7 @@ export const speech = {
   /** Pip's recorded voices (empty until the list has loaded). */
   pipVoices: (): PipVoice[] => voiceList?.voices ?? [],
   /** The voice used when a kid has not picked one. */
-  defaultPipVoice: () => voiceList?.default ?? '',
+  defaultPipVoice: () => voiceList?.default ?? (RECORDED ? '' : DEVICE_VOICE),
   /** Loads the list of Pip's voices. */
   loadPipVoices: () => loadList(),
   /** Picks Pip's voice: a recorded voice id, DEVICE_VOICE, or '' for the default. */
