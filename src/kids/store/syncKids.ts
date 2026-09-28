@@ -2,11 +2,12 @@
 // until then the synced copy keeps the kids part untouched. Like the grown-up merge, it keeps
 // progress made on either device: nodes, stickers, days and games combine item by item, minutes
 // and stars add up what each device did (sync/tally.ts), and names, avatars and settings follow
-// the device where a grown-up (or the kid) changed them last. Deleted kids stay deleted, and a
-// reset wins over progress made before it.
+// the device where a grown-up (or the kid) changed them last. Deleted kids stay deleted, a
+// reset wins over progress made before it, and so does a grown-up's "Starting world".
 import { dayKey } from '../../lib/srs';
 import { addSyncPart, sync, syncAvailable, tallyPart } from '../../sync';
 import { filterTally, maxTally, mergeTallied, readTally, type Tally } from '../../sync/tally';
+import { placementRating, unplaceFrom } from './progress';
 import { applySyncedKids, getKids, kidCounters, normalizeKids, subscribeKids, SEEN_MAX, FIRSTS_MAX, type DayRecord, type KidProfile, type KidsState, type NodeProgress } from './kidsStore';
 
 export type SyncedKids = Pick<KidsState, 'kids' | 'family' | 'removed' | 'updatedAt'>;
@@ -76,11 +77,25 @@ export function kidSinceReset(k: KidProfile, at: number): KidProfile {
   return out;
 }
 
+/** What a kid's copy that missed a grown-up's "Starting world" `s` keeps: as on the device where
+ *  it was set, the test-out passes from that world on go (played nodes keep their stars), and
+ *  before the first puzzle the rating follows the new start. */
+export function kidSinceStart(k: KidProfile, s: NonNullable<KidProfile['startAt']>): KidProfile {
+  const out: KidProfile = { ...k, nodes: Object.fromEntries(Object.entries(k.nodes).map(([id, n]) => [id, { ...n }])), startAt: s };
+  unplaceFrom(out, s.rank);
+  if (out.testedOut !== undefined) out.testedOut = Math.min(out.testedOut, s.rank - 1);
+  if (out.puzzle.attempts === 0) out.puzzle = { ...out.puzzle, rating: placementRating(s.rank - 1) };
+  return out;
+}
+
 /** Merges one kid's two copies; `b` is from the side that changed last. */
 export function mergeKid(a: KidProfile, b: KidProfile): KidProfile {
   const resetAt = Math.max(a.resetAt ?? 0, b.resetAt ?? 0);
   if ((a.resetAt ?? 0) < resetAt) a = kidSinceReset(a, resetAt);
   if ((b.resetAt ?? 0) < resetAt) b = kidSinceReset(b, resetAt);
+  const startAt = (a.startAt?.t ?? 0) > (b.startAt?.t ?? 0) ? a.startAt : b.startAt;
+  if (startAt && (a.startAt?.t ?? 0) < startAt.t) a = kidSinceStart(a, startAt);
+  if (startAt && (b.startAt?.t ?? 0) < startAt.t) b = kidSinceStart(b, startAt);
   // Name, avatar, age group and settings: from the copy where they changed last (ties: b).
   const chosen = (a.settingsAt ?? 0) > (b.settingsAt ?? 0) ? a : b;
   const pz = b.puzzle.attempts > a.puzzle.attempts ? b.puzzle : a.puzzle;
@@ -126,11 +141,15 @@ export function mergeKid(a: KidProfile, b: KidProfile): KidProfile {
   return out;
 }
 
-/** A device joining a copy keeps its kids' progress and the copy keeps its own: a reset made on
- *  either side before they were linked applies to neither. */
+/** A device joining a copy keeps its kids' progress and the copy keeps its own: a reset (or a
+ *  delete-all, for the star jar) made on either side before they were linked applies to neither. */
 export function joiningCopy(local: SyncedKids, remote: SyncedKids): SyncedKids {
   const theirs = new Map(remote.kids.map((k) => [k.id, k]));
-  return { ...local, kids: local.kids.map((k) => (theirs.has(k.id) ? { ...k, resetAt: theirs.get(k.id)!.resetAt } : k)) };
+  return {
+    ...local,
+    family: { ...local.family, resetAt: remote.family.resetAt },
+    kids: local.kids.map((k) => (theirs.has(k.id) ? { ...k, resetAt: theirs.get(k.id)!.resetAt } : k)),
+  };
 }
 
 export function mergeSyncedKids(local: SyncedKids, remote: SyncedKids): SyncedKids {
@@ -146,10 +165,14 @@ export function mergeSyncedKids(local: SyncedKids, remote: SyncedKids): SyncedKi
     byId.delete(k.id);
   }
   kids.push(...byId.values());
-  // Stars in the family jar add up across devices; every full hundred is a party.
-  const jar = mergeTallied({ stars: local.family.stars }, local.family.tally, { stars: remote.family.stars }, remote.family.tally);
-  const family: SyncedKids['family'] = { stars: jar.counts.stars, parties: Math.max(local.family.parties, remote.family.parties, Math.floor(jar.counts.stars / 100)) };
+  // Stars in the family jar add up across devices; every full hundred is a party. A jar that
+  // missed a delete-all starts again.
+  const resetAt = Math.max(local.family.resetAt ?? 0, remote.family.resetAt ?? 0);
+  const [lf, rf] = [local.family, remote.family].map((f) => ((f.resetAt ?? 0) < resetAt ? { stars: 0, parties: 0 } : f));
+  const jar = mergeTallied({ stars: lf.stars }, lf.tally, { stars: rf.stars }, rf.tally);
+  const family: SyncedKids['family'] = { stars: jar.counts.stars, parties: Math.max(lf.parties, rf.parties, Math.floor(jar.counts.stars / 100)) };
   if (jar.tally) family.tally = jar.tally;
+  if (resetAt) family.resetAt = resetAt;
   const out: SyncedKids = {
     kids: kids.filter((k) => !(k.id in removed)),
     family,
@@ -167,15 +190,17 @@ const pick = (s: KidsState): SyncedKids => {
 
 const KIDS_TALLY = 'kids-tally';
 
-/** The tallies of the kids and the star jar, synced again on their own (see tallyPart). */
-function tallies(s: SyncedKids): { family?: Tally; kids: Record<string, Tally> } {
-  return { family: s.family.tally, kids: Object.fromEntries(s.kids.filter((k) => k.tally).map((k) => [k.id, k.tally!])) };
+/** The tallies of the kids and the star jar, synced again on their own (see tallyPart). The jar's
+ *  tally goes with its delete-all time: one from before a delete-all is not folded back in. */
+function tallies(s: SyncedKids): { family?: Tally; familyResetAt?: number; kids: Record<string, Tally> } {
+  return { family: s.family.tally, familyResetAt: s.family.resetAt, kids: Object.fromEntries(s.kids.filter((k) => k.tally).map((k) => [k.id, k.tally!])) };
 }
 
 /** Folds the tallies synced on their own back into the synced kids. */
 export function withTallies(s: SyncedKids, mirror: unknown): SyncedKids {
-  const m = (mirror ?? {}) as { family?: unknown; kids?: Record<string, unknown> };
-  const family = maxTally(s.family.tally, readTally(m.family));
+  const m = (mirror ?? {}) as { family?: unknown; familyResetAt?: unknown; kids?: Record<string, unknown> };
+  const sameJar = (typeof m.familyResetAt === 'number' ? m.familyResetAt : undefined) === s.family.resetAt;
+  const family = maxTally(s.family.tally, sameJar ? readTally(m.family) : undefined);
   return {
     ...s,
     family: family ? { ...s.family, tally: family } : s.family,

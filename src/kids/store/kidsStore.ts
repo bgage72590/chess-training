@@ -23,8 +23,9 @@ export interface KidsState {
   activeKid: string | null;
   kids: KidProfile[];
   /** The family star jar. `tally`: what each device added (sync/tally.ts), so stars earned on two
-   *  devices at once add up. */
-  family: { stars: number; parties: number; tally?: Tally };
+   *  devices at once add up. `resetAt`: when a grown-up last deleted all kids data (ms), so a
+   *  device that missed it does not refill the jar. */
+  family: { stars: number; parties: number; tally?: Tally; resetAt?: number };
   device: { pinSalt?: string; pinHash?: string; voiceURI?: string };
   updatedAt: number;
   /** Deleted kids (id -> when), so syncing another device does not bring them back. */
@@ -61,6 +62,9 @@ export interface KidProfile {
   settingsAt?: number;
   /** Last progress reset by a grown-up (ms). Syncing drops older progress from copies that missed it. */
   resetAt?: number;
+  /** Last "Starting world" a grown-up set (when, and the world rank). Syncing takes back the
+   *  test-out passes a copy that missed it has from that world on. */
+  startAt?: { t: number; rank: number };
   /** What each device added to the day minutes and stars (see kidCounters). */
   tally?: Tally;
 }
@@ -325,6 +329,7 @@ function normalizeKid(x: unknown): KidProfile | null {
   if (isObj(x.graduated)) kid.graduated = { t: num(x.graduated.t, Date.now()), form: oneOf(x.graduated.form, ['queen', 'king'] as const, 'queen') };
   if (typeof x.settingsAt === 'number') kid.settingsAt = num(x.settingsAt, 0, 0);
   if (typeof x.resetAt === 'number') kid.resetAt = num(x.resetAt, 0, 0);
+  if (isObj(x.startAt)) kid.startAt = { t: num(x.startAt.t, 0, 0), rank: Math.round(num(x.startAt.rank, 1, 1, 8)) };
   const tally = readTally(x.tally);
   if (tally) kid.tally = tally;
   return kid;
@@ -361,6 +366,7 @@ export function normalizeKids(raw: unknown): KidsState {
   const out: KidsState = { v: 1, activeKid, kids, family: { stars: num(fam.stars, 0, 0), parties: num(fam.parties, 0, 0) }, device, updatedAt: num(raw.updatedAt, 0, 0) };
   const famTally = readTally(fam.tally);
   if (famTally) out.family.tally = famTally;
+  if (typeof fam.resetAt === 'number') out.family.resetAt = num(fam.resetAt, 0, 0);
   const removed = numMap(raw.removed);
   if (Object.keys(removed).length) out.removed = removed;
   return out;

@@ -528,17 +528,17 @@ export function applyPlacement(kid: KidProfile, testedWorlds: number[], today = 
       if (np.skipped) delete np.skipped;
     }
   }
-  if (testedWorlds.length) kid.puzzle.rating = Math.max(kid.puzzle.rating, Math.min(850, 600 + 40 * testedWorlds.length));
+  if (testedWorlds.length) kid.puzzle.rating = Math.max(kid.puzzle.rating, placementRating(testedWorlds.length));
   if (!opts.challenge) kid.testedOut = testedWorlds.length;
   else kid.testedOut = Math.max(kid.testedOut ?? 0, testedWorlds.length);
   kid.placed = true;
 }
 
-/**
- * Grown-ups "Starting world": the worlds below `rank` are tested out. From `rank` on, placement
- * passes are taken back so a lower start locks the later worlds again; played nodes keep their stars.
- */
-export function startAtRank(kid: KidProfile, rank: number, today = dayKey()) {
+/** The puzzle rating a kid who tested out of `worlds` worlds starts from. */
+export const placementRating = (worlds: number) => (worlds > 0 ? Math.min(850, 600 + 40 * worlds) : 600);
+
+/** Takes back the test-out passes from world `rank` on; played nodes keep their stars. */
+export function unplaceFrom(kid: KidProfile, rank: number) {
   for (const w of WORLDS.slice(rank - 1))
     for (const n of nodesOf(w.id)) {
       const np = kid.nodes[n.id];
@@ -546,7 +546,18 @@ export function startAtRank(kid: KidProfile, rank: number, today = dayKey()) {
       if (np.plays === 0) delete kid.nodes[n.id];
       else delete np.passed;
     }
+}
+
+/**
+ * Grown-ups "Starting world": the worlds below `rank` are tested out. From `rank` on, placement
+ * passes are taken back so a lower start locks the later worlds again; played nodes keep their stars.
+ * Before the first puzzle the puzzle rating follows the new start, down as well as up.
+ */
+export function startAtRank(kid: KidProfile, rank: number, today = dayKey(), now = Date.now()) {
+  unplaceFrom(kid, rank);
+  if (kid.puzzle.attempts === 0) kid.puzzle.rating = 600;
   applyPlacement(kid, Array.from({ length: rank - 1 }, (_, i) => i + 1), today);
+  kid.startAt = { t: now, rank };
 }
 
 // ---------- Grown-up report ----------

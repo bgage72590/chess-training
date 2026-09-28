@@ -230,7 +230,7 @@ export function ReviewPage({ id }: { id: string }) {
               <div className="eyebrow">Retry the moment</div>
               <p>Find a better move than the one you played.</p>
               {retry.msg && <Feedback tone={retry.state === 'good' ? 'good' : 'bad'} icon={retry.state === 'good' ? 'check' : 'x'} body={retry.msg} reveal />}
-              <div className="btn-row">
+              <div className="btn-row result-actions">
                 {retry.state === 'bad' && (
                   <Button onClick={() => startRetry(retry.ply)} icon="refresh">
                     Try again

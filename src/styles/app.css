@@ -1031,6 +1031,16 @@ button.card:hover,
   .panel-divider {
     margin: 0 -16px;
   }
+  /* The buttons for a result stay on screen: under the board the result is often below the fold. */
+  .result-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin: 0 -16px;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
 }
 
 /* Feedback banners: one recipe, toned by --tone. */
@@ -1308,11 +1318,22 @@ button.feedback:hover {
   color: var(--ink-2);
 }
 @media (max-width: 900px) {
+  /* Under the top bar: at the bottom they would cover the result a move just revealed. */
   .toasts {
     left: 16px;
     right: 16px;
-    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    top: calc(62px + env(safe-area-inset-top, 0px));
+    bottom: auto;
     max-width: none;
+  }
+  .toast {
+    animation-name: toast-drop;
+  }
+}
+@keyframes toast-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }
 

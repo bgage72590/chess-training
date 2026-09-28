@@ -155,7 +155,7 @@ function PanelBody({ api, puzzle, onNext, nextLabel = 'Next puzzle' }: { api: So
           Puzzle rating <span className="num">{puzzle.rating}</span>
         </p>
       )}
-      <div className="btn-row">
+      <div className="btn-row result-actions">
         {!finished && (
           <>
             <Button icon="bulb" onClick={api.hint} disabled={api.status !== 'solving'}>

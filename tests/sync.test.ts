@@ -663,6 +663,73 @@ describe('kids sync: settings, resets and counters', async () => {
     expect(withTallies(stripped, 'junk')).toEqual(stripped);
   });
 
+  it('a Starting world set on one device takes back the test-outs another device still has', async () => {
+    const { applyPlacement, startAtRank } = await import('../src/kids/store/progress');
+    const { nodesOf } = await import('../src/kids/curriculum/worlds');
+    const ids = (w: string) => nodesOf(w as never).filter((n) => n.bands.includes('explorer' as never)).map((n) => n.id);
+    const today = '2026-09-20';
+    const base = kid();
+    applyPlacement(base, [1, 2, 3], today);
+    expect(base.puzzle.rating).toBe(720);
+    const phone = structuredClone(base);
+    startAtRank(phone, 2, today, 5000);
+    expect(phone.startAt).toEqual({ t: 5000, rank: 2 });
+    expect(phone.puzzle.rating).toBe(640);
+    expect(phone.testedOut).toBe(1);
+    // The laptop missed it and played a World 3 node (a test-out pass there) and a World 1 node.
+    const laptop = structuredClone(base);
+    const [w1, w3] = [ids('w1')[0], ids('w3')[0]];
+    laptop.nodes[w1] = { ...laptop.nodes[w1], stars: 3, plays: 1, last: 6000 };
+    laptop.nodes[w3] = { ...laptop.nodes[w3], stars: 2, plays: 1, last: 6000 };
+    for (const m of [mergeKid(phone, laptop), mergeKid(laptop, phone)]) {
+      expect(m.startAt).toEqual({ t: 5000, rank: 2 });
+      expect(m.testedOut).toBe(1);
+      expect(m.puzzle.rating).toBe(640);
+      expect(ids('w1').every((id) => m.nodes[id]?.passed)).toBe(true);
+      expect(m.nodes[w1].stars).toBe(3);
+      expect(m.nodes[w3]).toMatchObject({ stars: 2, plays: 1 });
+      expect(m.nodes[w3].passed).toBeUndefined();
+      expect([...ids('w2'), ...ids('w3')].filter((id) => m.nodes[id]?.passed)).toEqual([]);
+      expect(Object.keys(m.nodes).filter((id) => ids('w2').includes(id))).toEqual([]);
+      expect(mergeKid(m, m)).toEqual(m);
+    }
+    // A later Starting world wins again, and survives a round trip through normalization.
+    const later = structuredClone(mergeKid(laptop, phone));
+    startAtRank(later, 4, today, 7000);
+    const round = normalizeKids(JSON.parse(JSON.stringify({ v: 1, kids: [mergeKid(phone, later)] }))).kids[0];
+    expect(round.startAt).toEqual({ t: 7000, rank: 4 });
+    expect(ids('w3').every((id) => round.nodes[id]?.passed)).toBe(true);
+    // The puzzle rating only follows the start before the first puzzle.
+    const solved = structuredClone(base);
+    solved.puzzle.attempts = 3;
+    startAtRank(solved, 1, today, 8000);
+    expect(solved.puzzle.rating).toBe(720);
+    expect(mergeKid(solved, phone).puzzle.rating).toBe(720);
+  });
+
+  it('deleting all kids data empties the star jar on every device', () => {
+    const cleared = { kids: [], family: { stars: 0, parties: 0, resetAt: 1000 }, removed: { 'k-mia': 1000 }, updatedAt: 1000 };
+    const stale = { kids: [kid()], family: { stars: 150, parties: 1, tally: { base: { stars: 100 }, tab: { stars: 50 } } }, updatedAt: 900 };
+    for (const m of [mergeSyncedKids(cleared, stale), mergeSyncedKids(stale, cleared)]) {
+      expect(m.kids).toEqual([]);
+      expect(m.family).toEqual({ stars: 0, parties: 0, resetAt: 1000 });
+    }
+    // Stars earned after the delete-all still add up; the stale copy adds nothing.
+    const earned = { ...cleared, family: { stars: 3, parties: 0, tally: { phone: { stars: 3 } }, resetAt: 1000 }, updatedAt: 1100 };
+    const m = mergeSyncedKids(stale, earned);
+    expect(m.family).toEqual(earned.family);
+    expect(mergeSyncedKids(m, m)).toEqual(m);
+    // The jar's tally synced on its own comes back only from the same jar.
+    expect(withTallies(cleared, { family: { tab: { stars: 50 } } }).family.tally).toBeUndefined();
+    expect(withTallies(cleared, { family: { tab: { stars: 50 } }, familyResetAt: 1000 }).family.tally).toEqual({ tab: { stars: 50 } });
+    expect(withTallies(stale, { family: { tab: { stars: 60 } } }).family.tally).toEqual({ base: { stars: 100 }, tab: { stars: 60 } });
+    // A device that joins the copy only now keeps its jar.
+    const local = { kids: [], family: { stars: 20, parties: 0, tally: { laptop: { stars: 20 } } }, updatedAt: 50 };
+    expect(mergeSyncedKids(joiningCopy(local, earned), earned).family).toMatchObject({ stars: 23, resetAt: 1000 });
+    // normalizeKids keeps the delete-all time.
+    expect(normalizeKids(JSON.parse(JSON.stringify({ v: 1, ...cleared }))).family).toEqual(cleared.family);
+  });
+
   it("updateKids records this device's minutes, stars and jar stars", () => {
     const s = defaultKidsState();
     s.kids.push(kid());

@@ -37,9 +37,16 @@ export function useScrollTopOn(view: unknown) {
   useLayoutEffect(() => scrollToTop(), [view]);
 }
 
+/** The first `.btn-row` after `el` among its siblings: the actions that go with a result. */
+function actionsAfter(el: HTMLElement) {
+  for (let n = el.nextElementSibling; n; n = n.nextElementSibling) if (n.classList.contains('btn-row')) return n;
+  return null;
+}
+
 /**
- * Scrolls the page to show `ref` when `when` turns true (on phones a result under the board can
- * land below the fold), but never so far that the board's top slides under the header.
+ * Scrolls the page to show `ref` and the button row after it when `when` turns true (on phones
+ * a result under the board can land below the fold), but never so far that the board's top
+ * slides under the header.
  */
 export function useReveal(ref: RefObject<HTMLElement | null>, when: boolean) {
   useEffect(() => {
@@ -47,7 +54,8 @@ export function useReveal(ref: RefObject<HTMLElement | null>, when: boolean) {
     const main = el?.closest<HTMLElement>('.main');
     if (!when || !el || !main) return;
     const view = main.getBoundingClientRect();
-    const below = el.getBoundingClientRect().bottom - view.bottom + (parseFloat(getComputedStyle(main).scrollPaddingBottom) || 0);
+    const bottom = Math.max(el.getBoundingClientRect().bottom, actionsAfter(el)?.getBoundingClientRect().bottom ?? 0);
+    const below = bottom - view.bottom + (parseFloat(getComputedStyle(main).scrollPaddingBottom) || 0);
     const board = main.querySelector('.board');
     const by = Math.min(below, board ? board.getBoundingClientRect().top - view.top : below);
     if (by > 0) main.scrollBy({ top: by, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });

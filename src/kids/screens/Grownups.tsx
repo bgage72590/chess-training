@@ -449,7 +449,7 @@ function Device() {
             const now = Date.now();
             const prev = getKids();
             const removed = { ...prev.removed, ...Object.fromEntries(prev.kids.map((k) => [k.id, now])) };
-            replaceKids({ ...defaultKidsState(), removed });
+            replaceKids({ ...defaultKidsState(), removed, family: { stars: 0, parties: 0, resetAt: now } });
             toast({ title: 'All kids data deleted.' }, 2500);
             go.picker();
           }}
