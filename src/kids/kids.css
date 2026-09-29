@@ -1658,7 +1658,7 @@
   flex-direction: column;
   align-items: center;
   gap: 18px;
-  padding-top: 20px;
+  padding-top: calc(20px + env(safe-area-inset-top, 0px));
   padding-bottom: 90px;
 }
 .k-picker-head {
@@ -1680,9 +1680,11 @@
 }
 .k-avatar-grid {
   display: grid;
-  grid-template-columns: repeat(2, 160px);
+  /* minmax, so a 320px phone fits two tiles instead of cutting off the right one */
+  grid-template-columns: repeat(2, minmax(0, 160px));
   gap: 16px;
   justify-content: center;
+  max-width: 100%;
 }
 @media (min-width: 700px) {
   .k-avatar-grid {
@@ -1723,6 +1725,9 @@
   font-size: 22px;
   line-height: 1.1;
   text-align: center;
+  /* A long name with no spaces wraps instead of spilling out of the tile. */
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .k-avatar-meta {
   display: flex;
@@ -1814,9 +1819,14 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
+  max-width: 100%;
+  padding: 0 12px;
 }
 .k-splash-hi {
   font-size: calc(var(--k-title) + 12px);
+  max-width: 100%;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 .k-splash-tap {
   display: inline-flex;
@@ -1834,16 +1844,18 @@
 }
 .k-splash-other {
   position: fixed;
-  top: 12px;
+  top: calc(12px + env(safe-area-inset-top, 0px));
   right: 12px;
 }
 
 /* ================= New player ================= */
+/* The top bars keep clear of a phone's notch or status bar (the app draws edge to edge). */
 .k-screenbar {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 72px;
+  height: calc(72px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
 }
 .k-steps {
   flex: 1;
@@ -2061,6 +2073,9 @@
   font-family: var(--k-font-display);
   font-weight: 600;
   font-size: 24px;
+  max-width: 100%;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 .k-swatches,
 .k-faces {
@@ -3266,6 +3281,16 @@
 }
 .k-gate-note {
   color: var(--k-oops-ink);
+  /* Always there, so a message appearing does not move the keypad and is read out. */
+  min-height: 1.5em;
+}
+.k-gate:focus {
+  outline: none;
+}
+.k-gate-forgot {
+  min-height: 44px;
+  padding: 6px 12px;
+  font-size: 15px;
 }
 .k-gate-hold {
   display: grid;
@@ -3361,8 +3386,44 @@
   color: #1f2a44;
   box-shadow: 0 4px 0 var(--k-grass-edge);
 }
-.k-key-ok:disabled {
+.k-key-ok:disabled,
+.k-key:disabled {
   opacity: 0.5;
+  cursor: default;
+}
+/* A phone on its side: the question and the keypad sit side by side so the card fits. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .k-gate {
+    width: min(560px, 100%);
+    gap: 6px;
+    padding: 14px 18px;
+  }
+  .k-gate-title {
+    font-size: 20px;
+  }
+  .k-gate-ask {
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    column-gap: 22px;
+    width: 100%;
+  }
+  .k-gate-q,
+  .k-gate-value,
+  .k-gate-note,
+  .k-gate-forgot {
+    grid-column: 1;
+  }
+  .k-keypad {
+    grid-column: 2;
+    grid-row: 1 / span 5;
+    gap: 6px;
+    grid-template-columns: repeat(3, 56px);
+  }
+  .k-key {
+    width: 56px;
+    height: 56px;
+    font-size: 24px;
+  }
 }
 
 /* ================= Grown-ups ================= */
@@ -3379,7 +3440,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 72px;
+  height: calc(72px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
 }
 .k-gu-head h1 {
   flex: 1;
@@ -3428,11 +3490,12 @@
 .k-gu-cols {
   display: grid;
   gap: 16px;
-  grid-template-columns: 1fr;
+  /* minmax(0, ...): a long name or a wide control must not stretch the column past the screen */
+  grid-template-columns: minmax(0, 1fr);
 }
 @media (min-width: 1000px) {
   .k-gu-cols {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
   .k-gu-cols > :first-child {
     grid-row: span 2;
@@ -3447,6 +3510,7 @@
 .k-gu-card h2 {
   display: flex;
   align-items: center;
+  overflow-wrap: anywhere;
   gap: 8px;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 19px;
@@ -3556,7 +3620,9 @@
   overflow: hidden;
 }
 .k-gu-seg button {
-  min-height: 40px;
+  flex: 1 1 auto;
+  min-height: 44px;
+  min-width: 44px;
   padding: 0 12px;
   border: 0;
   border-right: 1px solid var(--k-line);
@@ -3572,6 +3638,13 @@
   background: var(--k-sea);
   color: #1f2a44;
   font-weight: 700;
+}
+/* A long note wraps under its label; the switch stays beside it. */
+.k-gu-toggle {
+  flex-wrap: nowrap;
+}
+.k-gu-toggle .k-gu-label {
+  min-width: 0;
 }
 .k-gu-toggle input {
   appearance: none;
@@ -3618,8 +3691,9 @@
   align-items: center;
 }
 .k-gu-inline select,
-.k-gu-pin {
-  min-height: 40px;
+.k-gu-pin,
+.k-gu-text {
+  min-height: 44px;
   border-radius: 10px;
   border: 2px solid var(--k-line);
   background: var(--k-card-2);
@@ -3632,12 +3706,20 @@
   width: 110px;
   letter-spacing: 0.2em;
 }
+.k-gu-text {
+  width: 190px;
+  max-width: 100%;
+}
+.k-gu-range {
+  width: 180px;
+  min-height: 44px;
+}
 .k-gu-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 42px;
+  min-height: 44px;
   padding: 0 14px;
   border-radius: 12px;
   border: 2px solid var(--k-line);
@@ -3655,6 +3737,13 @@
 .k-gu-btn.danger {
   border-color: #e0734f;
   color: var(--k-oops-ink);
+}
+.k-gu-hold {
+  /* A long press must not start a text selection or the callout menu on a touch screen. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
 }
 .k-gu-hold::before {
   content: '';
@@ -3849,9 +3938,12 @@
 /* ================= Toasts ================= */
 .k-toasts {
   position: fixed;
-  top: 10px;
+  top: calc(10px + env(safe-area-inset-top, 0px));
   left: 50%;
   translate: -50% 0;
+  /* Without a width, a fixed box at left 50% may only grow to half the screen: long messages wrapped in a sliver. */
+  width: max-content;
+  max-width: calc(100vw - 24px);
   z-index: 90;
   display: grid;
   gap: 8px;
@@ -3863,8 +3955,9 @@
   align-items: center;
   gap: 10px;
   min-height: 56px;
-  padding: 0 20px;
-  border-radius: 999px;
+  max-width: 100%;
+  padding: 6px 20px;
+  border-radius: 28px;
   background: var(--k-card);
   border: 3px solid var(--k-line);
   box-shadow: var(--k-press), var(--k-lift);
@@ -3903,6 +3996,14 @@
   animation-delay: 0ms !important;
   transition-duration: 150ms !important;
   scroll-behavior: auto !important;
+}
+/* The press-and-hold rings are a timer, not decoration: they keep filling over the whole hold, so a
+   grown-up can see how long is left. */
+.kids-app .k-hold.on .k-hold-fill {
+  transition-duration: 2s !important;
+}
+.kids-app .k-gu-hold.on::before {
+  transition-duration: var(--ms) !important;
 }
 .kids-app[data-motion='reduced'] .k-cloud,
 .kids-app[data-motion='reduced'] .k-conf {
@@ -4110,6 +4211,60 @@
 }
 .k-splash-rest {
   cursor: default;
+}
+
+/* A phone on its side is about 390px tall: the cards with Pip on them shrink him so their buttons stay in view,
+   and Break time puts him beside the words. (Pip's size is set inline, hence !important.) */
+@media (max-height: 520px) and (orientation: landscape) {
+  .k-welcome-card .k-pip,
+  .k-place-card .k-pip {
+    width: 84px !important;
+    height: 84px !important;
+  }
+  .k-welcome-card .k-pip svg,
+  .k-place-card .k-pip svg {
+    width: 84px;
+    height: 84px;
+  }
+  .k-place-card .k-buddy {
+    width: 84px;
+    height: 101px;
+  }
+  .k-welcome-card {
+    margin-top: 0;
+    gap: 12px;
+    padding: 16px 20px;
+  }
+  .k-place-card {
+    gap: 10px;
+    padding: 16px 20px;
+  }
+  .k-place-card .k-title {
+    font-size: 26px;
+  }
+  .k-break {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 22px;
+    row-gap: 8px;
+    width: min(700px, 100%);
+    padding: 14px 22px;
+  }
+  .k-break > .k-pip {
+    grid-column: 1;
+    grid-row: 1 / span 5;
+    width: 110px !important;
+    height: 110px !important;
+  }
+  .k-break > .k-pip svg {
+    width: 110px;
+    height: 110px;
+  }
+  .k-break > :not(.k-pip) {
+    grid-column: 2;
+    justify-self: center;
+  }
 }
 
 /* Map speaker button: quiet mode (no sounds, no automatic reading aloud). */

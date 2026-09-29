@@ -1,6 +1,6 @@
 // "Show Pip what you know!": world checkpoints (3 items each). 2 of 3 tests a world out; 2 misses
 // stops. Never called a test; no score display, just a 3-dot path per world.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ItemResult } from '../activities/types';
 import { CHECKPOINTS, REGISTRY } from '../packs';
 import { WORLDS } from '../curriculum/worlds';
@@ -15,7 +15,9 @@ import { SpeechBubble } from '../ui/SpeechBubble';
 import { sayAs, speech } from '../player/speech';
 import { go } from '../routes';
 
-export function Placement({ kid, single }: { kid: KidProfile; single?: number }) {
+export function Placement({ kid, single: asked }: { kid: KidProfile; single?: number }) {
+  // A link to a world that does not exist is the plain placement, not a blank screen.
+  const single = asked && asked >= 1 && asked <= WORLDS.length ? Math.floor(asked) : undefined;
   const cap = BAND_TUNING[kid.band].placementCap;
   const [state, setState] = useState<PlacementState>(() => (single ? { entry: 1, world: single, tested: [], restarted: false, done: false, startWorld: single } : placementStart(kid.start === 'games' ? 'games' : 'moves')));
   const [dots, setDots] = useState<('pass' | 'miss')[]>([]);
@@ -25,6 +27,11 @@ export function Placement({ kid, single }: { kid: KidProfile; single?: number })
   const [singlePassed, setSinglePassed] = useState(false);
   const world = WORLDS[state.world - 1];
   const set = CHECKPOINTS.get(`cp${state.world}`);
+  // Placement already done (a reload, or Back after it): straight to the map, not the games again.
+  useEffect(() => {
+    if (kid.placed && !single) go.map(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onWorldDone = (results: ItemResult[]) => {
     const passed = placementWorldPassed(results);
@@ -40,14 +47,24 @@ export function Placement({ kid, single }: { kid: KidProfile; single?: number })
     setBetween({ passed, next });
   };
 
+  // The player keeps a browser-history entry while an item is live and gives it back when it goes. A new
+  // player mounting in the same instant would take the giving back for a Back press and ask "Stop showing
+  // Pip?", so the next world's player comes a moment after the last one is gone (the card stays up).
+  const [swapping, setSwapping] = useState(false);
+  const swap = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => void (swap.current && clearTimeout(swap.current)), []);
   const continueOn = () => {
-    if (!between) return;
+    if (!between || swapping) return;
     const next = between.next;
-    setBetween(null);
-    setDots([]);
-    setAttempt((a) => a + 1);
-    if (next.done) updateKid(kid.id, (d) => applyPlacement(d, next.tested));
-    setState(next);
+    setSwapping(true);
+    swap.current = setTimeout(() => {
+      setSwapping(false);
+      setBetween(null);
+      setDots([]);
+      setAttempt((a) => a + 1);
+      if (next.done) updateKid(kid.id, (d) => applyPlacement(d, next.tested));
+      setState(next);
+    }, 150);
   };
 
   const skipAll = () => {
@@ -126,23 +143,25 @@ export function Placement({ kid, single }: { kid: KidProfile; single?: number })
   if (!set || !world) return null;
   return (
     <div className="k-screen k-placement">
-      <ActivityPlayer
-        key={`${state.world}-${attempt}`}
-        mode="placement"
-        kid={kid}
-        set={set}
-        title={`Rank ${world.rank}: ${world.title}`}
-        header={dotsRow}
-        onPlacementDone={onWorldDone}
-        onExit={() => go.map()}
-      />
+      {!swapping && (
+        <ActivityPlayer
+          key={`${state.world}-${attempt}`}
+          mode="placement"
+          kid={kid}
+          set={set}
+          title={`Rank ${world.rank}: ${world.title}`}
+          header={dotsRow}
+          onPlacementDone={onWorldDone}
+          onExit={() => go.map()}
+        />
+      )}
       {between && (
         <div className="k-overlay">
           <div className="k-card k-place-card">
             <Pip mood={between.passed ? 'cheer' : 'idle'} size={110} />
             {dotsRow}
             <h2 className="k-title">{between.passed ? `You know ${world.title}!` : between.next.done ? 'Great trying!' : 'Let’s warm up first!'}</h2>
-            <BigButton variant="primary" icon="next" onClick={continueOn} autoFocus whoosh>
+            <BigButton variant="primary" icon="next" onClick={continueOn} disabled={swapping} autoFocus whoosh>
               Next
             </BigButton>
           </div>

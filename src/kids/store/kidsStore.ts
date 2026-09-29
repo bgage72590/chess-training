@@ -14,6 +14,9 @@ import { filterTally, readTally, tallyGrowth, type Counts, type Tally } from '..
 
 export const KIDS_KEY = 'tempo.kids.v1';
 export const MAX_KIDS = 8;
+/** Kids kept when reading saved or synced data: more than MAX_KIDS can exist when two linked devices each
+ *  made kids, and they must not be cut off at the next reload. Import stops at MAX_KIDS. */
+export const KIDS_KEEP_MAX = 24;
 export const SEEN_MAX = 300;
 export const DAYS_MAX = 60;
 export const FIRSTS_MAX = 400;
@@ -205,7 +208,20 @@ export function newKid(o: { name: string; band: AgeBand; start: KidProfile['star
   };
 }
 
-export const cleanName = (s: unknown) => (typeof s === 'string' ? s.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 12) : '');
+export const NAME_MAX = 12;
+
+/** At most NAME_MAX characters as a person sees them: an emoji or an accented letter is never cut in half. */
+export function clipName(s: string): string {
+  const Segmenter = (Intl as { Segmenter?: new (l?: string, o?: { granularity: 'grapheme' }) => { segment(s: string): Iterable<{ segment: string }> } }).Segmenter;
+  const parts = Segmenter ? Array.from(new Segmenter(undefined, { granularity: 'grapheme' }).segment(s), (x) => x.segment) : Array.from(s);
+  return parts.slice(0, NAME_MAX).join('');
+}
+
+/** Control characters, angle brackets, zero-width characters and text-direction overrides (which would
+ *  hide a name or scramble the words around it) never belong in a name. */
+const NAME_JUNK = /[\u0000-\u001f\u007f-\u009f<>\u200b\u2060\ufeff\u202a-\u202e\u2066-\u2069]/g;
+
+export const cleanName = (s: unknown) => (typeof s === 'string' ? clipName(s.replace(NAME_JUNK, '').replace(/\s+/g, ' ').trim()) : '');
 
 const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
 const num = (x: unknown, d: number, min = -Infinity, max = Infinity) => (typeof x === 'number' && Number.isFinite(x) ? Math.min(max, Math.max(min, x)) : d);
@@ -346,14 +362,14 @@ export function kidCounters(k: KidProfile): Counts {
 }
 
 /** Validates and repairs stored or imported kids data. Anything unusable becomes the empty default. */
-export function normalizeKids(raw: unknown): KidsState {
+export function normalizeKids(raw: unknown, max = MAX_KIDS): KidsState {
   const base = defaultKidsState();
   if (!isObj(raw) || raw.v !== 1) return base;
   const seen = new Set<string>();
   const kids = (Array.isArray(raw.kids) ? raw.kids : [])
     .map(normalizeKid)
     .filter((k): k is KidProfile => !!k && !seen.has(k.id) && !!seen.add(k.id))
-    .slice(0, MAX_KIDS);
+    .slice(0, max);
   const fam = isObj(raw.family) ? raw.family : {};
   const dev = isObj(raw.device) ? raw.device : {};
   const device: KidsState['device'] = {};
@@ -368,6 +384,63 @@ export function normalizeKids(raw: unknown): KidsState {
   if (famTally) out.family.tally = famTally;
   if (typeof fam.resetAt === 'number') out.family.resetAt = num(fam.resetAt, 0, 0);
   const removed = numMap(raw.removed);
+  if (Object.keys(removed).length) out.removed = removed;
+  return out;
+}
+
+// ---------- Export and import ----------
+
+/** The biggest kids file Import reads (real files are well under 1 MB). */
+export const IMPORT_MAX_BYTES = 5_000_000;
+
+/** What Export writes: the kids and the star jar. The PIN and the device voice stay on the device, so a
+ *  shared or emailed file never carries the grown-up PIN. */
+export function exportKids(s: KidsState): string {
+  return JSON.stringify({ ...s, device: {} }, null, 2);
+}
+
+export type KidsImport = { ok: true; state: KidsState; skipped: number } | { ok: false; reason: 'big' | 'json' | 'newer' | 'notKids' | 'empty' };
+
+/** Reads a kids file: repairs what it can and says why when it cannot be used. `skipped`: kids in the
+ *  file that did not fit (unreadable ones, or more than MAX_KIDS). */
+export function parseKidsImport(text: string): KidsImport {
+  if (text.length > IMPORT_MAX_BYTES) return { ok: false, reason: 'big' };
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return { ok: false, reason: 'json' };
+  }
+  if (!isObj(raw) || typeof raw.v !== 'number' || !Array.isArray(raw.kids)) return { ok: false, reason: 'notKids' };
+  if (raw.v > 1) return { ok: false, reason: 'newer' };
+  if (raw.v !== 1) return { ok: false, reason: 'notKids' };
+  const state = normalizeKids(raw);
+  if (!state.kids.length) return { ok: false, reason: 'empty' };
+  return { ok: true, state, skipped: raw.kids.length - state.kids.length };
+}
+
+/**
+ * The state after importing `data` over `current`: the file's kids replace this device's kids. Kids
+ * this device had that are not in the file are marked deleted (so a linked device drops them too, and
+ * syncing does not quietly bring them back); a kid in the file that was deleted before comes back under
+ * a new id (a deleted id stays deleted). The PIN, the device voice and this tab's active kid stay.
+ */
+export function importedKids(current: KidsState, data: KidsState, now = Date.now()): KidsState {
+  const inFile = new Set(data.kids.map((k) => k.id));
+  const removed: Record<string, number> = { ...current.removed };
+  const kids = data.kids.map((k) => (k.id in removed ? { ...k, id: newKidId() } : k));
+  for (const k of current.kids) if (!inFile.has(k.id)) removed[k.id] = now;
+  const resetAt = Math.max(current.family.resetAt ?? 0, data.family.resetAt ?? 0);
+  const family: KidsState['family'] = { ...data.family };
+  if (resetAt) family.resetAt = resetAt;
+  const out: KidsState = {
+    v: 1,
+    activeKid: kids.some((k) => k.id === current.activeKid) ? current.activeKid : null,
+    kids,
+    family,
+    device: current.device,
+    updatedAt: now,
+  };
   if (Object.keys(removed).length) out.removed = removed;
   return out;
 }
@@ -432,7 +505,7 @@ export function readKids(st: StorageLike | null = storage()): KidsState {
     keepBackup(st, raw);
     return defaultKidsState();
   }
-  const out = normalizeKids(parsed);
+  const out = normalizeKids(parsed, KIDS_KEEP_MAX);
   const hadKids = isObj(parsed) && Array.isArray(parsed.kids) && parsed.kids.length > 0;
   if (!isObj(parsed) || parsed.v !== 1 || (hadKids && !out.kids.length)) keepBackup(st, raw);
   return out;
@@ -462,7 +535,11 @@ if (typeof window !== 'undefined') {
   try {
     window.addEventListener('storage', (e) => {
       if (e.key !== KIDS_KEY || e.newValue == null) return;
-      state = readKids();
+      const next = readKids();
+      // Who is playing is this tab's own choice: another tab picking someone else must not switch a
+      // child who is mid-game here (and if their profile was deleted over there, nobody is playing here).
+      next.activeKid = next.kids.some((k) => k.id === state.activeKid) ? state.activeKid : null;
+      state = next;
       emit();
     });
   } catch {

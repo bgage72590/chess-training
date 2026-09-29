@@ -726,6 +726,8 @@ All routes live under `#/kids/...` and are rendered by KidsApp full-screen, with
   - If a PIN is set: a 4-digit PIN keypad.
   - Otherwise: an arithmetic question in words, `a` times `b` with `a` from 11 to 19 and `b` from 3 to 9, for example "What is fourteen times three?", answered on the keypad. A wrong answer gives a new question.
   - It is a speed bump, not security. The grown-up text says so plainly.
+  - Five wrong answers in a row lock the keypad for 30 seconds (kept while the gate is closed and opened again). With a PIN set, "Forgot the PIN?" swaps it for a harder times question (two-digit numbers), so a forgotten PIN never locks a grown-up out.
+  - The gate works from the keyboard: hold Enter or Space on the ring, type the digits, Enter sends, Escape closes; Tab stays inside it.
 - **PIN storage**: `{ pinSalt, pinHash }` where the hash is SHA-256 over salt + PIN via `crypto.subtle`. If `crypto.subtle` is unavailable (an insecure context), the PIN option is hidden and the arithmetic gate is used.
 - **Guards**:
   - exit to Tempo
@@ -750,7 +752,7 @@ All routes live under `#/kids/...` and are rendered by KidsApp full-screen, with
 - All kids data is in `localStorage['tempo.kids.v1']`, and the device lock is in `localStorage['tempo.kids.lock.v1']`. Both are separate from `'tempo.profile.v1'`.
 - **They are never synced.** `src/store/cloud.ts` must not import from `src/kids` or reference `tempo.kids`, and a test asserts both.
 - Names are optional nicknames. No photos, no birthdates (band only), no chat, no external links, no ads, no analytics, no network calls. Fonts are self-hosted and Stockfish is local WASM.
-- Export is a local JSON download. Import validates with `normalizeKids()`.
+- Export is a local JSON download without the PIN or the device voice. Import validates with `normalizeKids()`, says why a file cannot be used, asks before it replaces the players on the device, and keeps the device's PIN.
 - Siblings see only each other's name, avatar, rank and stars on the picker.
 - **Robustness**: every localStorage access is wrapped in try/catch, with an in-memory fallback (private mode or sandboxed frame). When saving fails, Grown-ups shows a small note: "Progress won't be saved on this device."
 

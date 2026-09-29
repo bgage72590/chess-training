@@ -10,7 +10,7 @@ const NAME: Record<string, string> = { p: 'pawn', n: 'knight', b: 'bishop', r: '
 export function DangerSheet({ piece, onUndo, onKeep }: { piece: string; onUndo(): void; onKeep(): void }) {
   useEffect(() => kidSound('boop'), []);
   return (
-    <div className="k-sheet" role="alertdialog" aria-label="Danger alarm">
+    <div className="k-sheet" role="alertdialog" aria-modal="true" aria-label="Danger alarm">
       <div className="k-sheet-card k-danger">
         <Pip mood="wow" size={72} />
         <p className="k-sheet-title">Uh-oh! Is your {NAME[piece.toLowerCase()] ?? 'piece'} safe?</p>
