@@ -5,11 +5,23 @@ import { isSq } from '../../lib/fen';
 import { ALL_SQUARES, dests } from '../../lib/miniRules';
 import { SQUARE_RE } from '../../lib/pronounce';
 import { pick } from '../../lib/rng';
+import { flipPlacement, flipSqs } from '../../lib/mirror';
 
 export interface PaintItem {
   pieces: Placement; // exactly 1 white piece
   blockers?: Sq[]; // white friends (drawn as white pawns)
   enemies?: Placement; // black pieces: capturing them counts
+  noMirror?: boolean; // never shown reflected
+}
+
+/** The item reflected left to right (a <-> h): the same squares, mirrored. */
+export function mirrorPaint<T extends PaintItem>(item: T): T {
+  return {
+    ...item,
+    pieces: flipPlacement(item.pieces),
+    ...(item.blockers ? { blockers: flipSqs(item.blockers) } : {}),
+    ...(item.enemies ? { enemies: flipPlacement(item.enemies) } : {}),
+  };
 }
 
 /** The one white piece of an item. */
@@ -41,6 +53,9 @@ export function validatePaint(item: PaintItem & ItemMeta, band: AgeBand): string
   if (new Set(sqs).size !== sqs.length) errs.push('overlapping squares');
   if (Object.values(item.enemies ?? {}).some((p) => !p || p !== p.toLowerCase())) errs.push('enemies must be black');
   if (!errs.length && paintTargets(item).length < 1) errs.push('no squares to paint');
+  // blockers are drawn as white pawns and enemy pawns as black ones: none on the first or last rank
+  const pawns = [...(item.blockers ?? []), ...Object.entries(item.enemies ?? {}).filter(([, p]) => p?.toUpperCase() === 'P').map(([s]) => s)];
+  if (pawns.some((s) => s[1] === '1' || s[1] === '8')) errs.push('a pawn on the first or last rank');
   if (band === 'sprout' && SQUARE_RE.test(bandText(item.say, band))) errs.push('sprout text contains a square name');
   return errs;
 }

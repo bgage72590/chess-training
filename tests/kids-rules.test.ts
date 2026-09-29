@@ -116,7 +116,7 @@ describe('quiz answers recomputed with chess.js', () => {
   });
 
   it('trade: plays the capture and the best recapture', () => {
-    const want: Record<string, boolean> = { t1: false, t2: true, t3: true, t4: false };
+    const want: Record<string, boolean> = { t1: false, t2: true, t3: true, t4: false, t5: true, t6: false };
     for (const it of quiz('w6-trade')) {
       if (it.kind !== 'trade') throw new Error('trade expected');
       const c = new Chess(it.fen);
@@ -158,7 +158,7 @@ describe('quiz answers recomputed with chess.js', () => {
   it('bishop-reach: square colors', () => {
     expect(isLight('a1')).toBe(false);
     expect(isLight('h1')).toBe(true);
-    const want: Record<string, boolean> = { b1: false, b2: true, b3: false, b4: true, b5: true, b6: false };
+    const want: Record<string, boolean> = { b1: false, b2: true, b3: false, b4: true, b5: true, b6: false, b7: false, b8: true };
     for (const it of quiz('w2-bishop-color')) {
       if (it.kind !== 'bishop-reach') throw new Error('bishop-reach expected');
       const from = Object.keys(it.pieces)[0];

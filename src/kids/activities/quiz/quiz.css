@@ -60,14 +60,15 @@
   background: var(--k-sea-edge);
   color: #fffaf0;
 }
+/* Small and low, so the capture and the recapture (the middle ranks) stay in view. */
 .k-quiz-scale {
   position: absolute;
   left: 50%;
-  bottom: 4%;
+  bottom: 2%;
   z-index: 20;
-  width: min(80%, 300px);
+  width: min(54%, 190px);
   translate: -50% 0;
-  padding: 8px 12px 10px;
+  padding: 4px 8px 6px;
   border-radius: var(--k-r);
   background: var(--k-card);
   border: 2px solid var(--k-edge);
@@ -89,14 +90,14 @@
   justify-content: space-between;
   font-family: var(--k-font-num);
   font-weight: 600;
-  font-size: 16px;
+  font-size: 14px;
   color: var(--k-ink);
 }
 .k-quiz-banner {
   position: absolute;
-  top: 2%;
+  top: 0;
   left: 50%;
-  translate: -50% 0;
+  translate: -50% calc(-100% - 4px);
   z-index: 20;
   padding: 4px 14px;
   border-radius: var(--k-r-pill);

@@ -1,17 +1,21 @@
 // Magic Memory: look at a position, then a magic cloak sweeps it away. Rebuild it with the piece
 // tray, or (what-moved) spot the one piece that moved. Scored on first-try placements.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ActivityProps, ArtKey, PieceCode, Placement, Sq, SquareTone } from '../types';
+import type { ActivityProps, ArtKey, PieceCode, Placement, Sq, SquareTone, TrayButton } from '../types';
 import { KidsBoard } from '../../player/KidsBoard';
 import { placementFen } from '../../lib/fen';
 import { applyMove } from '../../lib/miniRules';
 import { kidSound } from '../../lib/kidsSound';
 import { pieceTrayButtons } from '../boardVision/pieceTray';
 import { PIECE_NAME } from '../boardVision/logic';
-import { memoryScore, type MemoryItem } from './logic';
+import { useBadFlash } from '../boardVision/useBadFlash';
+import { memoryScore, movedScore, type MemoryItem } from './logic';
 import '../boardVision/boardVision.css';
 
 type Phase = 'look' | 'cloak' | 'play';
+
+/** The tray while the pieces are covered: the same buttons, blank, so the board does not jump when they appear. */
+const covered = (pieces: Placement): TrayButton[] => pieceTrayButtons(pieces, null, () => {}).map((b) => ({ id: b.id, label: '', icon: 'eye', variant: 'plain', disabled: true, onPress: () => {} }));
 
 export function Memory({ item, player, onDone }: ActivityProps<MemoryItem>) {
   const [phase, setPhase] = useState<Phase>('look');
@@ -22,6 +26,7 @@ export function Memory({ item, player, onDone }: ActivityProps<MemoryItem>) {
   const [wobble, setWobble] = useState<Sq | null>(null);
   const [tones, setTones] = useState<Partial<Record<Sq, SquareTone>>>({});
   const [done, setDone] = useState(false);
+  const [badTone, flashBad] = useBadFlash();
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const later = (fn: () => void, ms: number) => timers.current.push(setTimeout(fn, ms));
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
@@ -53,7 +58,7 @@ export function Memory({ item, player, onDone }: ActivityProps<MemoryItem>) {
 
   useEffect(() => {
     if (item.mode !== 'rebuild') return;
-    player.setTray(phase === 'play' && !done ? pieceTrayButtons(todo, sel, setSel) : null);
+    player.setTray(phase === 'play' && !done ? pieceTrayButtons(todo, sel, setSel) : covered(item.pieces));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, todo, sel, done]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,11 +86,11 @@ export function Memory({ item, player, onDone }: ActivityProps<MemoryItem>) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todo]);
 
-  const finish = (firstTry: number, m: number) => {
+  const finish = (base: 1 | 2 | 3, m: number) => {
     setDone(true);
     player.celebrate('small');
     const hl = player.hintLevel;
-    const score = Math.min(memoryScore(total, firstTry), hl >= 3 ? 1 : hl === 2 ? 2 : 3) as 1 | 2 | 3;
+    const score = Math.min(base, hl >= 3 ? 1 : hl === 2 ? 2 : 3) as 1 | 2 | 3;
     player.best(`memory-${item.mode}`, score, 'higher');
     later(() => onDone({ score, mistakes: m, hintLevel: hl, golden: score === 3 && hl === 0 }), 1000);
   };
@@ -97,12 +102,12 @@ export function Memory({ item, player, onDone }: ActivityProps<MemoryItem>) {
         setTones({ [sq]: 'good' });
         kidSound('pop', 3);
         player.say(`Yes! The ${PIECE_NAME[after[sq]!.toUpperCase()]} moved!`, 'cheer');
-        // Score by tries: right first = full, second = 70%, else less.
-        finish(misses === 0 ? total : misses === 1 ? Math.ceil(total * 0.7) : 0, misses);
-      } else {
+        finish(movedScore(misses), misses);
+      } else if (after[sq]) {
         setMisses((m) => m + 1);
-        player.mistake(after[sq] ? 'That one stayed still. Look again!' : 'Tap a piece!');
-      }
+        flashBad(sq);
+        player.mistake('That one stayed still. Look again!');
+      } else player.say('Tap a piece!', 'idle'); // an empty square is not an answer
       return;
     }
     if (placed[sq]) return;
@@ -115,7 +120,7 @@ export function Memory({ item, player, onDone }: ActivityProps<MemoryItem>) {
       setPlaced(np);
       kidSound('pop', Object.keys(np).length);
       if (!Object.entries(todo).some(([s, p]) => s !== sq && p === sel)) setSel(null);
-      if (Object.keys(np).length === total) finish(Math.max(0, total - misses), misses);
+      if (Object.keys(np).length === total) finish(memoryScore(total, Math.max(0, total - misses)), misses);
       return;
     }
     setMisses((m) => m + 1);
@@ -128,7 +133,7 @@ export function Memory({ item, player, onDone }: ActivityProps<MemoryItem>) {
 
   return (
     <div className="k-bv">
-      <KidsBoard fen={fen} interactive={false} onSquareClick={onTap} wobble={wobble} tones={tones} hint={phase === 'play' ? player.hint : null} label={phase === 'play' ? 'Magic Memory board' : 'Remember this board'} />
+      <KidsBoard fen={fen} interactive={false} onSquareClick={onTap} wobble={wobble} tones={{ ...tones, ...badTone }} hint={phase === 'play' ? player.hint : null} label={phase === 'play' ? 'Magic Memory board' : 'Remember this board'} />
       {phase === 'look' && (
         <span className="k-bv-timer" role="timer">
           {secsLeft}s

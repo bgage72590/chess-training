@@ -8,12 +8,17 @@ import { useKidCtx } from '../../player/context';
 import { placementFen } from '../../lib/fen';
 import { applyMove } from '../../lib/miniRules';
 import { kidSound } from '../../lib/kidsSound';
-import { paintBoard, paintPiece, paintTargets, type PaintItem } from './logic';
+import { plural } from '../../lib/plural';
+import { mirrorPaint, paintBoard, paintPiece, paintTargets, type PaintItem } from './logic';
+import { useBadFlash } from '../boardVision/useBadFlash';
 import { PIECE_NAME } from '../boardVision/logic';
 import '../boardVision/boardVision.css';
 
-export function Paint({ item, player, onDone, band }: ActivityProps<PaintItem>) {
+export function Paint({ item: authored, player, onDone, band }: ActivityProps<PaintItem>) {
   const { reducedMotion } = useKidCtx();
+  // Half the runs see the board reflected left to right, so a replay is not the same picture.
+  const [mirrored] = useState(() => !authored.noMirror && player.rng() < 0.5);
+  const item = useMemo(() => (mirrored ? mirrorPaint(authored) : authored), [mirrored, authored]);
   const [from, piece] = paintPiece(item) ?? ['a1', 'R'];
   const name = PIECE_NAME[piece.toUpperCase()];
   const targets = useMemo(() => paintTargets(item), [item]);
@@ -24,21 +29,34 @@ export function Paint({ item, player, onDone, band }: ActivityProps<PaintItem>) 
   const [demoAt, setDemoAt] = useState<Sq | null>(null);
   const [demoing, setDemoing] = useState(band === 'sprout' && !reducedMotion);
   const [done, setDone] = useState(false);
+  const [badTone, flashBad] = useBadFlash();
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const later = (fn: () => void, ms: number) => timers.current.push(setTimeout(fn, ms));
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
-  // Sprouts watch the piece glide to each square first.
+  // Sprouts watch the piece glide to each square first. A tap on the board, or the hint bulb, ends the show early.
+  const stopDemo = () => {
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+    setDemoAt(null);
+    setDemoing(false);
+  };
+  const endDemo = () => {
+    stopDemo();
+    player.say(`Your turn! Tap every square the ${name} can go.`, 'idle');
+  };
   useEffect(() => {
     if (!demoing) return;
     targets.forEach((t, i) => later(() => setDemoAt(t), 500 * (i + 1)));
-    later(() => {
-      setDemoAt(null);
-      setDemoing(false);
-      player.say(`Your turn! Tap every square the ${name} can go.`, 'idle');
-    }, 500 * (targets.length + 1) + 300);
+    later(endDemo, 500 * (targets.length + 1) + 300);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A hint asked for during the show is shown at once, not hidden behind it.
+  useEffect(() => {
+    if (demoing && player.hintLevel > 0) stopDemo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player.hintLevel]);
 
   const left = targets.filter((t) => !painted.includes(t));
   useEffect(() => {
@@ -55,7 +73,8 @@ export function Paint({ item, player, onDone, band }: ActivityProps<PaintItem>) 
   }, [painted.length]);
 
   const onTap = (sq: Sq) => {
-    if (demoing || done || sq === from || painted.includes(sq)) return;
+    if (demoing) return endDemo();
+    if (done || sq === from || painted.includes(sq)) return;
     if (targets.includes(sq)) {
       const got = [...painted, sq];
       setPainted(got);
@@ -70,6 +89,7 @@ export function Paint({ item, player, onDone, band }: ActivityProps<PaintItem>) 
       return;
     }
     setMistakes((m) => m + 1);
+    flashBad(sq);
     setWobble(null);
     requestAnimationFrame(() => setWobble(from));
     player.mistake(`The ${name} can't go there.`);
@@ -80,16 +100,17 @@ export function Paint({ item, player, onDone, band }: ActivityProps<PaintItem>) 
   const shown = demoAt ? applyMove(base, from, demoAt) : base;
 
   return (
-    <div className="k-bv">
+    <div className="k-bv" data-mirrored={mirrored ? 1 : undefined}>
       <KidsBoard
         fen={placementFen(shown)}
         interactive={false}
         onSquareClick={onTap}
         art={art}
         wobble={wobble}
+        tones={badTone}
         lastMove={demoAt ? [from, demoAt] : null}
         hint={demoing ? null : player.hint}
-        label={`Paint board: ${left.length} squares left for the ${name}`}
+        label={`Paint board: ${plural(left.length, 'square')} left for the ${name}`}
       />
       <span className="k-bv-count" aria-live="polite">
         {painted.length}/{targets.length}

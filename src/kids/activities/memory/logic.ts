@@ -67,3 +67,8 @@ export function memoryScore(total: number, firstTry: number): 1 | 2 | 3 {
   const pct = total ? firstTry / total : 1;
   return pct >= 1 ? 3 : pct >= 0.7 ? 2 : 1;
 }
+
+/** "What moved?" is a single answer: right first = 3, second try = 2, later = 1 (whatever the piece count). */
+export function movedScore(misses: number): 1 | 2 | 3 {
+  return misses === 0 ? 3 : misses === 1 ? 2 : 1;
+}

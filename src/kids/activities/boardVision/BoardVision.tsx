@@ -7,8 +7,10 @@ import { KidsBoard } from '../../player/KidsBoard';
 import { fenPlacement, placementFen } from '../../lib/fen';
 import { ALL_SQUARES } from '../../lib/miniRules';
 import { kidSound } from '../../lib/kidsSound';
+import { plural } from '../../lib/plural';
 import { isLight, lineSquares, PIECE_NAME, setupTargets, setupTip, type BoardVisionItem } from './logic';
 import { pieceTrayButtons } from './pieceTray';
+import { useBadFlash } from './useBadFlash';
 import './boardVision.css';
 
 type P<K extends BoardVisionItem['kind']> = ActivityProps<Extract<BoardVisionItem, { kind: K }>>;
@@ -60,6 +62,7 @@ function TapColor({ item, player, onDone }: P<'tap-color'>) {
   const { done, finish } = useFinish(player, onDone);
   const [taps, setTaps] = useState<Sq[]>([]);
   const [mistakes, setMistakes] = useState(0);
+  const [badTone, flashBad] = useBadFlash();
   const light = item.color === 'light';
   const want = (s: Sq) => isLight(s) === light;
 
@@ -84,6 +87,7 @@ function TapColor({ item, player, onDone }: P<'tap-color'>) {
     if (done || taps.includes(sq)) return;
     if (!want(sq)) {
       setMistakes((m) => m + 1);
+      flashBad(sq);
       player.mistake(light ? 'That one is dark. Find a light one!' : 'That one is light. Find a dark one!');
       return;
     }
@@ -95,7 +99,7 @@ function TapColor({ item, player, onDone }: P<'tap-color'>) {
 
   return (
     <div className="k-bv">
-      <KidsBoard fen={EMPTY} interactive={false} onSquareClick={onTap} art={Object.fromEntries(taps.map((s, i) => [s, splat(i)]))} hint={player.hint} label={`Tap ${item.count} ${item.color} squares`} />
+      <KidsBoard fen={EMPTY} interactive={false} onSquareClick={onTap} art={Object.fromEntries(taps.map((s, i) => [s, splat(i)]))} tones={badTone} hint={player.hint} label={`Tap ${plural(item.count, item.color + ' square')}`} />
     </div>
   );
 }
@@ -107,6 +111,7 @@ function TapLine({ item, player, onDone }: P<'tap-line'>) {
   const line = useMemo(() => lineSquares(item.through, item.line), [item.through, item.line]);
   const [lit, setLit] = useState<Sq[]>([item.through]);
   const [mistakes, setMistakes] = useState(0);
+  const [badTone, flashBad] = useBadFlash();
   const left = line.filter((s) => !lit.includes(s));
 
   useEffect(() => {
@@ -125,6 +130,7 @@ function TapLine({ item, player, onDone }: P<'tap-line'>) {
     if (done || lit.includes(sq)) return;
     if (!line.includes(sq)) {
       setMistakes((m) => m + 1);
+      flashBad(sq);
       player.mistake('That square is not on the road.');
       return;
     }
@@ -141,9 +147,9 @@ function TapLine({ item, player, onDone }: P<'tap-line'>) {
         interactive={false}
         onSquareClick={onTap}
         art={Object.fromEntries(lit.map((s) => [s, 'star' as ArtKey]))}
-        tones={{ [item.through]: 'focus' }}
+        tones={{ [item.through]: 'focus', ...badTone }}
         hint={player.hint}
-        label={`Light up the road: ${left.length} squares left`}
+        label={`Light up the road: ${plural(left.length, 'square')} left`}
       />
     </div>
   );
@@ -156,6 +162,7 @@ function NamePiece({ item, player, onDone }: P<'name-piece'>) {
   const board = useMemo(() => fenPlacement(item.fen), [item.fen]);
   const [mistakes, setMistakes] = useState(0);
   const [found, setFound] = useState<Sq | null>(null);
+  const [badTone, flashBad] = useBadFlash();
   const name = PIECE_NAME[item.ask.toUpperCase()];
   const matches = (p: PieceCode | undefined) => !!p && p.toLowerCase() === item.ask && (!item.color || (item.color === 'w') === (p === p.toUpperCase()));
   const hits = Object.keys(board).filter((s) => matches(board[s]));
@@ -192,12 +199,13 @@ function NamePiece({ item, player, onDone }: P<'name-piece'>) {
       return;
     }
     setMistakes((m) => m + 1);
+    flashBad(sq);
     player.mistake(p ? `That's the ${PIECE_NAME[p.toUpperCase()]}! Find the ${name}.` : `Find the ${name}!`);
   };
 
   return (
     <div className="k-bv">
-      <KidsBoard fen={item.fen} interactive={false} onSquareClick={onTap} tones={found ? { [found]: 'good' } : {}} hint={player.hint} label={`Find the ${name}`} />
+      <KidsBoard fen={item.fen} interactive={false} onSquareClick={onTap} tones={found ? { [found]: 'good' } : badTone} hint={player.hint} label={`Find the ${name}`} />
     </div>
   );
 }
@@ -230,7 +238,8 @@ const fileRank = (sq: Sq) => Object.fromEntries(ALL_SQUARES.filter((s) => s[0] =
 
 function FindSquare({ item, player, onDone }: P<'find-square'>) {
   const { done, finish, later } = useFinish(player, onDone);
-  const targets = useMemo(() => targetsFor(item, player.rng), [item, player]);
+  // Drawn once per item: `player` is a new object on every render, so it cannot be a memo key.
+  const [targets] = useState(() => targetsFor(item, player.rng));
   const [round, setRound] = useState(0);
   const [mistakes, setMistakes] = useState(0);
   const [flash, setFlash] = useState<Sq | null>(null);
@@ -292,15 +301,15 @@ function Dash({ item, player, onDone }: P<'find-square'>) {
   const [target, setTarget] = useState<Sq>(() => ALL_SQUARES[Math.floor(player.rng() * 64) % 64]);
   const [miss, setMiss] = useState<Sq | null>(null);
   const scoreRef = useRef(0);
+  const leftRef = useRef(secs);
 
   useEffect(() => {
     player.setHints([{ say: 'Letter first, then number. Go fast!' }]);
     const iv = setInterval(() => {
-      setLeft((l) => {
-        const n = l - 1;
-        if (n <= 5 && n > 0) player.sound('tick');
-        return Math.max(0, n);
-      });
+      // The tick is a side effect: it stays out of the state updater (dev mode runs updaters twice).
+      leftRef.current = Math.max(0, leftRef.current - 1);
+      if (leftRef.current <= 5 && leftRef.current > 0) player.sound('tick');
+      setLeft(leftRef.current);
     }, 1000);
     return () => clearInterval(iv);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -308,7 +317,8 @@ function Dash({ item, player, onDone }: P<'find-square'>) {
   useEffect(() => {
     if (left > 0 || done) return;
     const n = scoreRef.current;
-    const best = player.best(item.bestKey ?? `dash-${secs}`, n, 'higher');
+    // A dash with no squares is not "a new best".
+    const best = n > 0 && player.best(item.bestKey ?? `dash-${secs}`, n, 'higher');
     player.say(best ? `${n} squares! A new best!` : `${n} squares! Great dashing!`, 'cheer');
     finish(0, { score: n >= 15 ? 3 : n >= 8 ? 2 : 1, stats: { found: n } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -414,7 +424,7 @@ function Setup({ item, player, onDone }: P<'setup'>) {
 
   return (
     <div className="k-bv">
-      <KidsBoard fen={placementFen(placed)} interactive={false} onSquareClick={onTap} art={art} wobble={wobble} hint={player.hint} label={`Set up the board: ${total - Object.keys(placed).length} pieces left`} />
+      <KidsBoard fen={placementFen(placed)} interactive={false} onSquareClick={onTap} art={art} wobble={wobble} hint={player.hint} label={`Set up the board: ${plural(total - Object.keys(placed).length, 'piece')} left`} />
     </div>
   );
 }

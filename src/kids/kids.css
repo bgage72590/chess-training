@@ -4164,12 +4164,13 @@
   }
 }
 
-/* Player: Pip's row keeps one height in portrait, so the board never jumps while a kid aims. */
+/* Player: Pip's row keeps one height in portrait, so the board never jumps while a kid aims. It is tall
+   enough for three lines of the phone-size caption; a longer line scrolls inside the bubble. */
 .k-player-coach {
-  height: 88px;
+  height: 104px;
 }
 .k-player-coach .k-bubble {
-  max-height: 84px;
+  max-height: 100px;
   overflow-y: auto;
   overscroll-behavior: contain;
   /* A line taller than the bubble starts at the top and scrolls, instead of centring off the top. */

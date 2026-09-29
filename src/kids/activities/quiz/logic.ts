@@ -191,6 +191,8 @@ export function validateQuiz(item: QuizItem & ItemMeta, band: AgeBand): string[]
       const got = munchers(item.fen, item.target);
       if (!got.length) errs.push('nobody can munch');
       if (!sameSet(got, item.answer)) errs.push(`munchers are ${got.join(',')}`);
+      // the board lets a kid tap any piece but the king, so a king muncher could never be picked
+      if (item.answer.some((s) => c.get(s as Square)?.type === 'k')) errs.push('a king cannot be one of the munchers');
       break;
     }
     case 'move':

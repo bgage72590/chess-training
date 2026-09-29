@@ -60,7 +60,7 @@ export function Intro({ steps, band, rate, onSay, onDone }: { steps: IntroStep[]
     if (!st.move || movedRef.current) return;
     const [a, b] = st.move;
     movedRef.current = true;
-    setPos((cur) => applyMove(cur, a, b));
+    setPos((cur) => applyIntroMove(cur, a, b));
     setLast([a, b]);
     setMoved(true);
     kidSound('move');
@@ -96,6 +96,21 @@ export function Intro({ steps, band, rate, onSay, onDone }: { steps: IntroStep[]
   );
 }
 
+/** A demo move. Castling brings the rook along, so the picture matches "the rook hops over him". */
+export function applyIntroMove(p: Placement, a: string, b: string): Placement {
+  const next = applyMove(p, a, b);
+  const step = b.charCodeAt(0) - a.charCodeAt(0);
+  if (p[a]?.toUpperCase() === 'K' && Math.abs(step) === 2) {
+    const from = (step > 0 ? 'h' : 'a') + a[1];
+    const to = (step > 0 ? 'f' : 'd') + a[1];
+    if (next[from]?.toUpperCase() === 'R') {
+      next[to] = next[from];
+      delete next[from];
+    }
+  }
+  return next;
+}
+
 function placementOf(step: IntroStep | undefined): Placement | null {
   if (!step) return null;
   if (step.fen) return fenPlacement(step.fen);
@@ -109,8 +124,11 @@ const NAME: Record<string, string> = { K: 'king', Q: 'queen', R: 'rook', B: 'bis
 export function PiecePick({ pick, band, onSay, onDone }: { pick: { answer: PieceCode; options: PieceCode[] }; band: AgeBand; onSay(text: string, mood?: 'cheer' | 'oops'): void; onDone(): void }) {
   const [wrong, setWrong] = useState<PieceCode | null>(null);
   const [right, setRight] = useState(false);
+  // Leaving during the 1.5 s pause must not start the next item behind the kid's back.
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   useEffect(() => {
     onSay(`Which one is the ${NAME[pick.answer.toUpperCase()]}?`);
+    return () => timers.current.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (
@@ -128,12 +146,12 @@ export function PiecePick({ pick, band, onSay, onDone }: { pick: { answer: Piece
                 setRight(true);
                 kidSound('pop', 3);
                 onSay(`Yes! That's the ${NAME[p.toUpperCase()]}!`, 'cheer');
-                setTimeout(onDone, 1500);
+                timers.current.push(setTimeout(onDone, 1500));
               } else {
                 setWrong(p);
                 kidSound('boop');
                 onSay(`That's the ${NAME[p.toUpperCase()]}! Find the ${NAME[pick.answer.toUpperCase()]}.`, 'oops');
-                setTimeout(() => setWrong(null), 400);
+                timers.current.push(setTimeout(() => setWrong(null), 400));
               }
             }}
           >

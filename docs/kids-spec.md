@@ -1161,6 +1161,8 @@ interface StarItem {
 - A tap on an unreachable square gives a wobble plus `boop` but is **not** a mistake. After the 2nd such tap, the dots show for 2 s.
 - The item finishes when every star is collected. There is no losing and no move limit.
 
+**Variety**: a run shows each star or Paint item reflected left to right (a <-> h) half the time, so a replay is not the same picture. Every rule is symmetric, so pars and answers are unchanged. Items with `noMirror` (the w1-hello lessons), a `bestKey` or an `awardOnDone` are never reflected. Level sets whose run used the whole pool also gained a few extra items after the tables below were written (for example `r8`, `r9`, `s8`, `s9`, second boss items and two more Paint items per piece); `tests/kids-content-qa.test.ts` re-solves every item with a separate solver.
+
 **Scoring**: `moves <= par + parSlack` = 3; `moves <= par + 2 + parSlack` = 2; otherwise 1. The result is then capped by the standard mistake and hint score (lava bumps are mistakes). **Golden**: `moves === par`, 0 mistakes, no hint.
 
 **UI**
@@ -1193,7 +1195,7 @@ intro: [
 
 **Level sets (content/core.ts)**. `S` marks `bands: ['sprout']` items, and `tune.sprout` is written inline. Unmarked items are all bands.
 
-`w1-hello` (order `'fixed'`, perRun S4, E5, C4)
+`w1-hello` (order `'fixed'`, perRun S4, E5, C4; h1 and h2 are for Sprouts and Explorers only, so a Champion's four are h3 to h6 and every item is reachable; none of these items is ever shown reflected)
 | id | item | par |
 |---|---|---|
 | h1 | `{pieces:{a1:'R'}, stars:['a3'], tune:{sprout:{area:'a1:d4'}}}` | 1 |
@@ -1448,10 +1450,10 @@ The board is non-interactive: `interactive={false}` plus `onSquareClick`. There 
 validate: squares valid; a `name-piece` FEN contains the asked piece; setup strings contain only the letters RNBQKP; `tap-line` has at least 3 squares.
 
 Level sets (content/movement.ts):
-- `w1-roads` (perRun 3): tap-line through `a1` file; `d4` rank; `h8` file; plus E/C `c1` diagonal.
+- `w1-roads` (perRun 3): tap-line through `a1` file; `d4` rank; then Sprouts get the `h8` file and E/C get the `c1` diagonal (a fixed run of 3 would otherwise never reach the diagonal).
 - `w1-colors`: tap-color light x1; dark x3; light x2.
-- `w2-treasure-map`: find-square rounds 5 of `['a1','h8','e4','d5','c3']` with `fadeCoords`; then rounds 8 random; perRun E2, C2.
-- `w5-army`: name-piece over the start position, asking k, q, r, b, n, p (6 items; perRun S3, E5, C6).
+- `w2-treasure-map`: find-square rounds 5 of `['a1','h8','e4','d5','c3']` with `fadeCoords`; then rounds 8 random for Explorers, or 6 random with fading labels for Champions (`tm3`); perRun E2, C2. The random squares are drawn once per item.
+- `w5-army`: name-piece over the start position, asking k, q, r, b, n, p (6 items; perRun S3, E5, C6; shuffled, not fixed, so a Sprout meets every piece over a few runs).
 - `w5-setup`: S `setup 'R R'` with colorHints, then `'RNBQKBNR'` with colorHints; E and C `'RNBQKBNR'`, then both sides (`pieces: 'RNBQKBNR/PPPPPPPP'`).
 
 ### 13.4 PAINT THE MOVES (`paint`, Pack A, P2 graft)
