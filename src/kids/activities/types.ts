@@ -70,6 +70,8 @@ export interface TrayButton {
   art?: ReactNode;
   /** Shown like a button but only informs (the candy jar): no focus, no press, read out by `ariaLabel`. */
   inert?: boolean;
+  /** Keeps a button's place while it waits to appear (Memory's covered tray): no press, hidden from screen readers. */
+  placeholder?: boolean;
   ariaLabel?: string;
   variant?: 'primary' | 'go' | 'info' | 'boss' | 'magic' | 'plain';
   disabled?: boolean;
@@ -85,7 +87,8 @@ export interface PlayerApi {
   setHints(steps: HintStep[]): void; // ladder levels 1..4 for the current item (missing levels use generic fallbacks)
   readonly hint: HintStep | null; // currently shown hint step (activity renders tones/arrows/art from it)
   readonly hintLevel: 0 | 1 | 2 | 3 | 4;
-  progress(done: number, total: number): void; // small counter chip in the top bar (e.g. stars 2/3)
+  pauseHints(paused: boolean): void; // nothing to hint yet (Memory's look phase): the bulb is off and the idle ladder waits
+  progress(done: number, total?: number): void; // small counter chip in the top bar (e.g. stars 2/3; a bare count without a total)
   par?(used: number, par: number): void; // footprints in the top bar (Explorer and Champion star items)
   celebrate(kind: 'small' | 'big' | 'checkmate' | 'promotion'): void;
   sound(name: KidSound): void;

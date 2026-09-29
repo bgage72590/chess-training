@@ -1,6 +1,6 @@
 // "Show Pip what you know!": world checkpoints (3 items each). 2 of 3 tests a world out; 2 misses
 // stops. Never called a test; no score display, just a 3-dot path per world.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ItemResult } from '../activities/types';
 import { CHECKPOINTS, REGISTRY } from '../packs';
 import { WORLDS } from '../curriculum/worlds';
@@ -47,24 +47,14 @@ export function Placement({ kid, single: asked }: { kid: KidProfile; single?: nu
     setBetween({ passed, next });
   };
 
-  // The player keeps a browser-history entry while an item is live and gives it back when it goes. A new
-  // player mounting in the same instant would take the giving back for a Back press and ask "Stop showing
-  // Pip?", so the next world's player comes a moment after the last one is gone (the card stays up).
-  const [swapping, setSwapping] = useState(false);
-  const swap = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => void (swap.current && clearTimeout(swap.current)), []);
   const continueOn = () => {
-    if (!between || swapping) return;
+    if (!between) return;
     const next = between.next;
-    setSwapping(true);
-    swap.current = setTimeout(() => {
-      setSwapping(false);
-      setBetween(null);
-      setDots([]);
-      setAttempt((a) => a + 1);
-      if (next.done) updateKid(kid.id, (d) => applyPlacement(d, next.tested));
-      setState(next);
-    }, 150);
+    setBetween(null);
+    setDots([]);
+    setAttempt((a) => a + 1);
+    if (next.done) updateKid(kid.id, (d) => applyPlacement(d, next.tested));
+    setState(next);
   };
 
   const skipAll = () => {
@@ -128,7 +118,7 @@ export function Placement({ kid, single: asked }: { kid: KidProfile; single?: nu
             icon="map"
             onClick={() => {
               speech.cancel();
-              go.map(true);
+              go.upToMap();
             }}
             autoFocus
             whoosh
@@ -143,25 +133,22 @@ export function Placement({ kid, single: asked }: { kid: KidProfile; single?: nu
   if (!set || !world) return null;
   return (
     <div className="k-screen k-placement">
-      {!swapping && (
-        <ActivityPlayer
-          key={`${state.world}-${attempt}`}
-          mode="placement"
-          kid={kid}
-          set={set}
-          title={`Rank ${world.rank}: ${world.title}`}
-          header={dotsRow}
-          onPlacementDone={onWorldDone}
-          onExit={() => go.map()}
-        />
-      )}
+      <ActivityPlayer
+        key={`${state.world}-${attempt}`}
+        mode="placement"
+        kid={kid}
+        set={set}
+        title={`Rank ${world.rank}: ${world.title}`}
+        header={dotsRow}
+        onPlacementDone={onWorldDone}
+      />
       {between && (
         <div className="k-overlay">
           <div className="k-card k-place-card">
             <Pip mood={between.passed ? 'cheer' : 'idle'} size={110} />
             {dotsRow}
             <h2 className="k-title">{between.passed ? `You know ${world.title}!` : between.next.done ? 'Great trying!' : 'Let’s warm up first!'}</h2>
-            <BigButton variant="primary" icon="next" onClick={continueOn} disabled={swapping} autoFocus whoosh>
+            <BigButton variant="primary" icon="next" onClick={continueOn} autoFocus whoosh>
               Next
             </BigButton>
           </div>

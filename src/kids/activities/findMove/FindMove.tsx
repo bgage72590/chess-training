@@ -66,7 +66,7 @@ export function FindMove({ item, player, onDone }: ActivityProps<FindMoveItem>) 
   }, [fen, goal, ply, found, ways, replaying, item.fen]);
 
   useEffect(() => {
-    const rule = item.rule ?? ruleLine(goal);
+    const rule = item.rule ?? ruleLine(goal, item.fen);
     const s = solution;
     const steps: HintStep[] = item.hints?.length
       ? item.hints

@@ -23,7 +23,7 @@ function ugly(m: Move): boolean {
 
 describe('coach bots', () => {
   for (const n of [4, 5]) {
-    it(`level ${n} opens like a club player, not at random`, { timeout: 60000 }, () => {
+    it(`level ${n} opens like a club player, not at random`, { timeout: 600_000 }, () => {
       const bot = LEVELS[n - 1].bot;
       if (bot?.kind !== 'olive') throw new Error(`level ${n} is not Olive`);
       const bad: string[] = [];

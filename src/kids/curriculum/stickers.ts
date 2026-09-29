@@ -98,9 +98,9 @@ export const TROPHIES: TrophyDef[] = [
   { id: 'tr-stars-50', title: '50 stars', icon: 'star', color: '#d99a00', how: 'Collect 50 stars', test: (s) => s.totalStars >= 50 },
   { id: 'tr-stars-100', title: '100 stars', icon: 'star', color: '#d99a00', how: 'Collect 100 stars', test: (s) => s.totalStars >= 100 },
   { id: 'tr-stars-250', title: '250 stars', icon: 'star', color: '#d99a00', how: 'Collect 250 stars', test: (s) => s.totalStars >= 250 },
-  { id: 'tr-gold-1', title: 'Gold crown', icon: 'crown', color: '#d99a00', how: 'Earn a gold crown on a world', test: (s) => s.goldCrowns >= 1 },
+  { id: 'tr-gold-1', title: 'Gold crown', icon: 'crown', color: '#d99a00', how: 'Earn a gold crown on a Rank', test: (s) => s.goldCrowns >= 1 },
   { id: 'tr-gold-4', title: '4 gold crowns', icon: 'crown', color: '#d99a00', how: 'Earn 4 gold crowns', test: (s) => s.goldCrowns >= 4 },
-  { id: 'tr-gold-8', title: '8 gold crowns', icon: 'crown', color: '#d99a00', how: 'Earn gold crowns on all 8 worlds', test: (s) => s.goldCrowns >= 8 },
+  { id: 'tr-gold-8', title: '8 gold crowns', icon: 'crown', color: '#d99a00', how: 'Earn gold crowns on all 8 Ranks', test: (s) => s.goldCrowns >= 8 },
   { id: 'tr-graduate', title: 'Graduate', icon: 'crown', color: '#b07a12', how: 'Reach the top of Crown Tower', test: (s) => s.graduated },
 ];
 

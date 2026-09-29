@@ -10,6 +10,22 @@ export function belowPassRecap(score: number, need: number, rank: number, band: 
   return `You got ${got}! Get ${want} to open Rank ${rank}. Try again?`;
 }
 
+/** Playground recaps by activity (the Dash and Last Piece Standing are Champion-only, so calmer). */
+const PLAYGROUND_RECAP: Record<string, string> = {
+  stars: 'Great hunting!',
+  puzzles: 'Puzzle power! Great thinking!',
+  'board-vision': 'Quick eyes! Try to beat your best.',
+  memory: 'What a memory! Pip is amazed!',
+  gobble: 'Last piece standing! Well solved.',
+};
+
+/** A Playground round's recap: games say how they went (a game with a friend cheers both players). */
+export function playgroundRecap(activity: string, band: AgeBand, friend: boolean, game: boolean, results: ItemResult[], score: number): string {
+  if (friend) return 'What a game! High five, you two!';
+  if (game) return recapFor({ score: Math.min(3, Math.max(1, score)) as 1 | 2 | 3, bossPassedNow: false }, '', band, true, results);
+  return PLAYGROUND_RECAP[activity] ?? 'Great playing!';
+}
+
 export function recapFor(o: Pick<RunOutcome, 'score' | 'bossPassedNow'>, title: string, band: AgeBand, game: boolean, results: ItemResult[]): string {
   // The Golden Rules mission scores its checklist, not a win or a draw.
   const rules = results[0]?.stats?.rules;

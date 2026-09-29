@@ -14,7 +14,7 @@ export function Tray({ buttons, band }: { buttons: TrayButton[] | null; band: Ag
             {bandText(b.label, band)}
           </div>
         ) : (
-          <BigButton key={b.id} variant={b.variant ?? 'plain'} icon={b.icon} disabled={b.disabled} onClick={b.onPress} aria-label={b.ariaLabel}>
+          <BigButton key={b.id} variant={b.variant ?? 'plain'} icon={b.icon} disabled={b.disabled || b.placeholder} onClick={b.onPress} aria-label={b.ariaLabel} aria-hidden={b.placeholder || undefined}>
             {b.art}
             {bandText(b.label, band)}
           </BigButton>

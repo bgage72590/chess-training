@@ -79,7 +79,13 @@ export const W6_BATTLES: LevelSet<BattleItem> = {
       bot: { depth: 1, r: 1.0 },
       say: { all: 'Knight against three pawns! Catch every pawn before one reaches your side.', sprout: 'Hop and catch the pawns!' },
       tune: { champion: { bot: { depth: 2, r: 2.0 } } },
-      ease: [{ bot: { depth: 1, r: 1 } }, { bot: { depth: 1, r: 3 } }, { black: { a7: 'p', b7: 'p' }, bot: { depth: 1, r: 3 } }],
+      // The pawns' bot barely matters here (a sleepier one races just as well), so the steps change the
+      // position: the knight starts nearer, then one pawn stays home. Simulated wins against a steady
+      // player: 38% as authored, then about 47% and 72%.
+      ease: [
+        { white: { e2: 'N' }, bot: { depth: 1, r: 3 } },
+        { white: { e2: 'N' }, black: { a7: 'p', c7: 'p' }, bot: { depth: 1, r: 3 } },
+      ],
     },
     {
       id: 'queen-8',

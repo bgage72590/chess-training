@@ -62,7 +62,7 @@ export function NewKid() {
     setDir(1);
     setStep((s) => s + 1);
   };
-  const back = () => (step === 0 ? go.picker() : (setDir(-1), setStep((s) => s - 1)));
+  const back = () => (step === 0 ? go.upToPicker() : (setDir(-1), setStep((s) => s - 1)));
   const canNext = step === 0 ? true : step === 1 ? age != null : step === 2 ? start != null : true;
 
   // Two quick taps on "Let's play!" must not make two players.
@@ -70,7 +70,7 @@ export function NewKid() {
   const finish = () => {
     if (done.current) return;
     done.current = true;
-    if (getKids().kids.length >= MAX_KIDS) return go.picker();
+    if (getKids().kids.length >= MAX_KIDS) return go.upToPicker();
     const kid = newKid({ name: cleanName(name) || funName(), band, start: start ?? 'new', avatar: { color, face, hat: null } });
     updateKids((s) => {
       s.kids.push(kid);

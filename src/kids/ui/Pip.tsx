@@ -118,7 +118,7 @@ export function Pip({
   const m: PipMood = mood === 'idle' && fx ? fx.kind : mood;
   const synced = m === 'talk' && talkWord !== undefined;
   return (
-    <span ref={root} className={`k-pip mood-${m}${listen ? ' listen' : ''}${synced ? ' sync' : ''}${synced && talkWord < 0 ? ' talk-gap' : ''} ${className ?? ''}`} style={{ width: size, height: size, ...glance }} aria-hidden="true">
+    <span ref={root} className={`k-pip mood-${m}${listen ? ' listen' : ''}${synced ? ' sync' : ''}${synced && talkWord < 0 ? ' talk-gap' : ''} ${className ?? ''}`} style={{ width: `var(--pip-size, ${size}px)`, height: `var(--pip-size, ${size}px)`, ...glance }} aria-hidden="true">
       <svg viewBox="0 0 120 120" width={size} height={size}>
         <g className="k-pip-body" ref={body}>
           {/* mane, behind the head */}

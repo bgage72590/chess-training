@@ -194,15 +194,15 @@ export function wrongLine(goal: Goal): string {
   }
 }
 
-/** The rule line (hint level 1) for a goal. */
-export function ruleLine(goal: Goal): string {
+/** The rule line (hint level 1) for a goal; `fen` says whose move it is (the other side's pieces are the snacks). */
+export function ruleLine(goal: Goal, fen?: string): string {
   switch (goal.kind) {
     case 'check':
       return 'Check means you attack the king.';
     case 'mate':
       return "Checkmate: attack the king so he can't escape.";
     case 'capture':
-      return 'Capture by moving onto a black piece.';
+      return fen?.split(' ')[1] === 'b' ? 'Capture by moving onto a white piece.' : 'Capture by moving onto a black piece.';
     case 'safe-capture':
       return 'Find a snack that nobody guards.';
     case 'protect':

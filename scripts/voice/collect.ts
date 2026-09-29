@@ -1,7 +1,8 @@
 // Lists every line Kids mode can say aloud, for scripts/voice/render.py.
 // Parses src/kids (oxc parser, via rolldown) and keeps sentence-like string literals (lines
 // built at run time are recorded for every value when the values are few and predictable, such
-// as piece names, squares, buddy names and small numbers; the rest use the device voice).
+// as piece names, squares, buddy names and small numbers; the rest use the device voice). The
+// grown-up screens and the parent gate are left out: they are read, never spoken.
 // Output: [{ key, text }] as JSON on stdout.
 //   npx tsx scripts/voice/collect.ts > /tmp/lines.json
 import fs from 'node:fs';
@@ -11,10 +12,14 @@ import { clipKey, spokenText } from '../../src/kids/lib/clipKey';
 
 const ROOT = path.resolve(import.meta.dirname, '../../src/kids');
 
+/** Grown-up screens and what only they show: read, never spoken (the parent gate is never spoken at all). */
+const GROWN_UP_ONLY = new Set(['screens/Grownups.tsx', 'ui/ParentGate.tsx', 'ui/Keypad.tsx', 'curriculum/skills.ts']);
+
 function files(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const p = path.join(dir, e.name);
-    return e.isDirectory() ? files(p) : /\.tsx?$/.test(e.name) && !e.name.endsWith('.test.ts') ? [p] : [];
+    if (e.isDirectory()) return files(p);
+    return /\.tsx?$/.test(e.name) && !e.name.endsWith('.test.ts') && !GROWN_UP_ONLY.has(path.relative(ROOT, p).split(path.sep).join('/')) ? [p] : [];
   });
 }
 
@@ -127,6 +132,9 @@ function visit(node: unknown) {
   if (!node || typeof node !== 'object') return;
   const n = node as Node;
   if (n.type === 'ImportDeclaration' || n.type === 'ExportAllDeclaration') return;
+  // Why the parent gate is asked for (requireGate's reason, <Gated reason>) shows only in the gate.
+  if (n.type === 'CallExpression' && (n.callee as Node).type === 'Identifier' && (n.callee as { name?: string }).name === 'requireGate') return visit((n.arguments as unknown[]).slice(1));
+  if (n.type === 'JSXAttribute' && (n.name as { name?: string }).name === 'reason') return;
   if (n.type === 'Literal' && typeof n.value === 'string') add(n.value);
   if (n.type === 'TemplateLiteral') {
     const quasis = (n.quasis as { value: { cooked: string } }[]).map((q) => q.value.cooked ?? '');

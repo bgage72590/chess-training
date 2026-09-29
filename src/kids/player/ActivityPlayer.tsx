@@ -11,6 +11,7 @@ import { ACTIVITIES, REGISTRY } from '../packs';
 import { awardTo, getKid, updateKid, updateKids, type KidProfile } from '../store/kidsStore';
 import { acceptEase, acceptFastTrack, fastTrackOffer, addFamilyStars, bossOffers, bossPassed, bossPassMark, nextNode, nodeScore, recordRun, recordWarmup, skipNode, activeNodes, type RunOutcome } from '../store/progress';
 import { hashSeed, mulberry32 } from '../lib/rng';
+import { plural } from '../lib/plural';
 import { kidSound, type KidSound } from '../lib/kidsSound';
 import { toast } from '../../lib/toast';
 import { engine } from '../../engine/engine';
@@ -20,7 +21,7 @@ import { markBreak, onBreak, sessionOver } from './useSession';
 import { useKidCtx } from './context';
 import { Intro, PiecePick } from './Intro';
 import { Results } from './Results';
-import { belowPassRecap, recapFor } from './recap';
+import { belowPassRecap, playgroundRecap, recapFor } from './recap';
 import { TopBar, ChipStars } from '../ui/TopBar';
 import { hintTarget, pipReact } from '../ui/pipEvents';
 import { Coach } from '../ui/Coach';
@@ -69,6 +70,18 @@ const DEFAULT_SAY: Record<string, BandText> = {
 };
 const FALLBACK_HINT: BandText[] = ['', 'Try this piece!', 'Follow the arrow!', 'Watch me!'];
 
+// A player gives its history guard entry back with history.back(), whose popstate comes a moment
+// later. These pops are counted here, before any player hears them, so a player that mounts in
+// between never takes one for the kid pressing Back. A pop long after is a real one.
+let ownPops = 0;
+let ownPopAt = 0;
+let popIsOwn = false;
+if (typeof window !== 'undefined')
+  window.addEventListener('popstate', () => {
+    popIsOwn = ownPops > 0 && Date.now() - ownPopAt < 2000;
+    ownPops = popIsOwn ? ownPops - 1 : 0;
+  });
+
 export function ActivityPlayer(props: ActivityPlayerProps) {
   const { mode, kid } = props;
   const { band, tuning } = useKidCtx();
@@ -102,17 +115,23 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
   const pickStep = introSteps.find((s) => s.pick);
 
   const [phase, setPhase] = useState<'intro' | 'item' | 'parade' | 'results' | 'break' | 'empty'>(watchSteps.length ? 'intro' : 'item');
+  const phaseRef = useRef(phase);
+  useEffect(() => void (phaseRef.current = phase), [phase]);
   const [current, setCurrent] = useState<Current | null>(null);
   const [pips, setPips] = useState<PipState[]>(() => Array.from({ length: total }, (_, i) => (i === 0 ? 'current' : 'todo')));
   const results = useRef<ItemResult[]>([]);
   const itemIds = useRef<string[]>([]);
   const braveTry = useRef(false);
+  /** Moment stickers and trophies the activities awarded during this run (shown on the results card). */
+  const awarded = useRef<string[]>([]);
   const perfectStreak = useRef(0);
   const warmIdx = useRef(0);
   const paradeDone = useRef(!pickStep);
   const [outcome, setOutcome] = useState<(RunOutcome & { playgroundScore?: number }) | null>(null);
   const [offer, setOffer] = useState<'easier' | 'super' | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  /** Placement: this world's checkpoint is decided (the parent shows its card). */
+  const [decided, setDecided] = useState(false);
   const [confetti, setConfetti] = useState(0);
   const pendingAfterBreak = useRef<(() => void) | null>(null);
 
@@ -171,10 +190,14 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
   const [hintLevel, setHintLevel] = useState<0 | 1 | 2 | 3 | 4>(0);
   const [hintSteps, setHintSteps] = useState<HintStep[]>([]);
   const [pulse, setPulse] = useState(false);
+  /** The activity has nothing to hint yet (see PlayerApi.pauseHints). */
+  const [hintsPaused, setHintsPaused] = useState(false);
   const [tray, setTray] = useState<TrayButton[] | null>(null);
-  const [chip, setChip] = useState<{ done: number; total: number } | null>(null);
+  const [chip, setChip] = useState<{ done: number; total?: number } | null>(null);
   const [par, setPar] = useState<{ used: number; par: number } | null>(null);
   const itemMistakes = useRef(0);
+  /** A game's ease ladder length (the played item's), for the loss offers at the results. */
+  const easeSteps = useRef(0);
   const easierOffered = useRef(false);
   const pops = useRef(0);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -192,23 +215,23 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
 
   const advanceHint = useCallback(() => {
     setPulse(false);
-    if (hintLevel >= 4) return;
+    if (hintLevel >= 4 || hintsPaused) return;
     const next = (hintLevel + 1) as 1 | 2 | 3 | 4;
     setHintLevel(next);
     const line = hintSteps[next - 1]?.say ?? (next === 1 ? current?.item.rule : FALLBACK_HINT[next - 1]);
     kidSound('sparkle');
     if (line) say(line, next === 4 ? 'talk' : 'think');
     if (next < 4) pipReact('point', hintTarget(hintSteps[next - 1]));
-  }, [hintLevel, hintSteps, current, say]);
+  }, [hintLevel, hintSteps, hintsPaused, current, say]);
 
   // Idle: step up the ladder (Sprout/Explorer) or pulse the bulb (Champion).
   const resetIdle = useCallback(() => {
     if (idleTimer.current) clearTimeout(idleTimer.current);
-    if (!itemLive || hintLevel >= 4) return;
+    if (!itemLive || hintLevel >= 4 || hintsPaused) return;
     const sec = tuning.hintOfferOnly ? tuning.bulbPulseSec : tuning.hintAfterIdleSec;
     if (!sec) return;
     idleTimer.current = setTimeout(() => (tuning.hintOfferOnly ? setPulse(true) : advanceHint()), sec * 1000);
-  }, [itemLive, hintLevel, tuning, advanceHint]);
+  }, [itemLive, hintLevel, hintsPaused, tuning, advanceHint]);
   useEffect(() => {
     resetIdle();
     return () => {
@@ -224,7 +247,8 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       const a = ACTIVITIES.get(opts.setId ? REGISTRY.LEVEL_SETS.get(opts.setId)?.activity ?? '' : set?.activity ?? '');
       if (!a) return;
       const ease = isGame ? np?.ease ?? 0 : 0;
-      let item = resolveItem(run.item, band, { super: opts.superStar, ease: Math.min(ease, run.item.ease?.length ?? 0) });
+      easeSteps.current = run.item.ease?.length ?? 0;
+      let item = resolveItem(run.item, band, { super: opts.superStar, ease: Math.min(ease, easeSteps.current) });
       if (opts.lowerBand) item = { ...item, ...(run.item.tune?.[opts.lowerBand] ?? {}) };
       clearOfferTimer();
       itemMistakes.current = 0;
@@ -233,6 +257,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       setHintLevel(0);
       setHintSteps([]);
       setPulse(false);
+      setHintsPaused(false);
       setTray(null);
       setChip(null);
       setPar(null);
@@ -300,6 +325,8 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
         const pass = results.current.filter((x) => x.score >= 2 && x.hintLevel <= 1).length;
         const miss = results.current.length - pass;
         if (pass >= 2 || miss >= 2 || results.current.length >= total) {
+          // The world is decided: Placement's card takes over, and Back is no longer this player's.
+          setDecided(true);
           props.onPlacementDone?.(results.current);
           return;
         }
@@ -349,7 +376,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       let out: RunOutcome | null = null;
       updateKids((s) => {
         const d = s.kids.find((x) => x.id === kid.id)!;
-        out = recordRun(d, { nodeId: props.nodeId!, results: results.current, itemIds: itemIds.current, game: isGame, braveTry: braveTry.current }, REGISTRY);
+        out = recordRun(d, { nodeId: props.nodeId!, results: results.current, itemIds: itemIds.current, game: isGame, easeSteps: easeSteps.current, braveTry: braveTry.current }, REGISTRY);
         addFamilyStars(s, out.gained);
       });
       // The boss confetti waits for the crown to land (Results fires it).
@@ -414,6 +441,10 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       resetIdle();
     },
     setHints: (steps) => setHintSteps(steps),
+    pauseHints: (paused) => {
+      setHintsPaused(paused);
+      if (paused) setPulse(false);
+    },
     get hint() {
       return hintStep(hintLevel);
     },
@@ -436,11 +467,11 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
     award: (id) => {
       // Placement ("Show Pip what you know") grants nothing, so everything can still be earned.
       if (mode === 'placement') return;
+      // A chime now; the sticker itself is stamped onto the results card with the run's other
+      // rewards (a toast mid-item would cover Pip, the board or the buttons).
       if (awardTo(kid.id, id)) {
-        const def = stickerDef(id);
-        const tr = TROPHY_BY_ID.get(id);
         kidSound('chime');
-        toast({ title: def ? `New sticker: ${def.title}!` : `New trophy: ${tr?.title ?? id}!`, icon: 'star', tone: 'accent' }, 2500);
+        awarded.current.push(id);
       }
     },
     setTray: (b) => setTray(b),
@@ -473,9 +504,21 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
   const exit = () => {
     speech.cancel();
     if (props.onExit) props.onExit();
-    else go.upToMap();
+    else go.close();
   };
-  const guardLeave = itemLive && results.current.length < total;
+  // Leaving before the results (X, Back, a break): what the run earned is announced on the next screen.
+  useEffect(
+    () => () => {
+      if (phaseRef.current === 'results') return;
+      for (const id of awarded.current) {
+        const def = stickerDef(id);
+        toast({ title: def ? `New sticker: ${def.title}!` : `New trophy: ${TROPHY_BY_ID.get(id)?.title ?? id}!`, icon: 'star', tone: 'accent' }, 2500);
+      }
+      awarded.current = [];
+    },
+    [],
+  );
+  const guardLeave = itemLive && !decided && results.current.length < total;
   const onX = () => (guardLeave ? setConfirmLeave(true) : exit());
   // The browser or Android back gesture asks too. A history entry with the same URL takes the first
   // back press (the router sees no change) and opens the sheet; a second back leaves. The entry is
@@ -483,24 +526,41 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
   const guardBack = guardLeave && !confirmLeave;
   useEffect(() => {
     if (!guardBack) return;
-    try {
-      history.pushState({ kidsGuard: 1 }, '');
-    } catch {
-      return;
-    }
+    const arm = () => {
+      try {
+        history.pushState({ kidsGuard: 1 }, '');
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    // After a reload the page opens on the guard entry it left: that one is reused, not stacked on.
+    if (!history.state?.kidsGuard && !arm()) return;
     const onPop = () => {
+      // A player that just went gave its entry back (the next placement world or node mounting in the
+      // same instant): not a Back press. Put this player's entry back on top if that pop took it.
+      if (popIsOwn) {
+        if (!history.state?.kidsGuard) arm();
+        return;
+      }
       if (!history.state?.kidsGuard) setConfirmLeave(true);
     };
     window.addEventListener('popstate', onPop);
     return () => {
       window.removeEventListener('popstate', onPop);
-      if (history.state?.kidsGuard) history.back();
+      if (history.state?.kidsGuard) {
+        ownPops += 1;
+        ownPopAt = Date.now();
+        history.back();
+      }
     };
   }, [guardBack]);
 
   // ---------- results ----------
   const renderResults = () => {
     if (!outcome) return null;
+    const awardedStickers = awarded.current.filter((id) => !!stickerDef(id));
+    const awardedTrophies = awarded.current.filter((id) => TROPHY_BY_ID.has(id));
     const k = getKid(kid.id) ?? kid;
     if (mode === 'warmup')
       return (
@@ -509,8 +569,8 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
           title="Warm-up done!"
           stars={0}
           recap={band === 'champion' ? 'Warm-up complete. On to new things.' : 'Your brain is all warmed up!'}
-          stickers={[]}
-          trophies={[]}
+          stickers={awardedStickers}
+          trophies={awardedTrophies}
           hats={[]}
           onNext={props.onContinue}
           nextLabel="Let's play!"
@@ -518,15 +578,17 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
           onSpeak={(t) => say(t)}
         />
       );
-    if (mode === 'playground')
+    if (mode === 'playground') {
+      // A game with a friend has no stars: its score is White's, not this kid's.
+      const friend = props.opponent?.kind === 'friend';
       return (
         <Results
           band={band}
           title={props.title}
-          stars={outcome.score}
-          recap="Great hunting!"
-          stickers={[]}
-          trophies={[]}
+          stars={friend ? 0 : outcome.score}
+          recap={playgroundRecap(set?.activity ?? '', band, friend, isGame, results.current, outcome.score)}
+          stickers={awardedStickers}
+          trophies={awardedTrophies}
           hats={[]}
           onAgain={props.onAgain}
           onMap={() => go.upToPlayground()}
@@ -534,7 +596,8 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
           onSpeak={(t) => say(t)}
         />
       );
-    const offers = node ? bossOffers(k, node) : { practice: false, skip: false, easeOffer: false };
+    }
+    const offers = node ? bossOffers(k, node, easeSteps.current) : { practice: false, skip: false, easeOffer: false };
     const nextN = nextNode(k, REGISTRY);
     const opened = outcome.worldOpened ? WORLDS.find((w) => w.id === outcome.worldOpened) : null;
     const lowest = node && offers.practice ? activeNodes(node.world, k.band, REGISTRY).filter((n) => !n.boss && !n.bonus).sort((a, b) => (k.nodes[a.id]?.stars ?? 0) - (k.nodes[b.id]?.stars ?? 0))[0] : undefined;
@@ -542,6 +605,9 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
     const nextWorld = node ? WORLDS[WORLDS.findIndex((w) => w.id === node.world) + 1] : undefined;
     const recap = below && nextWorld ? belowPassRecap(outcome.score, bossPassMark(band), nextWorld.rank, band) : recapFor(outcome, node?.title ?? '', band, isGame, results.current);
     const fast = node ? fastTrackOffer(k, node.id, REGISTRY) : null;
+    const crown = outcome.crownNew ? outcome.crown : null;
+    // After the recap, Pip names a new crown, and says so when a game plays sleepier from now on.
+    const alsoSay = [...(crown ? [crown === 'gold' ? 'You earned a gold crown!' : 'You earned a silver crown!'] : []), ...(outcome.easeAuto ? ["I'll play sleepier. Let's go!"] : [])];
     return (
       <Results
         band={band}
@@ -549,14 +615,16 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
         stars={outcome.score}
         golden={outcome.golden}
         recap={recap}
-        stickers={outcome.stickers.filter((s) => !s.startsWith('st-garden'))}
-        trophies={outcome.trophies}
+        stickers={[...new Set([...outcome.stickers.filter((s) => !s.startsWith('st-garden')), ...awardedStickers])]}
+        trophies={[...new Set([...outcome.trophies, ...awardedTrophies])]}
         hats={outcome.hats}
         bossPassed={outcome.bossPassedNow}
         openedRank={opened ? { rank: opened.rank, title: opened.title } : null}
-        crown={outcome.crown}
+        crown={crown}
+        crownFor={WORLDS.find((w) => w.id === node?.world)?.title}
+        garden={outcome.gardenFlower ? k.garden : null}
         need={below && nextWorld ? { stars: bossPassMark(band), rank: nextWorld.rank } : null}
-        onSpeak={(t) => say(t)}
+        onSpeak={(t) => say([t, ...alsoSay])}
         extra={
           (offers.practice || offers.skip || offers.easeOffer || fast || outcome.easeAuto) && (
             <div className="k-results-offers">
@@ -635,7 +703,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       <>
         {chip && <ChipStars done={chip.done} total={chip.total} />}
         {par && (
-          <span className="k-chip-feet" aria-label={`${par.used} of ${par.par} moves`}>
+          <span className="k-chip-feet" aria-label={`${par.used} of ${plural(par.par, 'move')}`}>
             {Array.from({ length: Math.min(par.par, 10) }, (_, i) => (
               <svg key={i} className={`k-foot${i < par.used ? ' on' : ''}`} viewBox="0 0 12 18" aria-hidden="true">
                 <ellipse cx="6" cy="11.5" rx="4.2" ry="5.8" />
@@ -649,6 +717,8 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       </>
     ) : null;
 
+  // Under the results card and Break time (both modal) nothing behind is in reach of the keyboard or a screen reader.
+  const under = phase === 'results' || phase === 'break';
   return (
     <div
       className={`k-player${kid.settings.leftHanded ? ' left-handed' : ''} mode-${mode}${sheetOpen ? ' sheet-open' : ''}`}
@@ -656,15 +726,15 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       onPointerDown={() => itemLive && resetIdle()}
     >
       <TopBar
+        inert={under}
         onExit={onX}
         pips={pips}
         chip={chipNode}
-        hint={phase === 'item' && current ? { onPress: advanceHint, pulse, disabled: hintLevel >= 4 } : undefined}
+        hint={phase === 'item' && current ? { onPress: advanceHint, pulse, disabled: hintLevel >= 4 || hintsPaused } : undefined}
         onSpeaker={coach.text ? () => say(coach.lines ?? coach.text, undefined, true) : undefined}
       />
       {props.header}
-      {/* Under the results card the board and buttons are out of reach of the keyboard and screen readers. */}
-      <div className="k-player-body" inert={phase === 'results' || undefined}>
+      <div className="k-player-body" inert={under || undefined}>
         <aside className="k-player-coach">
           <Coach text={coach.text} mood={mood} token={coach.token} size={band === 'sprout' ? 80 : 72} />
         </aside>

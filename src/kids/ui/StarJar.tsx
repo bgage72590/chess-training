@@ -3,6 +3,7 @@
 // the jar bumps and the number counts up with a pop. Reduced motion just shows the new count.
 import { useEffect, useRef, useState } from 'react';
 import { motionReduced } from './rewardFx';
+import { starsText } from './StarRow';
 
 const SEEN_KEY = 'tempo.kids.jarSeen';
 let seen: number | null = null;
@@ -62,7 +63,7 @@ export function StarJar({ stars }: { stars: number }) {
   }, [stars]);
   const fill = (level % 100) / 100;
   return (
-    <div className="k-jar" role="img" aria-label={`Family star jar: ${stars} stars. ${100 - (stars % 100)} more for a party!`}>
+    <div className="k-jar" role="img" aria-label={`Family star jar: ${starsText(stars)}. ${100 - (stars % 100)} more for a party!`}>
       <span className="k-jar-body">
         <svg ref={svg} viewBox="0 0 80 96" width="72" height="86" aria-hidden="true">
           <defs>

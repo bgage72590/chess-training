@@ -568,6 +568,80 @@
   }
 }
 
+/* A new Rank crown: the ribbon fades in, the crown badge drops onto it with a bounce and a glint, then
+   a shine sweeps across the ribbon once (reduced motion: a plain fade, no shine). */
+.k-results-crown.in {
+  animation: k-fade-in 260ms var(--k-ease-out) var(--crown-d, 120ms) both;
+}
+.k-results-crown.in .k-results-crown-badge {
+  position: relative;
+  animation: kr-crown-badge 620ms var(--k-ease-spring) var(--crown-d, 120ms) both;
+}
+.k-results-crown.in .k-results-crown-badge::before {
+  content: '';
+  position: absolute;
+  right: -8px;
+  top: -8px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  filter: drop-shadow(0 0 3px var(--k-sun));
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  opacity: 0;
+  animation: kr-glint-pop 520ms var(--k-ease-out) calc(var(--crown-d, 120ms) + 300ms) both;
+}
+.k-results-crown-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+.k-results-crown-shine::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.8) 50%, transparent 70%);
+  opacity: 0;
+}
+.k-results-crown.in .k-results-crown-shine::before {
+  animation: kr-shine 900ms var(--k-ease-out) calc(var(--crown-d, 120ms) + 480ms) both;
+}
+.k-results-crown.gold.in .k-results-crown-shine::before {
+  animation-iteration-count: 2;
+}
+@keyframes kr-crown-badge {
+  0% {
+    opacity: 0;
+    transform: translateY(-28px) rotate(-24deg) scale(1.5);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(3px) rotate(6deg) scale(0.92);
+  }
+  80% {
+    transform: translateY(-2px) rotate(-2deg) scale(1.04);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes kr-shine {
+  0% {
+    opacity: 1;
+    transform: translateX(-100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(100%);
+  }
+}
+/* Today's garden flower grows up out of its pot. */
+.k-results-flower.in svg {
+  transform-origin: 50% 90%;
+  animation: kr-pop 520ms var(--k-ease-spring) 200ms both;
+}
+
 /* ================= Graduation and break time ================= */
 .k-grad-piece {
   animation: kr-piece 700ms var(--k-ease-spring) 600ms both;
@@ -647,6 +721,48 @@
   .k-results-gifts .k-trophy-mini {
     width: 52px;
     height: 52px;
+  }
+}
+/* A very short portrait phone (320 x 568, say): the buttons share rows (Next on its own, Again and
+   Map side by side) and a Sprout's big buttons are a little lower, so all of them stay on screen. */
+@media (max-height: 620px) and (orientation: portrait) {
+  .k-results-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+  .k-results-actions > :first-child:nth-last-child(3),
+  .k-results-actions > :only-child {
+    grid-column: 1 / -1;
+  }
+  .k-results-actions .k-btn {
+    min-width: 0;
+    padding: 0 12px;
+  }
+  .kids-app[data-band='sprout'] .k-results .k-btn {
+    min-height: 60px;
+  }
+  .k-results-title {
+    font-size: 24px;
+  }
+  .k-results-open,
+  .k-results-crown,
+  .k-results-flower,
+  .k-results-need {
+    font-size: 16px;
+  }
+  /* A boss pass with everything at once is still taller than the screen: the card scrolls, and the
+     buttons stay pinned at the bottom of it, so Next, Again and Map are always in reach. */
+  .k-results-actions {
+    position: sticky;
+    /* Down to the screen's edge (through the overlay's padding), so nothing peeks out below. */
+    bottom: calc(-1 * max(16px, var(--k-safe-b)));
+    z-index: 1;
+    margin: 0 -16px -14px;
+    padding: 10px 16px max(14px, var(--k-safe-b));
+    width: calc(100% + 32px);
+    background: var(--k-card);
+    border-radius: 0 0 var(--k-r-lg) var(--k-r-lg);
   }
 }
 

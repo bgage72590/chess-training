@@ -82,6 +82,12 @@ function close() {
   emit();
 }
 
+/** Drops an open gate request (the screen that asked has gone: Back, say), so it cannot pass later
+ *  and run its action on another screen. */
+export function cancelGate() {
+  if (request) close();
+}
+
 function useRequest() {
   return useSyncExternalStore(
     (l) => {

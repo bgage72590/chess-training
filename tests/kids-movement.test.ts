@@ -169,6 +169,10 @@ describe('generators and registry', () => {
         expect(validateMemory(reviewMemory(rng, band), band)).toEqual([]);
       }
   });
+  it('"Where can Queen go?" is all queen: the king is met later in the Rank, after his Piece Parade', () => {
+    const set = LEVEL_SETS.get('w3-queen-paint')!;
+    for (const it of set.items as (PaintItem & { id?: string })[]) expect(Object.values(it.pieces), it.id).toEqual(['Q']);
+  });
   it('every Pack A level set is registered', () => {
     const ids = ['w1-roads', 'w1-colors', 'w1-rook-paint', 'w1-rook-gobble', 'w2-bishop-paint', 'w2-bishop-gobble', 'w2-treasure-map', 'w3-queen-paint', 'w3-queen-gobble', 'w4-knight-paint', 'w4-knight-gobble', 'w5-pawn-slant', 'w5-army', 'w5-setup', 'w6-bite'];
     for (const id of ids) expect(LEVEL_SETS.get(id)?.activity, id).toBeTruthy();

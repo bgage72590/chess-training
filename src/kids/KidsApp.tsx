@@ -17,7 +17,7 @@ import { resolvePieceSet } from './lib/pieceProbe';
 import { RouteTrail } from './lib/navMotion';
 import { isKidsLocked } from './lock';
 import { parseKidsRoute, go } from './routes';
-import { clearGatePass, GateHost, gatePassed, requireGate } from './ui/ParentGate';
+import { cancelGate, clearGatePass, GateHost, gatePassed, requireGate } from './ui/ParentGate';
 import { KidsIcon } from './ui/KidsIcon';
 import { Pip } from './ui/Pip';
 import { BigButton } from './ui/BigButton';
@@ -74,6 +74,8 @@ export function KidsApp({ route }: { route: string }) {
   // Speech stops on every route change (and on leaving Kids mode). A cleanup, so it runs before the
   // new screen's effects and stops only the old screen's lines, never the new screen's first one.
   useEffect(() => () => speech.leaveScreen(), [route]);
+  // A parent gate asked for on one screen closes with it (the new screen's own request comes after).
+  useEffect(() => () => cancelGate(), [route]);
   useEffect(() => {
     if (r.screen !== 'picker') lockedLandingUsed = true;
   }, [r.screen]);
@@ -200,7 +202,7 @@ export function KidsApp({ route }: { route: string }) {
             onBye={() => {
               clearFreshBreak();
               setActiveKid(null);
-              go.picker(true);
+              go.backToPicker();
             }}
             onContinue={clearFreshBreak}
           />
@@ -226,7 +228,7 @@ function Gated({ reason, children }: { reason: string; children: React.ReactNode
       <div className="k-card k-place-card">
         <Pip mood="think" size={110} />
         <p className="k-body">This part is for grown-ups.</p>
-        <BigButton variant="primary" icon="home" onClick={() => go.picker(true)}>
+        <BigButton variant="primary" icon="home" onClick={() => go.upToPicker()}>
           Back
         </BigButton>
       </div>

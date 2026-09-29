@@ -65,7 +65,7 @@ export interface KidProfile {
   settingsAt?: number;
   /** Last progress reset by a grown-up (ms). Syncing drops older progress from copies that missed it. */
   resetAt?: number;
-  /** Last "Starting world" a grown-up set (when, and the world rank). Syncing takes back the
+  /** Last "Starting rank" a grown-up set (when, and the world rank). Syncing takes back the
    *  test-out passes a copy that missed it has from that world on. */
   startAt?: { t: number; rank: number };
   /** What each device added to the day minutes and stars (see kidCounters). */

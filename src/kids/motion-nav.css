@@ -90,24 +90,17 @@
 /* A squish on press and a springy return. The button's own press (kids.css) still moves it down;
    this adds the squash on top with the separate scale property. :where keeps these rules light, so
    a later one can override an earlier one. */
-.kids-app[data-motion='full'] :where(.k-btn, .k-round, .k-pillbtn, .k-avatar-chip, .k-avatar-tile, .k-tile, .k-exp-card, .k-age, .k-tab, .k-chipbtn, .k-facebtn:not(.locked), .k-swatch, .k-node-btn, .k-playbtn, .k-world-title, .k-sticker:not(.missing), .k-corner, .k-card-tap) {
+.kids-app[data-motion='full'] :where(.k-btn, .k-round, .k-pillbtn, .k-avatar-chip, .k-avatar-tile, .k-tile, .k-exp-card, .k-age, .k-tab, .k-chipbtn, .k-facebtn:not(.locked), .k-swatch, .k-node-btn, .k-playbtn, .k-world-title, .k-sticker:not(.missing), .k-corner) {
   transform-origin: 50% 90%;
   transition: transform 420ms var(--k-ease-spring), scale 420ms var(--k-ease-spring), box-shadow 220ms var(--k-ease-out);
 }
-.kids-app[data-motion='full'] :where(.k-btn, .k-round, .k-pillbtn, .k-avatar-chip, .k-avatar-tile, .k-tile, .k-exp-card, .k-age, .k-tab, .k-chipbtn, .k-facebtn:not(.locked), .k-swatch, .k-node-btn, .k-playbtn, .k-world-title, .k-sticker:not(.missing), .k-corner, .k-card-tap):active:not(:disabled) {
+.kids-app[data-motion='full'] :where(.k-btn, .k-round, .k-pillbtn, .k-avatar-chip, .k-avatar-tile, .k-tile, .k-exp-card, .k-age, .k-tab, .k-chipbtn, .k-facebtn:not(.locked), .k-swatch, .k-node-btn, .k-playbtn, .k-world-title, .k-sticker:not(.missing), .k-corner):active:not(:disabled) {
   scale: 1.03 0.94;
   transition-duration: 60ms;
   transition-timing-function: var(--k-ease-out);
 }
 .kids-app[data-motion='full'] :where(.k-node-btn, .k-round, .k-swatch, .k-age):active:not(:disabled) {
   scale: 0.92;
-}
-.k-card-tap {
-  cursor: pointer;
-  touch-action: manipulation;
-}
-.k-card-tap:active {
-  transform: translateY(3px);
 }
 
 /* ================= Staggered entrance ================= */

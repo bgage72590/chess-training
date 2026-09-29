@@ -3,6 +3,10 @@
 // "Whisper", "Zarvox"... before "Samantha") or an old robotic one. This ranks the natural, neural
 // and premium voices first and leaves the novelty voices out entirely.
 
+/** What Pip says when a grown-up tries a voice (Grown-ups): recorded in every voice, so it lives here with
+ *  the kid-side lines rather than in the grown-up screen, which scripts/voice/collect.ts leaves out. */
+export const VOICE_PREVIEW = "Hi! I'm Pip. Let's play chess together!";
+
 export interface VoiceLike {
   name: string;
   lang: string;

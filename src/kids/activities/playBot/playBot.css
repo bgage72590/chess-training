@@ -149,4 +149,51 @@
   .k-player-main > .k-playbot.has-sheet.has-rules {
     width: min(100cqw, max(220px, calc(100cqh - 180px - var(--k-room, 0px))), 720px);
   }
+  /* A short play area (a small phone): while the sheet is up the name cards step aside and the board
+     shrinks as far as it must, so the kid's back ranks stay above the sheet. */
+  @container (max-height: 480px) {
+    .k-playbot.has-sheet .k-playbot-card {
+      display: none;
+    }
+    .k-player-main > .k-playbot.has-sheet,
+    .k-player-main > .k-playbot.has-sheet.has-rules {
+      width: min(100cqw, max(120px, calc(100cqh - var(--k-room, 0px) - 8px)), 720px);
+    }
+    .k-playbot.has-sheet .k-playbot-rules {
+      display: none;
+    }
+  }
+}
+
+/* A phone on its side: slimmer cards, and the Golden Rules stand in a column beside the board, so the
+   board keeps most of the short height and the kid's card stays on screen. */
+@media (min-width: 700px) and (min-aspect-ratio: 11/10) and (max-height: 480px) {
+  .k-player-main > .k-playbot {
+    width: min(100cqw, calc(100cqh - 96px), 720px);
+    gap: 4px;
+  }
+  .k-playbot-card {
+    min-height: 44px;
+  }
+  .k-player-main > .k-playbot.has-rules {
+    width: min(100cqw, calc(100cqh - 96px + 122px), 720px);
+  }
+  .k-playbot.has-rules .k-playbot-board {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .k-playbot.has-rules .k-playbot-board > .kids-board {
+    flex: 1;
+    min-width: 0;
+  }
+  .k-playbot.has-rules .k-playbot-rules {
+    flex: none;
+    width: 114px;
+    margin: 0;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 6px;
+  }
 }

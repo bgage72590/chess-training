@@ -6,6 +6,7 @@ import { KidsBoard } from '../../player/KidsBoard';
 import { placementFen } from '../../lib/fen';
 import { applyMove } from '../../lib/miniRules';
 import { kidSound } from '../../lib/kidsSound';
+import { KidsIcon } from '../../ui/KidsIcon';
 import { pieceTrayButtons } from '../boardVision/pieceTray';
 import { PIECE_NAME } from '../boardVision/logic';
 import { useBadFlash } from '../boardVision/useBadFlash';
@@ -14,8 +15,23 @@ import '../boardVision/boardVision.css';
 
 type Phase = 'look' | 'cloak' | 'play';
 
-/** The tray while the pieces are covered: the same buttons, blank, so the board does not jump when they appear. */
-const covered = (pieces: Placement): TrayButton[] => pieceTrayButtons(pieces, null, () => {}).map((b) => ({ id: b.id, label: '', icon: 'eye', variant: 'plain', disabled: true, onPress: () => {} }));
+/** The tray while the pieces are covered: the same buttons with the same shape (a hidden piece in the
+ *  picture's place), so nothing jumps when they appear; placeholders, with nothing to press or read out yet. */
+const covered = (pieces: Placement): TrayButton[] =>
+  pieceTrayButtons(pieces, null, () => {}).map((b) => ({
+    id: b.id,
+    label: '',
+    art: (
+      <span className="k-bv-tray-pc">
+        <span className="k-bv-tray-img k-bv-tray-hidden">
+          <KidsIcon name="eye" size={26} />
+        </span>
+      </span>
+    ),
+    variant: 'plain',
+    placeholder: true,
+    onPress: () => {},
+  }));
 
 export function Memory({ item, player, onDone }: ActivityProps<MemoryItem>) {
   const [phase, setPhase] = useState<Phase>('look');
@@ -63,6 +79,11 @@ export function Memory({ item, player, onDone }: ActivityProps<MemoryItem>) {
   }, [phase, todo, sel, done]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => () => player.setTray(null), []);
+  // A hint while the kid is still looking would be used up on a board they cannot play yet.
+  useEffect(() => {
+    player.pauseHints(phase !== 'play');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   useEffect(() => {
     if (item.mode === 'rebuild') {

@@ -13,6 +13,7 @@ import { PlayButton, BigButton } from '../ui/BigButton';
 import { KidsIcon } from '../ui/KidsIcon';
 import { BossRequirement } from '../ui/BossCard';
 import { Pip } from '../ui/Pip';
+import { Flower } from '../ui/Flower';
 import { StarRow, starsText } from '../ui/StarRow';
 import { useIsLandscape } from '../ui/useLayout';
 import { go } from '../routes';
@@ -92,7 +93,7 @@ export function MapBar({ kid, stars, playgroundOpen, back }: { kid: KidProfile; 
         </button>
       ) : (
         <button type="button" className="k-avatar-chip" onClick={() => go.players()} aria-label="Switch player">
-          <PawnBuddy color={kid.avatar.color} face={kid.avatar.face} hat={kid.graduated ? 'crown' : kid.avatar.hat} size={40} />
+          <PawnBuddy color={kid.avatar.color} face={kid.avatar.face} hat={kid.avatar.hat} size={40} />
           <span className="k-avatar-chip-name">{kid.name}</span>
         </button>
       )}
@@ -241,26 +242,5 @@ function MapSide({ kid, next }: { kid: KidProfile; next: NodeDef | null }) {
         <p>{w.intro}</p>
       </div>
     </aside>
-  );
-}
-
-export function Flower({ on, i }: { on: boolean; i: number }) {
-  const petal = ['#ff9f7f', '#ffc83d', '#c9b3ff', '#f4a3c1', '#7ab0e0'][i % 5];
-  return (
-    <svg viewBox="0 0 40 56" width="34" height="48" aria-hidden="true">
-      <path d="M8 40h24l-3 14H11z" fill="#c98d4f" stroke="#1f2a44" strokeWidth="2.5" strokeLinejoin="round" />
-      {on ? (
-        <>
-          <path d="M20 40V22" stroke="#3f8f4f" strokeWidth="3" strokeLinecap="round" />
-          <path d="M20 32c-6 0-8-4-7-7 5 0 7 3 7 7z" fill="#9ad48f" />
-          {[0, 72, 144, 216, 288].map((a) => (
-            <ellipse key={a} cx="20" cy="11" rx="4.5" ry="6.5" fill={petal} stroke="#1f2a44" strokeWidth="1.5" transform={`rotate(${a} 20 17)`} />
-          ))}
-          <circle cx="20" cy="17" r="4" fill="#ffc83d" stroke="#1f2a44" strokeWidth="1.5" />
-        </>
-      ) : (
-        <path d="M20 40v-4" stroke="#8b5a2b" strokeWidth="3" strokeLinecap="round" />
-      )}
-    </svg>
   );
 }

@@ -5,7 +5,7 @@ import { Chess } from 'chess.js';
 import { ACTIVITIES, CHECKPOINTS, LEVEL_SETS, PACKS, createRegistry } from '../src/kids/packs';
 import type { ActivityDef, AgeBand, ItemResult, KidsPack, LevelSet } from '../src/kids/activities/types';
 import { NODES, NODE_BY_ID, WORLDS, nodesOf } from '../src/kids/curriculum/worlds';
-import { BAND_TUNING, BANDS, resolveItem, visibleTo } from '../src/kids/curriculum/tuning';
+import { BAND_TUNING, BANDS, promotionFor, resolveItem, visibleTo } from '../src/kids/curriculum/tuning';
 import { isKnownSticker, stickerDef } from '../src/kids/curriculum/stickers';
 import { applyMove, attacks, dests, gobbleSolutions, lavaSquares, placementFen, pseudoMoves, sqRange, starPar } from '../src/kids/lib/miniRules';
 import { dangerAfterMove, hangs } from '../src/kids/lib/danger';
@@ -43,8 +43,8 @@ import {
   type Registry,
 } from '../src/kids/store/progress';
 import { RunPicker, pickWarmupItem } from '../src/kids/player/run';
-import { recapFor } from '../src/kids/player/recap';
-import { escapeWay, solutions, validateFindMove, type Goal } from '../src/kids/activities/findMove/logic';
+import { playgroundRecap, recapFor } from '../src/kids/player/recap';
+import { escapeWay, ruleLine, solutions, validateFindMove, type Goal } from '../src/kids/activities/findMove/logic';
 import { reviewStars, validateStars } from '../src/kids/activities/stars/logic';
 
 // Source text of every Kids file (Vite raw imports: no Node APIs needed).
@@ -167,6 +167,27 @@ describe('content validation', () => {
     const ways = Object.fromEntries(new Chess(fen).moves({ verbose: true }).map((m) => [m.san, escapeWay(fen, m)]));
     expect(ways).toEqual({ 'Rxe8+': 'capture', Ne4: 'block', Kf2: 'run', Kf1: 'run', Kd1: 'run' });
     expect(sans('4k3/8/8/8/8/8/3q4/4K3 w - - 0 1', { kind: 'escape', ways: ['capture'] })).toEqual(['Kxd2']);
+  });
+  it("the capture rule names the other side's pieces", () => {
+    expect(ruleLine({ kind: 'capture', square: 'd5' }, '4k3/8/8/3q4/8/8/8/3RK3 w - - 0 1')).toBe('Capture by moving onto a black piece.');
+    expect(ruleLine({ kind: 'capture', square: 'd4' }, '3rk3/8/8/8/3Q4/8/8/4K3 b - - 0 1')).toBe('Capture by moving onto a white piece.');
+  });
+});
+
+describe('promotion', () => {
+  it('Explorers get a queen by themselves until Pawn Parade teaches promotion; Champions always pick; Sprouts never', () => {
+    const k = kidOf('explorer');
+    expect(promotionFor(BAND_TUNING.explorer, k)).toBe('auto');
+    starNode(k, 'w5-promo', 1);
+    expect(promotionFor(BAND_TUNING.explorer, k)).toBe('picker');
+    expect(promotionFor(BAND_TUNING.champion, kidOf('champion'))).toBe('picker');
+    const s = kidOf('sprout');
+    starNode(s, 'w5-promo', 3);
+    expect(promotionFor(BAND_TUNING.sprout, s)).toBe('auto');
+    // A test-out counts as taught (the kid showed they know it).
+    const t = kidOf('explorer');
+    applyPlacement(t, [1, 2, 3, 4, 5]);
+    expect(promotionFor(BAND_TUNING.explorer, t)).toBe('picker');
   });
 });
 
@@ -309,6 +330,17 @@ describe('results recap', () => {
     expect(recapFor(o(3), 'Golden Rules', 'champion', true, [r(3, { stats: { rules: 5 } })])).toBe('5 of 5 Golden Rules.');
     expect(recapFor(o(2), 'Snack Race', 'explorer', true, [r(2, { outcome: 'draw' })])).toBe("A draw! That's a good fight.");
   });
+  it('each kind of Playground game has its own recap; a game with a friend cheers both players', () => {
+    expect(playgroundRecap('stars', 'explorer', false, false, [r(3)], 3)).toBe('Great hunting!');
+    expect(playgroundRecap('puzzles', 'sprout', false, false, [r(2)], 2)).toBe('Puzzle power! Great thinking!');
+    expect(playgroundRecap('board-vision', 'champion', false, false, [r(1)], 1)).toBe('Quick eyes! Try to beat your best.');
+    expect(playgroundRecap('memory', 'explorer', false, false, [r(3)], 3)).toBe('What a memory! Pip is amazed!');
+    expect(playgroundRecap('gobble', 'champion', false, false, [r(3)], 3)).toBe('Last piece standing! Well solved.');
+    expect(playgroundRecap('play-bot', 'explorer', false, true, [r(3, { outcome: 'win' })], 3)).toBe('You won! Brilliant playing!');
+    expect(playgroundRecap('battle', 'explorer', false, true, [r(1, { outcome: 'loss' })], 1)).toBe('Good game! Every game makes you stronger.');
+    expect(playgroundRecap('capture-crown', 'explorer', true, true, [r(1, { outcome: 'loss' })], 1)).toBe('What a game! High five, you two!');
+    expect(playgroundRecap('something-new', 'explorer', false, false, [r(2)], 2)).toBe('Great playing!');
+  });
 });
 
 /** Fake pack lists for the missing-pack rules (5.2). */
@@ -404,6 +436,33 @@ describe('boss rules', () => {
     lose();
     expect(bossOffers(k, boss).skip).toBe(true);
     expect(k.nodes['w5-boss'].stars).toBe(1);
+  });
+  it('every game gets the ease ladder, a buddy game as well as a boss, while the item has a step left', () => {
+    const reg = fakeRegistry(['w6-battles', 'w5-boss']);
+    const k = kidOf('explorer');
+    const node = NODE_BY_ID.get('w6-battles')!;
+    expect(node.boss).toBeFalsy();
+    const lose = (id: string, easeSteps?: number) => recordRun(k, { nodeId: id, results: [r(1, { outcome: 'loss' })], itemIds: ['knight-3'], game: true, easeSteps }, reg, TODAY);
+    expect(lose('w6-battles', 2).easeAuto).toBe(false);
+    expect(lose('w6-battles', 2).easeAuto).toBe(false);
+    // Loss 2 offers a sleepier buddy; a game that is not a boss never needs "Skip for now".
+    expect(bossOffers(k, node, 2)).toEqual({ practice: false, skip: false, easeOffer: true });
+    expect(lose('w6-battles', 2).easeAuto).toBe(true);
+    expect(k.nodes['w6-battles'].ease).toBe(1);
+    expect(lose('w6-battles', 2).easeAuto).toBe(true);
+    expect(k.nodes['w6-battles'].ease).toBe(2);
+    // The ladder is used up: no more easing, and nothing to say about it.
+    expect(lose('w6-battles', 2).easeAuto).toBe(false);
+    expect(k.nodes['w6-battles'].ease).toBe(2);
+    expect(bossOffers(k, node, 2).skip).toBe(false);
+    // A win resets the losses; the ease step stays for the grown-up report.
+    recordRun(k, { nodeId: 'w6-battles', results: [r(3, { outcome: 'win' })], itemIds: ['knight-3'], game: true, easeSteps: 2 }, reg, TODAY);
+    expect(k.nodes['w6-battles'].losses).toBe(0);
+    expect(bossOffers(k, node, 2).easeOffer).toBe(false);
+    // With no step left, "Play sleepier?" is not offered either.
+    const k2 = kidOf('explorer');
+    for (let i = 0; i < 2; i++) recordRun(k2, { nodeId: 'w5-boss', results: [r(1, { outcome: 'loss' })], itemIds: ['b-e'], game: true, easeSteps: 0 }, reg, TODAY);
+    expect(bossOffers(k2, NODE_BY_ID.get('w5-boss')!, 0).easeOffer).toBe(false);
   });
   it('w8-crown never offers skip', () => {
     expect(gameLossStep(6, true)).not.toBe('skip');
