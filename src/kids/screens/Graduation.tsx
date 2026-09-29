@@ -90,7 +90,7 @@ export function Certificate({ kid }: { kid: KidProfile | undefined }) {
   return (
     <div className="k-screen k-cert-screen">
       <div className="k-cert-actions">
-        <BigButton variant="plain" size="small" icon="back" onClick={() => go.grownups(kid.id)}>
+        <BigButton variant="plain" size="small" icon="back" onClick={() => go.upToGrownups(kid.id)}>
           Back
         </BigButton>
         <BigButton variant="primary" size="small" icon="print" onClick={() => window.print()}>

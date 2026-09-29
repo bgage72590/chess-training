@@ -162,18 +162,24 @@ export interface BossOffers {
   practice: boolean;
   /** "Skip for now" (non-game after 3 attempts; game bosses after 4 losses, never the final boss). */
   skip: boolean;
-  /** Game boss after 2 losses: "Want me to play sleepier?" */
+  /** Any game after 2 losses in a row, while an easier step is left: "Want me to play sleepier?" */
   easeOffer: boolean;
 }
 
-export function bossOffers(kid: KidProfile, node: NodeDef): BossOffers {
+/**
+ * The results card's offers. The ease ladder is for every game (spec 3.3): a game that is not a boss
+ * never needs "Skip for now", since a loss earns the star that opens the next node. `easeSteps` is the
+ * played item's ease ladder length (unknown: assume there is a step left).
+ */
+export function bossOffers(kid: KidProfile, node: NodeDef, easeSteps = Infinity): BossOffers {
   const np = kid.nodes[node.id];
   const none = { practice: false, skip: false, easeOffer: false };
-  if (!np || !node.boss || bossPassed(kid, node) || np.skipped) return none;
+  if (!np || np.skipped || (node.boss && bossPassed(kid, node))) return none;
   if (node.game) {
     const l = np.losses;
-    return { practice: false, easeOffer: l === 2, skip: l >= 4 && !node.final };
+    return { practice: false, easeOffer: l === 2 && np.ease < easeSteps, skip: !!node.boss && l >= 4 && !node.final };
   }
+  if (!node.boss) return none;
   const a = np.attemptsBelowPass ?? 0;
   return { practice: a >= 2, skip: a >= 3, easeOffer: false };
 }
@@ -194,6 +200,8 @@ export interface RunSummary {
   itemIds: string[];
   /** The activity is a game (outcome scoring, ease ladder). */
   game?: boolean;
+  /** A game: how many ease steps the played item has (unknown: as many as it takes). */
+  easeSteps?: number;
   /** At least one item needed 3 or more mistakes (brave try sticker). */
   braveTry?: boolean;
 }
@@ -315,7 +323,9 @@ export function recordRun(kid: KidProfile, run: RunSummary, reg: Registry, today
       np.losses = 0;
     } else if (outcome === 'loss') {
       np.losses += 1;
-      if (node?.boss && np.losses >= 3) {
+      // From the third loss in a row, every game (a boss or not) plays one step sleepier, while the
+      // item has a step left (spec 5.3). Pip says so on the results card.
+      if (np.losses >= 3 && np.ease < (run.easeSteps ?? Infinity)) {
         np.ease += 1;
         easeAuto = true;
       }
@@ -551,7 +561,7 @@ export function unplaceFrom(kid: KidProfile, rank: number) {
 }
 
 /**
- * Grown-ups "Starting world": the worlds below `rank` are tested out. From `rank` on, placement
+ * Grown-ups "Starting rank": the worlds below `rank` are tested out. From `rank` on, placement
  * passes are taken back so a lower start locks the later worlds again; played nodes keep their stars.
  * Before the first puzzle the puzzle rating follows the new start, down as well as up.
  */

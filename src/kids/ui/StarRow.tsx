@@ -22,7 +22,7 @@ export function StarShape({ filled, size = 28, golden, className, style }: { fil
 
 export function StarRow({ stars, size = 28, golden, max = 3, label }: { stars: number; size?: 20 | 28 | 48 | number; golden?: boolean; max?: number; label?: string }) {
   return (
-    <span className="k-starrow" role="img" aria-label={label ?? `${stars} of ${max} stars`}>
+    <span className="k-starrow" role="img" aria-label={label ?? `${stars} of ${max} ${max === 1 ? 'star' : 'stars'}`}>
       {Array.from({ length: max }, (_, i) => (
         <StarShape key={i} filled={i < stars} size={size} golden={golden && i === max - 1} />
       ))}

@@ -30,7 +30,8 @@ export interface BandTuning {
   takebacks: 'always' | 'three' | 'one';
   dangerAlarm: 'locked-on' | 'on' | 'kid-can-off';
   threatLights: boolean;
-  promotion: 'auto' | 'picker';
+  /** chess.js activities: auto-queen, the big picker, or the picker once w5-promo has taught promotion. */
+  promotion: 'auto' | 'picker' | 'taught';
   bossPass: 1 | 2;
   warmupItems: number;
   sessionMinDefault: 10 | 20 | 30;
@@ -104,7 +105,7 @@ export const BAND_TUNING: Record<AgeBand, BandTuning> = {
     takebacks: 'three',
     dangerAlarm: 'on',
     threatLights: false,
-    promotion: 'picker',
+    promotion: 'taught',
     bossPass: 2,
     warmupItems: 2,
     sessionMinDefault: 20,
@@ -157,6 +158,15 @@ export const BANDS: AgeBand[] = ['sprout', 'explorer', 'champion'];
 export const bandOfAge = (age: number): AgeBand => (age <= 6 ? 'sprout' : age <= 9 ? 'explorer' : 'champion');
 
 export const BAND_LABEL: Record<AgeBand, string> = { sprout: 'Sprout (4-6)', explorer: 'Explorer (7-9)', champion: 'Champion (10-12)' };
+
+/** The node that teaches promotion ("Pawn becomes a Queen!"). */
+export const PROMOTION_NODE = 'w5-promo';
+
+/** How a pawn promotes in a chess.js activity for this kid (a `'taught'` band picks once w5-promo is played or tested out). */
+export function promotionFor(t: BandTuning, kid: { nodes: Record<string, { stars: number } | undefined> } | null): 'auto' | 'picker' {
+  if (t.promotion !== 'taught') return t.promotion;
+  return (kid?.nodes[PROMOTION_NODE]?.stars ?? 0) > 0 ? 'picker' : 'auto';
+}
 
 /** Is an item visible to a band? */
 export const visibleTo = (item: ItemMeta, band: AgeBand) => !item.bands || item.bands.includes(band);

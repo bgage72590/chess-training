@@ -269,6 +269,29 @@ describe('kids sync merge details', () => {
     expect(had.kids.every((k) => k.stickers['st-family-1'] === undefined)).toBe(true);
   });
 
+  it('a test-out does not come back from a copy that missed the real play, so the jar is not paid twice', async () => {
+    const { applyPlacement, earnedStars, recordRun, totalStars } = await import('../src/kids/store/progress');
+    const reg = { isRegistered: () => true };
+    const a = kidOf('k1', 'Mia');
+    applyPlacement(a, [1], '2026-09-20');
+    expect(a.nodes['w1-rook-stars']).toMatchObject({ stars: 1, tested: true, plays: 0 });
+    const b = structuredClone(a);
+    // Device B plays the tested-out node for real: all 3 stars are earned once.
+    const first = recordRun(b, { nodeId: 'w1-rook-stars', results: [{ score: 3, mistakes: 0, hintLevel: 0 }], itemIds: ['r1'] }, reg, '2026-09-21', 1000);
+    expect(first.gained).toBe(3);
+    for (const m of [mergeKid(a, b), mergeKid(b, a)]) {
+      expect(m.nodes['w1-rook-stars'].tested).toBeUndefined();
+      expect(earnedStars(m.nodes['w1-rook-stars'])).toBe(3);
+      expect(totalStars(m)).toBe(totalStars(b));
+      // Playing it again after the merge pays nothing more into the jar.
+      const again = recordRun(m, { nodeId: 'w1-rook-stars', results: [{ score: 3, mistakes: 0, hintLevel: 0 }], itemIds: ['r2'] }, reg, '2026-09-22', 2000);
+      expect(again.gained).toBe(0);
+      expect(again.firstCompletion).toBe(false);
+    }
+    // Two copies that only tested out keep the paper plane.
+    expect(mergeKid(a, structuredClone(a)).nodes['w1-rook-stars'].tested).toBe(true);
+  });
+
   it('personal bests keep the better value from either device (fewer moves is better for ladders and treks)', () => {
     const a = kidOf('k1', 'Mia');
     a.bests = { 'forks-solved': 8, 'ladder-moves': 12, 'trek-a1h8': 7, 'memory-cards': 5 };

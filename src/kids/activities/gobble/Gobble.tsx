@@ -8,6 +8,7 @@ import { placementFen } from '../../lib/fen';
 import { applyMove, attacks, gobbleSolutions, guarded } from '../../lib/miniRules';
 import { eatDests, soloDests, soloMove, soloSolutions, SOLO_MAX_CAPTURES, VALUE, type EatItem, type GobbleItem, type SoloItem } from './logic';
 import { PIECE_NAME } from '../boardVision/logic';
+import { plural } from '../../lib/plural';
 import '../boardVision/boardVision.css';
 
 export function Gobble(props: ActivityProps<GobbleItem>) {
@@ -184,7 +185,7 @@ function Eat({ item, player, onDone, band }: ActivityProps<EatItem>) {
         tones={tones}
         hint={player.hint}
         showDests={true}
-        label={`Gobble board: ${left} snacks left`}
+        label={`Gobble board: ${plural(left, 'snack')} left`}
       />
     </div>
   );
@@ -278,7 +279,7 @@ function Solo({ item, player, onDone }: ActivityProps<SoloItem>) {
         overlay={overlay}
         hint={player.hint}
         showDests={true}
-        label={`Last Piece Standing: ${count} pieces left`}
+        label={`Last Piece Standing: ${plural(count, 'piece')} left`}
       />
     </div>
   );

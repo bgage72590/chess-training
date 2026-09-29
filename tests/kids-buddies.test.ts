@@ -18,6 +18,21 @@ import { VALUE } from '../src/kids/lib/danger';
 
 const ALL: BuddyId[] = ['shelly', 'hop', 'tuck', 'fern', 'olive', 'bruno', 'ember'];
 
+/**
+ * Olive (and Bruno and Ember, who play as her here) searches until a deadline on the clock. This clock
+ * moves only when she reads it, `ms` a reading (she reads it once per position searched), so her search
+ * is a fixed amount of work: results and run times no longer depend on how busy the machine is.
+ * Returns a restore function, and a count of the readings so far.
+ */
+function workClock(ms: number) {
+  let t = 0;
+  let readings = 0;
+  const spy = vi.spyOn(performance, 'now').mockImplementation(() => (readings++, (t += ms)));
+  return { restore: () => spy.mockRestore(), readings: () => readings };
+}
+/** Generous: these tests check what the buddies play, and a busy machine only makes them slower. */
+const SLOW = 600_000;
+
 /** 20 fixed positions: hand-picked ones plus seeded random walks from the start. */
 const FIXTURES: string[] = (() => {
   const hand = [
@@ -56,14 +71,19 @@ describe('kidBot: every buddy plays legal moves', () => {
   for (const b of ALL)
     it(`${b} returns a legal move on every fixture (engine failed)`, async () => {
       const rng = mulberry32(11);
-      for (const f of FIXTURES) {
-        const { move, fellBack } = await buddyMove(b, f, rng);
-        expect(move, `${b} @ ${f}`).not.toBeNull();
-        const legal = new Chess(f).moves({ verbose: true }).map((m) => m.lan);
-        expect(legal).toContain(move!.lan);
-        expect(fellBack).toBe(b === 'bruno' || b === 'ember');
+      const clock = workClock(8);
+      try {
+        for (const f of FIXTURES) {
+          const { move, fellBack } = await buddyMove(b, f, rng);
+          expect(move, `${b} @ ${f}`).not.toBeNull();
+          const legal = new Chess(f).moves({ verbose: true }).map((m) => m.lan);
+          expect(legal).toContain(move!.lan);
+          expect(fellBack).toBe(b === 'bruno' || b === 'ember');
+        }
+      } finally {
+        clock.restore();
       }
-    }, 30000);
+    }, SLOW);
   it('returns null when the game is over', () => {
     expect(jsMove('olive', '7k/6Q1/6K1/8/8/8/8/8 b - - 0 1', mulberry32(1))).toBeNull();
   });
@@ -107,13 +127,23 @@ describe('kidBot personas', () => {
     expect(n).toBeGreaterThan(60);
     expect(n).toBeLessThan(140);
   });
-  it('olive always mates in 1 and answers within its budget', () => {
+  it('olive always mates in 1 and answers within its budget', { timeout: SLOW }, () => {
     const mates = ['6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1', 'k7/2Q5/2K5/8/8/8/8/8 w - - 0 1', 'r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4'];
     for (const f of mates) expect(oliveMove(new Chess(f), mulberry32(1)).san).toContain('#');
-    for (const f of FIXTURES.slice(0, 10)) {
-      const t = performance.now();
-      oliveMove(new Chess(f), mulberry32(2));
-      expect(performance.now() - t, f).toBeLessThan(1500);
+    // Measured in work: with a clock that ticks 4 ms a reading, her 400 ms budget is 100 positions.
+    // Depth 1 always finishes; after that she stops at the first reading past the budget.
+    const clock = workClock(4);
+    try {
+      for (const f of FIXTURES.slice(0, 10)) {
+        let at = clock.readings();
+        oliveMove(new Chess(f), mulberry32(2), { maxDepth: 1 });
+        const depth1 = clock.readings() - at;
+        at = clock.readings();
+        oliveMove(new Chess(f), mulberry32(2));
+        expect(clock.readings() - at, f).toBeLessThanOrEqual(Math.max(depth1, 100) + 2);
+      }
+    } finally {
+      clock.restore();
     }
   });
   it('olive grabs a free queen', () => {
@@ -150,13 +180,20 @@ function match(a: BuddyId, b: BuddyId, games: number, plies: number, seed: numbe
 }
 
 describe('kidBot strength ordering', () => {
-  it('hop beats shelly', () => expect(match('hop', 'shelly', 6, 60, 1)).toBeGreaterThan(0.5));
-  it('tuck beats hop', { timeout: 60000 }, () => expect(match('tuck', 'hop', 10, 60, 2)).toBeGreaterThan(0.5));
-  it('fern beats shelly and hop', { timeout: 60000 }, () => {
+  it('hop beats shelly', { timeout: SLOW }, () => expect(match('hop', 'shelly', 6, 60, 1)).toBeGreaterThan(0.5));
+  it('tuck beats hop', { timeout: SLOW }, () => expect(match('tuck', 'hop', 10, 60, 2)).toBeGreaterThan(0.5));
+  it('fern beats shelly and hop', { timeout: SLOW }, () => {
     expect(match('fern', 'shelly', 4, 60, 3)).toBeGreaterThan(0.5);
     expect(match('fern', 'hop', 4, 60, 4)).toBeGreaterThan(0.5);
   });
-  it('olive beats tuck', () => expect(match('olive', 'tuck', 4, 40, 5)).toBeGreaterThan(0.5), 120000);
+  it('olive beats tuck', { timeout: SLOW }, () => {
+    const clock = workClock(8);
+    try {
+      expect(match('olive', 'tuck', 4, 40, 5)).toBeGreaterThan(0.5);
+    } finally {
+      clock.restore();
+    }
+  });
 });
 
 describe('missions', () => {

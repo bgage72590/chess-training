@@ -91,7 +91,7 @@ Bands change presentation, pace and help, never the rules of chess. **Band and s
 | `dangerAlarm` default | on (kid cannot turn off) | on (grown-up can turn off) | on (the kid can switch it off: "I'm ready!") |
 | `threatLights` default | on | off | off |
 | `oopsShield` (engine alarm) | n/a | n/a | optional, off |
-| `promotion` in chess.js activities | `'auto'` (auto-queen) | `'picker'` from w5-promo on | `'picker'` |
+| `promotion` in chess.js activities | `'auto'` (auto-queen) | `'taught'`: auto-queen until `w5-promo` is played or tested out, then `'picker'` (`promotionFor()` in `curriculum/tuning.ts`) | `'picker'` |
 | `bossPass` (stars needed on non-game bosses) | 1 | 2 | 2 |
 | `warmupItems` | 1 | 2 | 3 |
 | `sessionMinDefault` | 10 | 20 | 30 |
@@ -115,7 +115,7 @@ Step (c) of New Player shows three picture cards:
 2. "I know how the pieces move" (a knight with arrows): runs placement from the **w1** checkpoint.
 3. "I play real games" (two kings): runs placement from the **w3** checkpoint. Passing w3 also marks w1-w2 as tested out. Failing w3 restarts placement at w1.
 
-A grown-up can skip placement ("Start at the beginning") or later set the starting world (or "Unlock all") in Grown-ups.
+A grown-up can skip placement ("Start at the beginning") or later set the starting rank ("Starting rank", or "Unlock all ranks") in Grown-ups.
 
 ### 3.2 Placement ("Show Pip what you know!", `kids/placement`)
 It is never called a test.
@@ -144,7 +144,7 @@ It is never called a test.
 5. **"Super Star?"** (P2 graft). After 3 perfect items in a row, Pip offers the item's `superTune` (or a tier-3 item) for a **golden star**. The golden star is cosmetic, shown as a gold sparkle on the node.
 6. **Fast track.** If the kid 3-stars the first two non-bonus nodes of a world with 0 mistakes, Pip offers "Want to try the boss now?". Passing the boss marks the skipped nodes `tested`.
 7. **World skip.** Any locked world shows "Challenge to skip ahead", which runs that world's checkpoint (section 3.2 rules, for one world).
-8. **Games.** Ease ladder and "Skip for now" (section 5.3). After 3 wins in a row against a buddy, Pip suggests the next one.
+8. **Games.** Every game node (a boss or not) has the ease ladder; game bosses also get "Skip for now" (section 5.3). After 3 wins in a row against a buddy, Pip suggests the next one.
 9. **Puzzle rating.** Elo with K=40 for the first 20 attempts, then K=24. The floor is 500. It is used only by Pack E.
 
 ---
@@ -302,7 +302,8 @@ Conventions:
 - **Game bosses** (battle, capture-crown, play-bot) pass on a WIN. The **ease ladder** makes a win reachable:
   - `NodeProgress.losses` counts consecutive losses and `NodeProgress.ease` holds the current ease step (0 = as authored).
   - After loss 2, Pip offers "Want me to play sleepier?" (ease +1) and turns the helpers on (Danger Alarm, threat lights).
-  - After loss 3, ease +1 is applied automatically, with Pip saying so ("I'll play sleepier. Let's go!"). Nothing is secretly weakened: the ease step is shown on the buddy card as sleepy "Zzz" marks, and the grown-up report lists it.
+  - After loss 3 (and each loss in a row after it), ease +1 is applied automatically while the played item has an ease step left. The results card says so ("Pip will play sleepier next time.") and Pip says it after the recap ("I'll play sleepier. Let's go!"). Once the ladder is used up nothing more is eased or announced, and "Want me to play sleepier?" is not offered. Nothing is secretly weakened: the ease step is shown on the buddy card as sleepy "Zzz" marks, and the grown-up report lists it (a win resets the losses, not the ease step).
+  - Game nodes that are not bosses (Little Pawn War, Mini battles, Capture the Crown, Mini armies, Golden Rules, Buddy Ladder) use the same offers and automatic ease, but never need "Skip for now": a loss earns the star that opens the next node.
   - After loss 4, "Skip for now" appears (all bands, all game bosses except `w8-crown`).
   - Each game item declares `ease: Partial<Item>[]`, a list of successively easier variants that the player merges over the item (section 11.3). The **last ease step of every game boss is Shelly the Snail (random moves) plus a handicap**, so a win is practically guaranteed. `w8-crown` cannot be skipped but has the same ladder.
 - **Skip for now** sets `skipped: true`. It unlocks the next world, like a pass. It gives no stars, and it does not count for crowns or graduation. The node shows a dotted outline and a small "come back" leaf. Pip: "We'll come back to this one later!"
@@ -360,7 +361,8 @@ Everything is deterministic and visible in advance. There is no random loot.
   - Each world boss passed gives a world hat: w1 tower hat, w2 leaf hat, w3 garden bow, w4 knight helmet, w5 drum-major hat, w6 sailor cap, w7 snow hat.
   - Each buddy beaten gives a matching hat (snail shell, bunny ears, turtle cap, fox ears, owl feathers, bear ears, dragon horns).
   - The **crown is reserved for graduation**.
-- **Pip's Garden** (P1 stamp card merged with P2 garden). Each day with any play plants one flower in a 5-pot strip. A full strip earns sticker `st-garden-<n>` and starts a new strip. It shows TOTAL flowers. Missed days are never shown or mentioned, and nothing ever wilts or resets.
+- **Crowns** (5.5) are announced on the results card of the run that earns them: a silver or gold ribbon ("Gold crown for Rook Road!") with a crown badge that drops on and a shine that sweeps across; a gold crown also rings the crown bell with confetti (a whole Rank finished). Pip says "You earned a silver crown!" or "You earned a gold crown!" after the recap.
+- **Pip's Garden** (P1 stamp card merged with P2 garden). Each day with any play plants one flower in a 5-pot strip; the results card of the run that planted it shows "A new garden flower!" with the flower growing out of its pot. A full strip earns sticker `st-garden-<n>` and starts a new strip. It shows TOTAL flowers. Missed days are never shown or mentioned, and nothing ever wilts or resets.
 - **Family Star Jar** (P2 graft). All kids' stars pour into one shared jar on the profile picker. Every 100 family stars triggers a "Family Party": confetti on the picker and sticker `st-family-<n>` in every profile's book. It is cooperative only; there is never a per-kid comparison.
 - **Personal bests only**: Coordinate Dash best, longest puzzle streak, fewest moves on the ladder mate, fewest moves on the Knight Trek. There are no leaderboards.
 - **Graduation**: the pawn promotes on screen into a crowned Queen or King avatar (the kid picks), with Pip's speech and a printable certificate (behind the gate).
@@ -565,6 +567,7 @@ There is no background music.
   - board, width `min(100vw - 2*gutter, 100svh - 64 - 88 - trayH - 24px)`
   - action tray: 96px for Sprouts, 80px otherwise; hidden when empty.
 - **Player, landscape**: a grid of `[coach 280px] [board] [tray 240px]`. The board is `min(100svh - 112px, 720px, 100vw - 600px)`. The `leftHanded` setting mirrors the columns to `[tray] [board] [coach]`.
+- **Player, phone on its side** (landscape and at most 480px tall): the side columns are `clamp(168px, 24vw, 210px)` and the top bar's parts move into them (the X and the progress pips over the coach column with the counter chip under them, the hint bulb and speaker over the tray column), so the board takes the whole height (about 358px at 844x390, 304px at 740x360). Pip is 84px and his tail hangs under him; a long line shrinks, then scrolls, inside the bubble. Sheets are as wide as the tray column. Play a Buddy uses slimmer cards and puts the Golden Rules beside the board.
 - Squares on a 360px phone are about 41px (360 - 2x8 gutter - 2x8 frame = 328, and 328 / 8 = 41). On a 390px phone they are about 45px. Sprouts on phones never need precise aim: tap-tap, auto-select of a lone piece, 36% dots, and cloud areas that remove distractions.
 - Map, portrait: a vertical scroll with Rank 1 at the bottom and auto-scroll to the current node; the PLAY button is sticky at the bottom. Map, landscape: the same path, plus a right side panel (360px) with the Garden, "Next up" and Pip's tip.
 
@@ -576,8 +579,8 @@ There is no background music.
 |---|---|
 | `BigButton` | Variants: `primary` (sun), `go` (grass), `info` (sea), `boss` (coral), `magic` (berry), `plain` (cream fill, `--k-cream-edge`). Height `var(--k-btn-h)` from the band (72/56/48), padding 0 24px, radius `--k-r`, Fredoka 600 at `--k-btn-label`. Shadow `0 6px 0 var(--edge)`. `:active` gives translateY(4px) and shadow `0 2px 0`. Focus ring: 4px `--k-hint-ring` with a 2px offset. There is always an icon plus a word; icon-only buttons need `aria-label`. `disabled` is 50% opacity with no press. Minimum width is equal to the height. |
 | `PlayButton` | The map's giant PLAY: 88px tall, full width up to 420px, sun fill, a play-triangle icon plus "Play!" (Fredoka 700, 30px), and a gentle 2 s scale pulse that is off under reduced motion. |
-| `Card` | `--k-card` fill, radius `--k-r-lg`, 3px `--k-line` border, `--k-press` bottom edge, padding 16/24. |
-| `TopBar` (player) | 64px, transparent over the gradient. Left: an X button (56px, plain). Center: progress pips. Right: hint bulb (56px, berry when hints are available, with a pulse when the ladder auto-offers) and speaker (56px). Sprouts' buttons are 64px. |
+| `.k-card` (a class, not a component) | `--k-card` fill, radius `--k-r-lg`, 3px `--k-line` border, `--k-press` bottom edge, padding 16/24. |
+| `TopBar` (player) | 64px, transparent over the gradient (it grows a little on a phone, where the counter chip wraps under the pips, so neither touches an edge). Left: an X button (56px, plain). Center: progress pips and the counter chip ("2/3", or a bare count such as Coordinate Dash's score). Right: hint bulb (56px, berry when hints are available, with a pulse when the ladder auto-offers; off while an activity has nothing to hint yet, e.g. Magic Memory's look phase) and speaker (56px). Sprouts' buttons are 64px. Under the results card and Break time it is inert, like the board. |
 | `ProgressPips` | One pip per item: 14px circles with 8px gaps; the current one is 18px with a sun fill; done ones are grass with a white check; skipped ones are cream with a dash. |
 | `SpeechBubble` | `--k-card-2` fill, radius 20px, a 3px `--k-line` border, and a 14px tail toward Pip. Text is `--k-bubble` Andika. Karaoke: the spoken word gets a sun underline 4px thick. There is a 56px speaker button inside the bubble at the end (hidden for the gate). `aria-live="polite"` (P2 graft). |
 | `Coach` | Pip plus the bubble. Portrait: a row. Landscape: a column (Pip at 120px above the bubble). |
@@ -586,13 +589,13 @@ There is no background music.
 | `WorldBand` (map) | A full-width band with the world `bg`, a 28px radius on top, an illustrated SVG header (simple shapes: towers, trees, hills, tents), the title (Fredoka 700, `--k-title`), a crown slot (silver/gold) and a dotted trail path (4px, ink at 25%) linking the nodes. |
 | `BossCard` | Coral edge, the buddy face (for game bosses) or a castle icon, the requirement row ("★★ opens Rank 3" / "Win to open!"), and a "Play" BigButton `boss`. |
 | `Tray` | The bottom action area. Answer buttons are laid out 2 per row (Sprout) or up to 4 per row, each at least `--k-btn-h`, with a 12px gap. |
-| `ResultsOverlay` | A dim backdrop (ink at 40%), then a centered Card (up to 440px): a drumroll (600 ms), stars filling, Pip cheering, a sticker peel-in on first completion, and a one-line recap ("You can checkmate with a queen!"). Buttons: Next (primary, auto-focused, Enter works), Again (plain), Map (plain). Boss pass: crown drop, then "Rank 4 is open!", then a pawn-walk animation on dismiss. Nothing auto-advances. |
+| `ResultsOverlay` | A dim backdrop (ink at 40%), then a centered card (up to 440px): a drumroll (600 ms), stars filling, Pip cheering, a sticker peel-in on first completion, and a one-line recap ("You can checkmate with a queen!"). Moment stickers and trophies the activities awarded during the run are stamped on here too (with a chime when they were earned; leaving early announces them in a toast on the next screen). New crowns and the day's garden flower have their own rows (6). Buttons: Next (primary, auto-focused, Enter works), Again (plain), Map (plain). Boss pass: crown drop, then "Rank 4 is open!", then a pawn-walk animation on dismiss. Nothing auto-advances. On a very short portrait phone the buttons share rows and stay pinned at the bottom of a card taller than the screen. |
 | `DangerAlarm` modal | A bottom sheet: Pip in `wow` mood plus the bubble "Uh-oh! Is your knight safe?". The threatened piece's square pulses (`danger` art) and the attacker gets an arrow. Two buttons: "Undo" (go, primary) and "Keep it" (plain). |
 | `ParentGate` modal | Ink backdrop at 70%, a cream card, the title "Grown-ups only". Step 1 is a 96px hold ring that fills over 2 s. Step 2 is the question and a 3x4 keypad of 64px keys. It is never spoken. |
 | `Keypad` | 64px keys, Fredoka 600 at 28px, a cream fill with an edge; backspace and OK keys. |
 | `AvatarTile` (picker) | 160px (phone: 2 columns; tablet: 3-4). The Pawn Buddy at 96px, the name (Fredoka 600, 22px), a rank badge ("Rank 5"), the total stars and the garden count. |
 | `StickerSlot` | A 96px circle or badge shape per world. Earned: full color, a 3px ink outline and a ribbon title. Missing: a `--k-line` silhouette plus "Play Rook Maze!". |
-| `Toast` (kids) | A cream pill at the top center, 56px tall, auto-hides after 2.5 s. Used only for saves and gate messages. It reuses the app's toast store and is styled by `.kids-app .toast`. |
+| `Toast` (kids) | A cream pill, 56px tall, that never takes a tap and auto-hides after 2.5 s: just below the screen's top bar, so it never covers its buttons; in the player, where Pip's bubble sits under the bar, it rises from the bottom (under the board on a tall screen, at the foot of the tray column on a wide one). Used for saves, gate messages and rewards earned in a run that was left early. It reuses the app's toast store (`KidsToasts` in `KidsApp.tsx`). |
 | `KidsPromoPicker` | A modal over the board with 4 pieces as 96px buttons (Queen, Rook, Bishop, Knight). Each shows the real piece image plus its name; the name is spoken on focus for Sprouts and Explorers; Queen is first and highlighted. |
 | `Confetti` | 40 absolutely positioned spans; CSS variables for color, angle and delay; removed after 1.4 s. |
 
@@ -641,6 +644,7 @@ All routes live under `#/kids/...` and are rendered by KidsApp full-screen, with
    - Game end: a result card plus "See how it ended" (the final position with arrows).
 9. **Playground** (`kids/playground`)
    - Tiles for the registered `PlaygroundEntry`s that are unlocked for this kid. Playing here gives trophies and personal bests but does not change map progress.
+   - Each kind of game ends with its own recap (`playgroundRecap()` in `player/recap.ts`): games against a buddy say how they went (the node game lines), a game with a friend has no stars and cheers both players ("What a game! High five, you two!"), and Star Hunt, puzzles, Coordinate Dash, Magic Memory and Last Piece Standing each have a line.
    - Framework tiles: "Star Hunt Endless" (stars `review()` generator) and "Puzzle of the Day" (only if Pack E is registered).
    - Empty state: "More games are coming!"
 10. **Sticker Book** (`kids/stickers`)
@@ -676,7 +680,7 @@ All routes live under `#/kids/...` and are rendered by KidsApp full-screen, with
       - piece set
       - tap only (no drag)
       - left-handed
-    - **Actions**: set starting world, unlock all, reset progress, delete profile (hold to confirm), print certificate.
+    - **Actions**: set starting rank, unlock all ranks, reset progress, delete profile (hold to confirm), print certificate.
     - **Device**: set or clear the 4-digit PIN, "Lock Kids mode on this device" (P3 graft; the app opens `#/kids` when launched), export or import kids data (a JSON file), "Delete all kids data", "Exit to Tempo".
 14. **Parent gate** (modal): see 10.4.
 
@@ -737,7 +741,7 @@ All routes live under `#/kids/...` and are rendered by KidsApp full-screen, with
   - deleting a profile or all data
   - reset
   - import/export
-  - unlock all / set starting world / band change
+  - unlock all ranks / set starting rank / band change
   - printing the certificate
   - turning off the device lock
 - It is never spoken (10.1).
@@ -750,8 +754,8 @@ All routes live under `#/kids/...` and are rendered by KidsApp full-screen, with
 
 ### 10.6 Privacy
 - All kids data is in `localStorage['tempo.kids.v1']`, and the device lock is in `localStorage['tempo.kids.lock.v1']`. Both are separate from `'tempo.profile.v1'`.
-- **They are never synced.** `src/store/cloud.ts` must not import from `src/kids` or reference `tempo.kids`, and a test asserts both.
-- Names are optional nicknames. No photos, no birthdates (band only), no chat, no external links, no ads, no analytics, no network calls. Fonts are self-hosted and Stockfish is local WASM.
+- **Sync across a family's own devices.** When a grown-up links devices with Tempo's sync code (Settings), the players, the family star jar and deleted-player markers sync as the `kids` part of `src/sync` (registered by `store/syncKids.ts` when Kids mode loads). The merge keeps progress made on either device item by item (nodes, stickers, days, games), adds up what each device did (minutes, stars), follows the latest change for names, avatars and settings, keeps deleted kids deleted, and lets a reset or a grown-up's "Starting rank" win over older progress. A test-out only stands until the node is really played on some device. The grown-up PIN, the device voice, the Kids-mode lock and which kid is active stay on the device. Without a sync code nothing leaves the device. The older `src/store/cloud.ts` backup must not import from `src/kids` or reference `tempo.kids`, and a test asserts both.
+- Names are optional nicknames. No photos, no birthdates (band only), no chat, no external links, no ads, no analytics, and no network calls besides Pip's recorded voice clips and the family's own sync above. Fonts are self-hosted and Stockfish is local WASM.
 - Export is a local JSON download without the PIN or the device voice. Import validates with `normalizeKids()`, says why a file cannot be used, asks before it replaces the players on the device, and keeps the device's PIN.
 - Siblings see only each other's name, avatar, rank and stars on the picker.
 - **Robustness**: every localStorage access is wrapped in try/catch, with an in-memory fallback (private mode or sandboxed frame). When saving fails, Grown-ups shows a small note: "Progress won't be saved on this device."
@@ -807,7 +811,7 @@ src/kids/
   player/Results.tsx     F
   player/speech.ts       F  (10.1)
   player/useSession.ts   F  (10.5)
-  ui/                    F  Pip, PawnBuddy, BuddyFace, BigButton, PlayButton, Card, TopBar, ProgressPips, SpeechBubble, Coach,
+  ui/                    F  Pip, PawnBuddy, BuddyFace, BigButton, PlayButton, Flower, TopBar, ProgressPips, SpeechBubble, Coach,
                             StarRow, NodeBubble, WorldBand, BossCard, Tray, Confetti, SquareArt, ParentGate, Keypad,
                             AvatarTile, StickerSlot, KidsIcon, DangerSheet
   screens/               F  ProfilePicker, NewKid, Placement, MapScreen, WorldScreen, Playground, StickerBook,
@@ -885,6 +889,8 @@ export interface ItemResult {
 export type PlayMode = 'node' | 'warmup' | 'placement' | 'playground';
 export interface TrayButton {
   id: string; label: BandText; icon?: KidsIconName; art?: ReactNode;
+  inert?: boolean; ariaLabel?: string;                   // shown like a button but only informs (the candy jar)
+  placeholder?: boolean;                                 // keeps a button's place (Memory's covered tray): no press, hidden from screen readers
   variant?: 'primary' | 'go' | 'info' | 'boss' | 'magic' | 'plain'; disabled?: boolean; onPress(): void;
 }
 export interface PlayerApi {
@@ -894,10 +900,11 @@ export interface PlayerApi {
   setHints(steps: HintStep[]): void;  // ladder levels 1..4 for the current item (missing levels use generic fallbacks)
   readonly hint: HintStep | null;     // currently shown hint step (activity renders tones/arrows/art from it)
   readonly hintLevel: 0 | 1 | 2 | 3 | 4;
-  progress(done: number, total: number): void;           // small counter chip in the top bar (e.g. stars 2/3)
+  pauseHints(paused: boolean): void;  // nothing to hint yet (Memory's look phase): the bulb is off and the idle ladder waits
+  progress(done: number, total?: number): void;          // small counter chip in the top bar (stars 2/3; a bare count without a total)
   celebrate(kind: 'small' | 'big' | 'checkmate' | 'promotion'): void;
   sound(name: KidSound): void;
-  award(id: string): void;            // sticker or trophy id declared in curriculum/stickers.ts; idempotent
+  award(id: string): void;            // sticker or trophy id declared in curriculum/stickers.ts; idempotent; shown on the results card
   setTray(buttons: TrayButton[] | null): void;
   rng(): number;                      // seeded per run
   best(key: string, value: number, better: 'higher' | 'lower'): boolean;   // personal bests; true if improved
@@ -1056,8 +1063,12 @@ It uses the existing `navigate()`, `useRoute()` and `routeParts()`. Routes:
 
 Rules:
 - With no active kid, any route except `kids` and `kids/new` redirects to `kids`.
-- Browser back works. A screen's own close or back button steps back through the history when the entry before it is the screen it goes to, and otherwise replaces its own entry, so Back never reopens an activity the kid just left. Results Next, "Try the boss!" and "Practice first" replace the activity's entry, and asking for the screen already showing adds nothing.
-- The player guards leaving only mid-item.
+- Browser back works. A screen's own close or back button steps back through the history when the entry before it is the screen it goes to, and otherwise replaces its own entry, so Back never reopens an activity the kid just left. Results Next, "Try the boss!" and "Practice first" replace the activity's entry, and asking for the screen already showing adds nothing. Each entry remembers (in `history.state`) the route it was opened from, how deep it is, and where the nearest picker below it is.
+  - The player's X / Map closes back to the calm screen it was opened from (the map or a World screen).
+  - Picking a player from the picker the map opened ("Switch player") steps back to that map (or gives the picker's entry to Placement or the first node), so the history never holds map, players, map. Placement's X, Grown-ups' back arrow and "Kids' screen", the certificate's Back, New player's first Back and "Delete all kids data" step back the same way; switching the kid in Grown-ups replaces its entry.
+  - "Bye for now" steps back to the picker the visit started from, so Back never lands on a screen that needs the kid who just left.
+  - A parent gate asked for on one screen closes when the route changes.
+- The player guards leaving only mid-item: an extra history entry with the same address takes the first Back and asks "Leave?"; a second Back leaves. The player drops the entry when the guard ends (results, a sheet, placement deciding a world). Its own `history.back()` is not taken for a Back press by a player that mounts in that instant (the next node, a warm-up, placement's next world), and a reload on the guard entry reuses it instead of stacking another.
 - `speech.cancel()` runs on every route change.
 
 ---
@@ -1507,6 +1518,7 @@ Level sets (content/movement.ts):
 ### 13.6 MAGIC MEMORY (`memory`, Pack A, Playground only, E and C; P2 graft)
 - `rebuild` mode: `{pieces: Placement, showMs}`. The position shows for `showMs`, then a "magic cloak" sweeps it away. The kid rebuilds it with the tray (as in setup).
 - `what-moved` mode: `{pieces, move: [from, to], showMs}`. The kid taps the piece that moved.
+- While the kid is still looking (and during the cloak) the hint bulb is off (`player.pauseHints`), and the rebuild tray shows placeholders of the same shape as the piece buttons, hidden from screen readers.
 - Score: pieces placed correctly on the first try (100% = 3, 70% or more = 2, else 1).
 - Items: E `{d4:'N', f6:'p'}` at 6000 ms, `{e1:'K', d8:'q', c3:'N', g7:'b'}` at 6000 ms. C: 6-8 pieces at 5000 ms.
 - Playground tile "Magic Memory".
@@ -1543,7 +1555,7 @@ Level sets (content/movement.ts):
     - E: 8v8 (a2-h2 vs a7-h7) `bot:{depth:2, r:0.3}`; ease `[{bot:{depth:1, r:0.5}}, {bot:{depth:1, r:3}}, {black:<a7..h7 minus a7 and h7>, bot:{depth:1, r:3}}]`.
     - C: 8v8 `bot:{depth:3, r:0.1}, enPassant:true`; ease `[{bot:{depth:2, r:0.3}}, {bot:{depth:1, r:0.5}}, {bot:{depth:1, r:3}}]`.
   - `w6-battles` (fixed):
-    - Knight vs 3 pawns `{white:{g1:'N'}, black:{a7:'p',b7:'p',c7:'p'}, win:'stop-pawns', bot:{depth:2, r:0.3}}`
+    - Knight vs 3 pawns `{white:{g1:'N'}, black:{a7:'p',b7:'p',c7:'p'}, win:'stop-pawns', bot:{depth:1, r:1.0}}` (C `{depth:2, r:2.0}`); ease `[{white:{e2:'N'}, bot:{depth:1, r:3}}, {white:{e2:'N'}, black:{a7:'p',c7:'p'}, bot:{depth:1, r:3}}]`. The pawns' bot barely matters here, so the steps change the position (the knight starts nearer, then one pawn stays home).
     - Queen vs 8 pawns (the Steps classic) `{white:{d1:'Q'}, black: pawns a7-h7, win:'capture-all', bot:{depth:2, r:0.2}}` (loss if a pawn promotes)
     - C: Rook vs 3 pawns `{white:{a1:'R'}, black:{f7:'p',g7:'p',h7:'p'}, win:'stop-pawns', bot:{depth:3, r:0.1}}`
 - Playground: Pawn War 3v3, Pawn War 8v8, Knight vs Pawns, Queen vs 8 Pawns (each also in friend mode).

@@ -9,6 +9,7 @@ import { SquareArt } from '../ui/SquareArt';
 import { sqRange, ALL_SQUARES } from '../lib/miniRules';
 import { resolvePieceSet } from '../lib/pieceProbe';
 import { useKidCtx } from './context';
+import { promotionFor } from '../curriculum/tuning';
 import { KidsPromoPicker } from './KidsPromoPicker';
 import { kidSound } from '../lib/kidsSound';
 import { playableDests } from '../lib/chessDests';
@@ -58,6 +59,8 @@ export function KidsBoard(props: KidsBoardProps) {
   const areaSet = useMemo(() => (area ? sqRange(area) : null), [area]);
   const pieceSet = useMemo(() => resolvePieceSet(kid?.settings.pieceSet ?? 'auto'), [kid?.settings.pieceSet]);
   const coords = props.coordinates ?? kid?.settings.coordinates ?? tuning.coordinates;
+  // Explorers get a queen by themselves until Pawn Parade teaches promotion (then the big picker).
+  const promotion = props.promotion ?? promotionFor(tuning, kid);
 
   // Selection resets whenever the position changes.
   useEffect(() => {
@@ -107,14 +110,14 @@ export function KidsBoard(props: KidsBoardProps) {
       if (!chess) return;
       const legal = chess.moves({ verbose: true }).filter((m) => m.from === from && m.to === to);
       if (!legal.length) return;
-      if (legal[0].promotion && (props.promotion ?? tuning.promotion) === 'picker') {
+      if (legal[0].promotion && promotion === 'picker') {
         setPromo({ from, to });
         return;
       }
       const m = new Chess(fen).move({ from, to, promotion: legal[0].promotion ? 'q' : undefined });
       props.onMove?.(m);
     },
-    [freeMoves, chess, fen, props, tuning.promotion],
+    [freeMoves, chess, fen, props, promotion],
   );
 
   // Board always gets free moves: chess.js activities pass their legal moves through here, so

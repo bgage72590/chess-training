@@ -340,5 +340,5 @@ describe('mate drill', () => {
       }
       expect(mated, `${it.id} mated within 80 moves`).toBe(true);
     }
-  }, 60000);
+  }, 600_000); // generous: fixed work, only slower on a busy machine
 });

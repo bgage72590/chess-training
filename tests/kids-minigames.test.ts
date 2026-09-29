@@ -1,5 +1,14 @@
 // Pack B: Pawn Wars, Mini Battles and Capture the Crown (spec 15, kids-minigames).
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Counts the positions the mini bot searches (each move it tries is one playBattle), so its speed is
+// checked as an amount of work, not as time on a machine that may be busy.
+const searched = vi.hoisted(() => ({ n: 0 }));
+vi.mock('../src/kids/activities/battle/logic', async (importOriginal) => {
+  const m = await importOriginal<typeof import('../src/kids/activities/battle/logic')>();
+  return { ...m, playBattle: (...a: Parameters<typeof m.playBattle>) => (searched.n++, m.playBattle(...a)) };
+});
+
 import type { AgeBand, LevelSet, Placement } from '../src/kids/activities/types';
 import { battleMoves, battleOutcome, battleRules, initialState, playBattle, validateBattle, type BattleItem, type BattleState } from '../src/kids/activities/battle/logic';
 import { evaluate, miniBotMove } from '../src/kids/activities/battle/miniBot';
@@ -146,9 +155,11 @@ describe('miniBot', () => {
   it('replies fast at the deepest content depth', () => {
     const item = W5_BOSS.items[2] as BattleItem;
     const rules = battleRules(item);
-    const t = performance.now();
+    searched.n = 0;
     miniBotMove(rules, initialState(item), item.bot, mulberry32(3));
-    expect(performance.now() - t).toBeLessThan(700);
+    // About 1,400 positions today (a fraction of a second on a phone); the old 700 ms budget was about 7,000.
+    expect(searched.n).toBeGreaterThan(0);
+    expect(searched.n).toBeLessThan(5000);
   });
   it('a kid playing sensible moves beats the Sprout bot', () => {
     // The kid side is played by a depth-2 search; the Sprout bot plays depth 1 with r = 1.
@@ -205,7 +216,7 @@ describe('miniBot', () => {
     }
     const mini = resolveItem(LEVEL_SETS.get('w5-pawn-war-mini')!.items.find((i) => i.bands?.includes('champion'))!, 'champion') as BattleItem;
     expect(winRate(mini, 30), 'little pawn war, champion').toBeGreaterThanOrEqual(0.15);
-  }, 120000);
+  }, 600_000); // generous: fixed work, only slower on a busy machine
 });
 
 describe('capture the crown', () => {

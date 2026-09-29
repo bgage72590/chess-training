@@ -11,7 +11,7 @@ export function AvatarTile({ kid, rank, stars, onPick, resting = false }: { kid:
           z<small>z</small>
         </span>
       )}
-      <PawnBuddy color={kid.avatar.color} face={kid.avatar.face} hat={kid.graduated ? 'crown' : kid.avatar.hat} size={96} />
+      <PawnBuddy color={kid.avatar.color} face={kid.avatar.face} hat={kid.avatar.hat} size={96} />
       <span className="k-avatar-name">{kid.name || 'Player'}</span>
       <span className="k-avatar-meta">
         <span className="k-rank-badge">Rank {rank}</span>

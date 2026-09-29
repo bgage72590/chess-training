@@ -19,8 +19,9 @@ import { BREAK_MS, pauseSession, setSessionLimit } from '../player/useSession';
 import { PawnBuddy } from '../ui/PawnBuddy';
 import { KidsIcon } from '../ui/KidsIcon';
 import { DEVICE_VOICE, RECORDED, speech } from '../player/speech';
-import { voiceNote, voiceScore } from '../player/voices';
+import { VOICE_PREVIEW, voiceNote, voiceScore } from '../player/voices';
 import { toast } from '../../lib/toast';
+import { plural } from '../lib/plural';
 import { go } from '../routes';
 
 export function Grownups({ kidId }: { kidId?: string }) {
@@ -43,11 +44,11 @@ export function Grownups({ kidId }: { kidId?: string }) {
   return (
     <div className="k-screen k-grownups">
       <header className="k-gu-head">
-        <button type="button" className="k-round k-round-plain" aria-label="Back" onClick={() => (getKids().activeKid ? go.map() : go.picker())}>
+        <button type="button" className="k-round k-round-plain" aria-label="Back" onClick={() => go.back(getKids().activeKid ? 'map' : '')}>
           <KidsIcon name="back" size={26} />
         </button>
         <h1>Grown-ups</h1>
-        <button type="button" className="k-gu-link" onClick={() => go.picker()}>
+        <button type="button" className="k-gu-link" onClick={() => go.upToPicker()}>
           Kids&rsquo; screen
         </button>
       </header>
@@ -56,7 +57,7 @@ export function Grownups({ kidId }: { kidId?: string }) {
       {s.kids.length > 0 && (
         <nav className="k-gu-kids" aria-label="Choose a kid">
           {s.kids.map((k) => (
-            <button key={k.id} type="button" className={`k-gu-kid${k.id === kid?.id ? ' on' : ''}`} onClick={() => go.grownups(k.id)}>
+            <button key={k.id} type="button" className={`k-gu-kid${k.id === kid?.id ? ' on' : ''}`} onClick={() => go.grownups(k.id, true)}>
               <PawnBuddy color={k.avatar.color} face={k.avatar.face} hat={k.avatar.hat} size={32} />
               {k.name || 'Player'}
             </button>
@@ -132,7 +133,7 @@ function Report({ kid }: { kid: KidProfile }) {
       <h3>Needed help with</h3>
       <p>{help.length ? help.map((n) => n.title).join(', ') : 'Nothing right now.'}</p>
       <h3>Minutes per day (last 7 days)</h3>
-      <div className="k-gu-bars" role="img" aria-label={mins.map((m) => `${m.day}: ${m.minutes} minutes`).join(', ')}>
+      <div className="k-gu-bars" role="img" aria-label={mins.map((m) => `${m.day}: ${plural(m.minutes, 'minute')}`).join(', ')}>
         {mins.map((m) => (
           <div key={m.day} className="k-gu-bar">
             <span style={{ height: `${(m.minutes / maxMin) * 100}%` }} />
@@ -251,7 +252,7 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
   // Without recorded voices (the single-file copy, or a list that did not load), Pip reads with the device's voice.
   const noRecorded = listLoaded && !pipVoices.length;
   const pipVoice = noRecorded ? DEVICE_VOICE : st.pipVoice || speech.defaultPipVoice();
-  const preview = () => speech.speak(["Hi! I'm Pip. Let's play chess together!"], { rate: st.rate ?? BAND_TUNING[kid.band].speechRate, clipRate: st.rate ?? undefined });
+  const preview = () => speech.speak([VOICE_PREVIEW], { rate: st.rate ?? BAND_TUNING[kid.band].speechRate, clipRate: st.rate ?? undefined });
   const pickVoice = (id: string) => {
     set('pipVoice', id);
     speech.setPipVoice(id);
@@ -458,9 +459,9 @@ function Actions({ kid }: { kid: KidProfile }) {
   return (
     <Section title="Actions" icon="flag">
       <div className="k-gu-row">
-        <span className="k-gu-label">Starting world</span>
+        <span className="k-gu-label">Starting rank</span>
         <div className="k-gu-inline">
-          <select value={startWorld} onChange={(e) => setStartWorld(Number(e.target.value))} aria-label="Starting world">
+          <select value={startWorld} onChange={(e) => setStartWorld(Number(e.target.value))} aria-label="Starting rank">
             {WORLDS.map((w) => (
               <option key={w.id} value={w.rank}>
                 Rank {w.rank}: {w.title}
@@ -479,7 +480,7 @@ function Actions({ kid }: { kid: KidProfile }) {
           </button>
         </div>
       </div>
-      <Toggle label="Unlock all worlds" value={kid.settings.unlockAll} onChange={(v) => updateKid(kid.id, (d) => void (d.settings.unlockAll = v))} />
+      <Toggle label="Unlock all ranks" value={kid.settings.unlockAll} onChange={(v) => updateKid(kid.id, (d) => void (d.settings.unlockAll = v))} />
       <div className="k-gu-actions">
         <button type="button" className="k-gu-btn" disabled={!kid.graduated} onClick={() => go.certificate(kid.id)}>
           <KidsIcon name="print" size={18} /> Print certificate
@@ -502,7 +503,7 @@ function Actions({ kid }: { kid: KidProfile }) {
               if (s.activeKid === kid.id) s.activeKid = null;
             });
             toast({ title: 'Player deleted.' }, 2500);
-            go.grownups();
+            go.grownups(undefined, true);
           }}
         />
       </div>
@@ -643,7 +644,7 @@ function Device() {
             // The grown-up PIN and the device voice stay: they are this device's, not a kid's.
             replaceKids({ ...defaultKidsState(), device: prev.device, removed, family: { stars: 0, parties: 0, resetAt: now } });
             toast({ title: 'All kids data deleted.' }, 2500);
-            go.picker();
+            go.upToPicker();
           }}
         />
         <button

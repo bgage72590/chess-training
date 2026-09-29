@@ -25,4 +25,14 @@
     width: min(100cqw, max(220px, calc(100cqh - 60px - var(--k-room, 0px))), 720px);
     margin-bottom: var(--k-room, 0px);
   }
+  /* A short play area: the game strip steps aside while the bells ring, and the board shrinks as far as
+     it must to keep the kid's king and back ranks above the sheet. */
+  @container (max-height: 480px) {
+    .kids-app .k-game.k-crown.has-sheet .k-game-bar {
+      display: none;
+    }
+    .kids-app .k-player-main > .k-game.k-crown.has-sheet {
+      width: min(100cqw, max(120px, calc(100cqh - var(--k-room, 0px) - 8px)), 720px);
+    }
+  }
 }

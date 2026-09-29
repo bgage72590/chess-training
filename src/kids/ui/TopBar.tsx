@@ -6,10 +6,11 @@ import { pipReact } from './pipEvents';
 import { centerOf, flyStar, lastTap } from './rewardFx';
 
 /**
- * The star counter in the chip. When the count rises, stars fly to it from the square the kid just
- * tapped (else the middle of the board), Pip cheers, and the number counts up with a pop as each lands.
+ * The star counter in the chip ("2/3", or a bare count with no total, as in Coordinate Dash). When the
+ * count rises, stars fly to it from the square the kid just tapped (else the middle of the board), Pip
+ * cheers, and the number counts up with a pop as each lands.
  */
-export function ChipStars({ done, total }: { done: number; total: number }) {
+export function ChipStars({ done, total }: { done: number; total?: number }) {
   const [shown, setShown] = useState(done);
   const [hit, setHit] = useState(0);
   const prev = useRef(done);
@@ -44,7 +45,7 @@ export function ChipStars({ done, total }: { done: number; total: number }) {
         <KidsIcon name="star" size={20} fill />
       </span>
       <span key={`n${hit}`} className={`k-chip-num${hit ? ' hit' : ''}`}>
-        {shown}/{total}
+        {total == null ? shown : `${shown}/${total}`}
       </span>
     </span>
   );
@@ -56,7 +57,10 @@ export function TopBar({
   chip,
   hint,
   onSpeaker,
+  inert,
 }: {
+  /** Out of reach while a modal card (results, Break time) is up. */
+  inert?: boolean;
   onExit(): void;
   pips: PipState[];
   chip?: ReactNode;
@@ -64,7 +68,7 @@ export function TopBar({
   onSpeaker?: () => void;
 }) {
   return (
-    <header className="k-topbar">
+    <header className="k-topbar" inert={inert || undefined}>
       <button type="button" className="k-round k-round-plain" aria-label="Leave" onClick={onExit}>
         <KidsIcon name="x" size={28} />
       </button>

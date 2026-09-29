@@ -132,7 +132,8 @@ export const W3_QUEEN_PAINT: LevelSet<PaintItem> = {
     { id: 'qp1', pieces: { d1: 'Q' }, blockers: ['d2', 'e2', 'c2'], say: 'Her friends are in the way! Where can the queen go?' },
     { id: 'qp2', pieces: { a1: 'Q' }, enemies: { a4: 'p', d4: 'n' }, say: paintSay('queen') },
     { id: 'qp3', pieces: { h8: 'Q' }, blockers: ['g7'], enemies: { h5: 'r' }, say: paintSay('queen') },
-    { id: 'qp4', pieces: { e1: 'K' }, say: 'Where can the king step?' },
+    // The king is met later in this Rank (King's Tiny Steps and its Piece Parade), so this set is all queen.
+    { id: 'qp8', pieces: { e1: 'Q' }, blockers: ['e2'], enemies: { h4: 'p' }, say: paintSay('queen') },
     { id: 'qp5', pieces: { d4: 'Q' }, tier: 2, say: 'The queen in the middle. So many squares!' },
     { id: 'qp6', pieces: { c3: 'Q' }, blockers: ['c5', 'e3'], enemies: { a2: 'p', f6: 'n' }, tier: 2, say: paintSay('queen') },
     { id: 'qp7', pieces: { h3: 'Q' }, blockers: ['g3', 'h4'], enemies: { d7: 'p' }, tier: 2, say: paintSay('queen') },

@@ -319,13 +319,16 @@ function Dash({ item, player, onDone }: P<'find-square'>) {
     const n = scoreRef.current;
     // A dash with no squares is not "a new best".
     const best = n > 0 && player.best(item.bestKey ?? `dash-${secs}`, n, 'higher');
-    player.say(best ? `${n} squares! A new best!` : `${n} squares! Great dashing!`, 'cheer');
+    // No squares is not praised as "great dashing"; one is "1 square".
+    if (!n) player.say('Good try! Play again?', 'talk');
+    else if (n === 1) player.say(best ? '1 square! A new best!' : '1 square! Great dashing!', 'cheer');
+    else player.say(best ? `${n} squares! A new best!` : `${n} squares! Great dashing!`, 'cheer');
     finish(0, { score: n >= 15 ? 3 : n >= 8 ? 2 : 1, stats: { found: n } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [left]);
   useEffect(() => {
     if (!done) player.say(`Find ${target}!`, 'idle');
-    player.progress(score, score);
+    player.progress(score);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target]);
 

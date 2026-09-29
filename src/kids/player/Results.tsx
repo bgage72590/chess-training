@@ -10,6 +10,7 @@ import { BigButton } from '../ui/BigButton';
 import { Confetti } from '../ui/Confetti';
 import { StickerArt } from '../ui/StickerSlot';
 import { KidsIcon } from '../ui/KidsIcon';
+import { Flower } from '../ui/Flower';
 import { stickerDef, TROPHY_BY_ID } from '../curriculum/stickers';
 import { HAT_BY_ID, type HatId } from '../curriculum/wardrobe';
 import { kidSound } from '../lib/kidsSound';
@@ -20,6 +21,11 @@ const DRUM = 650;
 const GAP = 300;
 const FLY = 500;
 const CROWN = 440;
+/** A new Rank crown's badge starts to drop this long after the reveal (after Pip's boss crown, when
+ *  there is one), and lands BADGE_LAND later. */
+const BADGE = 120;
+const BADGE_BOSS = CROWN + 480;
+const BADGE_LAND = 340;
 /** With reduced motion nothing flies or falls, so the same beats come much closer together. */
 export function revealTiming(still: boolean) {
   return still ? { drum: 150, gap: 180, fly: 0, crown: 150 } : { drum: DRUM, gap: GAP, fly: FLY, crown: CROWN };
@@ -36,7 +42,11 @@ export interface ResultsProps {
   hats: HatId[];
   bossPassed?: boolean;
   openedRank?: { rank: number; title: string } | null;
+  /** A crown this run earned for the Rank (`crownFor` is its name). */
   crown?: 'gold' | 'silver' | null;
+  crownFor?: string;
+  /** Today's flower was planted in Pip's Garden by this run: the garden's new total. */
+  garden?: number | null;
   /** A boss below the pass mark: the stars that open the next rank. */
   need?: { stars: number; rank: number } | null;
   extra?: ReactNode;
@@ -64,7 +74,8 @@ export function Results(p: ResultsProps) {
     const flights: (() => void)[] = [];
     const at = (ms: number, f: () => void) => t.push(setTimeout(f, ms));
     let end = 100;
-    const { drum, gap, fly, crown } = revealTiming(motionReduced());
+    const still = motionReduced();
+    const { drum, gap, fly, crown } = revealTiming(still);
     if (p.stars) {
       at(drum, () => setPhase('stars'));
       for (let i = 0; i < p.stars; i++)
@@ -89,6 +100,12 @@ export function Results(p: ResultsProps) {
           setConfetti(Date.now());
         });
       else kidSound('fanfare');
+      // A gold crown finishes a whole Rank: its bell and confetti come as the badge lands.
+      if (p.crown === 'gold' && !p.bossPassed)
+        at(still ? crown : BADGE + BADGE_LAND, () => {
+          kidSound('crown');
+          setConfetti(Date.now());
+        });
       if (p.stickers.length) at(stampAt + 320, () => kidSound('chime'));
       p.onSpeak?.(p.recap);
     });
@@ -150,6 +167,20 @@ export function Results(p: ResultsProps) {
               <KidsIcon name="unlock" size={24} /> Rank {p.openedRank.rank} is open: {p.openedRank.title}!
             </p>
           )}
+          {p.crown && (
+            <p className={`k-results-crown ${p.crown}${done ? ' in' : ' wait'}`} style={{ ['--crown-d' as string]: `${p.bossPassed ? BADGE_BOSS : BADGE}ms` }}>
+              <span className="k-results-crown-badge" aria-hidden="true">
+                <KidsIcon name="crown" size={24} fill />
+              </span>
+              {p.crown === 'gold' ? 'Gold' : 'Silver'} crown for {p.crownFor}!
+              <span className="k-results-crown-shine" aria-hidden="true" />
+            </p>
+          )}
+          {p.garden ? (
+            <p className={`k-results-flower${done ? ' in' : ' wait'}`}>
+              <Flower on i={p.garden - 1} size={22} /> A new garden flower!
+            </p>
+          ) : null}
           {(stickers.length > 0 || p.trophies.length > 0 || p.hats.length > 0) && (
             <div className={`k-results-gifts${done ? ' in' : ' wait'}`} style={{ ['--stamp-d' as string]: `${stampAt}ms` }}>
               {stickers.map((s, i) => (

@@ -3,7 +3,7 @@
 // progress made on either device: nodes, stickers, days and games combine item by item, minutes
 // and stars add up what each device did (sync/tally.ts), and names, avatars and settings follow
 // the device where a grown-up (or the kid) changed them last. Deleted kids stay deleted, a
-// reset wins over progress made before it, and so does a grown-up's "Starting world".
+// reset wins over progress made before it, and so does a grown-up's "Starting rank".
 import { dayKey } from '../../lib/srs';
 import { addSyncPart, sync, syncAvailable, tallyPart } from '../../sync';
 import { filterTally, maxTally, mergeTallied, readTally, type Tally } from '../../sync/tally';
@@ -35,9 +35,14 @@ function mergeNode(x: NodeProgress, y: NodeProgress): NodeProgress {
     last: Math.max(x.last, y.last),
     masteredDays: union(x.masteredDays, y.masteredDays).sort().slice(-2),
     golden: either(x.golden, y.golden, later.golden),
-    tested: either(x.tested, y.tested, later.tested),
     passed: either(x.passed, y.passed, later.passed),
   };
+  // A test-out (the paper plane) only stands until the node is really played on some device: that play
+  // replaced it there, so the stars it earned are the node's own and are never paid into the jar again.
+  // (Both copies still showing it keep it, so merging a copy with itself changes nothing.)
+  const tested = (x.tested && y.tested) || (!x.plays && !y.plays && either(x.tested, y.tested, later.tested));
+  if (tested) out.tested = true;
+  else delete out.tested;
   if (x.won || y.won) out.won = union(x.won, y.won);
   return out;
 }
@@ -83,14 +88,14 @@ export function kidSinceReset(k: KidProfile, at: number): KidProfile {
   };
   if (k.graduated && k.graduated.t < at) delete out.graduated;
   delete out.testedOut;
-  delete out.startAt; // the Starting world went with the test-outs it made
+  delete out.startAt; // the Starting rank went with the test-outs it made
   const tally = filterTally(k.tally, (key) => key.slice(0, 10) > day);
   if (tally) out.tally = tally;
   else delete out.tally;
   return out;
 }
 
-/** What a kid's copy that missed a grown-up's "Starting world" `s` keeps: as on the device where
+/** What a kid's copy that missed a grown-up's "Starting rank" `s` keeps: as on the device where
  *  it was set, the test-out passes from that world on go (played nodes keep their stars), and
  *  before the first puzzle the rating follows the new start. */
 export function kidSinceStart(k: KidProfile, s: NonNullable<KidProfile['startAt']>): KidProfile {

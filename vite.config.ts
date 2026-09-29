@@ -80,5 +80,7 @@ export default defineConfig(({ mode }) => ({
   },
   test: {
     include: ['tests/**/*.test.ts'],
+    // Some tests search thousands of positions: a busy machine makes them slower, never wrong.
+    testTimeout: 120_000,
   },
 }));

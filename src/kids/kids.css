@@ -243,7 +243,7 @@
 
 .k-screen {
   min-height: 100%;
-  padding: 0 var(--k-gutter) calc(var(--k-6) + env(safe-area-inset-bottom, 0px));
+  padding: 0 var(--k-gutter) calc(var(--k-6) + var(--k-safe-b));
   position: relative;
 }
 .k-center {
@@ -493,6 +493,8 @@
 }
 .k-pip svg {
   display: block;
+  width: 100%;
+  height: 100%;
   overflow: visible;
 }
 .k-pip-body {
@@ -784,26 +786,28 @@
   flex-direction: column;
   height: calc(100svh - var(--k-safe-t));
   height: calc(100dvh - var(--k-safe-t));
-  padding: 0 var(--k-gutter) max(12px, env(safe-area-inset-bottom, 0px));
+  padding: 0 var(--k-gutter) max(12px, var(--k-safe-b));
   overflow: hidden;
 }
 .k-topbar {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 64px;
+  min-height: 64px;
   flex: none;
   padding-top: 4px;
 }
 .kids-app[data-band='sprout'] .k-topbar {
-  height: 76px;
+  min-height: 76px;
 }
+/* On a phone the chip wraps under the pips; the bar then grows a little so neither touches an edge. */
 .k-topbar-mid {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 4px 12px;
+  padding: 4px 0;
   min-width: 0;
   flex-wrap: wrap;
 }
@@ -985,13 +989,8 @@
     align-items: center;
     gap: 22px;
   }
-  .k-player-coach .k-pip {
-    width: 120px !important;
-    height: 120px !important;
-  }
-  .k-player-coach .k-pip svg {
-    width: 120px;
-    height: 120px;
+  .k-player-coach {
+    --pip-size: 120px;
   }
   .k-player-coach .k-bubble {
     width: 100%;
@@ -1067,6 +1066,11 @@
     bottom: 12px;
     right: -150px;
   }
+  /* Left-handed, the tray column (where Skip waits) is on the left. */
+  .k-player.left-handed .k-intro-skip {
+    right: auto;
+    left: -150px;
+  }
 }
 .k-parade {
   display: grid;
@@ -1134,7 +1138,7 @@
   z-index: 45;
   display: flex;
   justify-content: center;
-  padding: 0 12px max(12px, env(safe-area-inset-bottom, 0px));
+  padding: 0 12px max(12px, var(--k-safe-b));
   animation: k-sheet-in 280ms var(--k-ease-spring);
 }
 @keyframes k-sheet-in {
@@ -1716,7 +1720,7 @@
   flex-direction: column;
   align-items: center;
   gap: 18px;
-  padding-top: calc(20px + env(safe-area-inset-top, 0px));
+  padding-top: 20px;
   padding-bottom: 90px;
 }
 .k-picker-head {
@@ -1832,7 +1836,7 @@
   bottom: 0;
   display: flex;
   justify-content: space-between;
-  padding: 10px 14px max(10px, env(safe-area-inset-bottom, 0px));
+  padding: 10px 14px max(10px, var(--k-safe-b));
   pointer-events: none;
 }
 .k-corner {
@@ -1902,18 +1906,17 @@
 }
 .k-splash-other {
   position: fixed;
-  top: calc(12px + env(safe-area-inset-top, 0px));
+  top: calc(12px + var(--k-safe-t));
   right: 12px;
 }
 
 /* ================= New player ================= */
-/* The top bars keep clear of a phone's notch or status bar (the app draws edge to edge). */
+/* The top bars sit below a phone's notch or status bar: .kids-app starts every screen below it. */
 .k-screenbar {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: calc(72px + env(safe-area-inset-top, 0px));
-  padding-top: env(safe-area-inset-top, 0px);
+  height: 72px;
 }
 .k-steps {
   flex: 1;
@@ -1961,7 +1964,7 @@
   bottom: 0;
   display: flex;
   justify-content: center;
-  padding: 14px 16px max(16px, env(safe-area-inset-bottom, 0px));
+  padding: 14px 16px max(16px, var(--k-safe-b));
   background: linear-gradient(180deg, transparent, var(--k-meadow) 40%);
 }
 .k-newkid-foot .k-btn {
@@ -2372,7 +2375,7 @@
   left: var(--k-safe-l);
   right: var(--k-safe-r);
   bottom: 0;
-  padding: 16px var(--k-gutter) max(16px, env(safe-area-inset-bottom, 0px));
+  padding: 16px var(--k-gutter) max(16px, var(--k-safe-b));
   background: linear-gradient(180deg, transparent, var(--k-meadow) 45%);
   z-index: 20;
 }
@@ -3359,6 +3362,20 @@
   font-size: 24px;
   font-weight: 700;
 }
+/* A narrow phone: the title sits at the left, like a dialog header, clear of the close button. */
+@media (max-width: 400px) {
+  .k-gate {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .k-gate-title {
+    align-self: stretch;
+    justify-content: flex-start;
+    padding-right: 52px;
+    font-size: 21px;
+    text-align: left;
+  }
+}
 .k-gate-reason,
 .k-gate-help,
 .k-gate-fine,
@@ -3527,8 +3544,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  height: calc(72px + env(safe-area-inset-top, 0px));
-  padding-top: env(safe-area-inset-top, 0px);
+  height: 72px;
 }
 .k-gu-head h1 {
   flex: 1;
@@ -4023,9 +4039,12 @@
 }
 
 /* ================= Toasts ================= */
+/* Just below a screen's top bar (72px), so they never cover its buttons. In the player, Pip's bubble sits
+   right under the bar, so there they rise from the bottom instead: under the board on a tall screen, at
+   the foot of the tray column on a wide one. They never take a tap. */
 .k-toasts {
   position: fixed;
-  top: max(10px, var(--k-safe-t));
+  top: calc(var(--k-safe-t) + 80px);
   left: 50%;
   translate: -50% 0;
   /* Without a width, a fixed box at left 50% may only grow to half the screen: long messages wrapped in a sliver. */
@@ -4061,6 +4080,45 @@
   from {
     transform: translateY(-30px);
     opacity: 0;
+  }
+}
+.kids-app:has(.k-player) .k-toasts {
+  top: auto;
+  bottom: calc(max(12px, var(--k-safe-b)) + 8px);
+}
+.kids-app:has(.k-player) .k-toast {
+  animation-name: k-toast-up;
+}
+@keyframes k-toast-up {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+}
+/* A short phone has only a sliver under the board: a slimmer toast, lower down. */
+@media (max-height: 620px) and (orientation: portrait) {
+  .kids-app:has(.k-player) .k-toasts {
+    bottom: max(6px, var(--k-safe-b));
+  }
+  .kids-app:has(.k-player) .k-toast {
+    min-height: 40px;
+    padding: 4px 14px;
+    font-size: 16px;
+  }
+}
+@media (min-width: 700px) and (min-aspect-ratio: 11/10) {
+  .kids-app:has(.k-player) .k-toasts {
+    left: auto;
+    right: calc(var(--k-gutter) + var(--k-safe-r));
+    translate: none;
+    /* The tray column's width (narrower on a phone on its side). */
+    max-width: clamp(168px, 24vw, 240px);
+    justify-items: end;
+  }
+  .kids-app:has(.k-player.left-handed) .k-toasts {
+    right: auto;
+    left: calc(var(--k-gutter) + var(--k-safe-l));
+    justify-items: start;
   }
 }
 
@@ -4241,6 +4299,111 @@
   }
 }
 
+/* A phone on its side is short: the top bar's buttons move into the side columns (the X and the
+   progress over Pip's column, the hint and speaker over the tray's), so the board gets the whole
+   height. Pip is smaller, a long line shrinks or scrolls inside his bubble, and the sheets are as wide
+   as the tray column. The bar, body and progress wrappers add no box of their own here. */
+@media (min-width: 700px) and (min-aspect-ratio: 11/10) and (max-height: 480px) {
+  .k-player {
+    --side: clamp(168px, 24vw, 210px);
+    display: grid;
+    grid-template-columns: var(--side) minmax(0, 1fr) var(--side);
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'bar main tools'
+      'chip main tray'
+      'path main tray'
+      'coach main tray';
+    column-gap: 14px;
+    padding-top: 6px;
+    padding-bottom: max(10px, var(--k-safe-b));
+  }
+  .k-player.left-handed {
+    grid-template-areas:
+      'bar main tools'
+      'tray main chip'
+      'tray main path'
+      'tray main coach';
+  }
+  .k-player .k-topbar,
+  .k-player .k-topbar-mid,
+  .k-player .k-player-body {
+    display: contents;
+  }
+  .k-topbar > .k-round {
+    grid-area: bar;
+    justify-self: start;
+  }
+  .k-player .k-pips {
+    grid-area: bar;
+    justify-self: end;
+    align-self: center;
+  }
+  .k-player .k-chip {
+    grid-area: chip;
+    justify-self: start;
+    max-width: 100%;
+    height: auto;
+    min-height: 36px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .k-topbar-right {
+    grid-area: tools;
+    justify-self: end;
+  }
+  .k-player > .k-place-path {
+    grid-area: path;
+    justify-content: flex-start;
+  }
+  .k-player-main {
+    grid-area: main;
+  }
+  .k-player-tray {
+    grid-area: tray;
+    min-height: 0;
+  }
+  .k-player-coach {
+    --pip-size: 84px;
+    grid-area: coach;
+    min-height: 0;
+    padding-top: 8px;
+    overflow: hidden;
+  }
+  .k-player-coach .k-coach {
+    max-height: 100%;
+    gap: 14px;
+  }
+  .k-player-coach .k-bubble {
+    flex: 0 1 auto;
+    min-height: 0;
+    padding: 8px 8px 8px 12px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .k-player-coach .k-bubble-text {
+    font-size: min(var(--k-bubble), 20px);
+    line-height: 1.25;
+  }
+  /* The bubble scrolls, which would clip its own tail: Pip holds it instead. */
+  .k-player-coach .k-bubble.tail-left::before {
+    content: none;
+  }
+  .k-player-coach .k-coach-pip::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 3px);
+    translate: -50% 0;
+    border: 10px solid transparent;
+    border-bottom: 14px solid var(--k-card-2);
+    border-top: 0;
+  }
+  .k-player .k-sheet {
+    width: var(--side);
+  }
+}
+
 /* Dots never point into lava: a dot always means a safe square. */
 .kids-board .sq:has(.k-art-lava) .dest {
   display: none;
@@ -4249,13 +4412,63 @@
 /* Results: the recap and the rank line land after the stars fill. */
 .k-results-recap.wait,
 .k-results-open.wait,
-.k-results-need.wait {
+.k-results-need.wait,
+.k-results-crown.wait,
+.k-results-flower.wait {
   visibility: hidden;
 }
 .k-results-recap.in,
 .k-results-open.in,
-.k-results-need.in {
+.k-results-need.in,
+.k-results-flower.in {
   animation: k-fade-in 260ms var(--k-ease-out);
+}
+/* A crown the run earned for the Rank: a silver or gold ribbon with the crown badge (motion-rewards.css). */
+.k-results-crown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 5px 16px 5px 5px;
+  border-radius: var(--k-r-pill);
+  border: 3px solid #1f2a44;
+  background: #e3e7ee;
+  color: #1f2a44;
+  font-family: var(--k-font-display);
+  font-weight: 600;
+  font-size: calc(var(--k-body) - 2px);
+}
+.k-results-crown.gold {
+  background: #fff1c2;
+}
+.k-results-crown-badge {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #1f2a44;
+  color: #8a94a6;
+}
+.k-results-crown.gold .k-results-crown-badge {
+  color: var(--k-sun);
+}
+.k-results-crown-badge .k-icon {
+  stroke: #1f2a44;
+}
+/* Today's flower for Pip's Garden. */
+.k-results-flower {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-family: var(--k-font-display);
+  font-weight: 600;
+  font-size: calc(var(--k-body) - 2px);
+  color: var(--k-ink);
 }
 .k-results-need {
   display: inline-flex;
@@ -4379,7 +4592,8 @@
   color: var(--k-ink-2, var(--k-ink));
 }
 @media (max-width: 420px) {
-  .k-mapbar .k-mute {
+  /* Sprouts' round buttons are bigger; on a narrow bar this one shrinks for them too, so it fits. */
+  .kids-app .k-mapbar .k-mute {
     width: 48px;
     height: 48px;
   }

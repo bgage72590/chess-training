@@ -131,7 +131,7 @@ export function MateDrill({ item, player, onDone, kid }: ActivityProps<MateDrill
       player.best('ladder-moves', n, 'lower');
     }
     if (item.method === 'box') player.award('tr-box');
-    player.say({ all: `Checkmate in ${n} moves! Amazing!`, champion: `Checkmate in ${n} moves.` }, 'cheer');
+    player.say(n === 1 ? { all: 'Checkmate in 1 move! Amazing!', champion: 'Checkmate in 1 move.' } : { all: `Checkmate in ${n} moves! Amazing!`, champion: `Checkmate in ${n} moves.` }, 'cheer');
     const hl = player.hintLevel;
     const score = watching ? 1 : (Math.min(drillScore(n, item.maxMoves), standardScore(mistakes, hl)) as 1 | 2 | 3);
     later(() => onDone({ score, mistakes, hintLevel: hl, golden: score === 3 && mistakes === 0 && hl === 0, stats: { moves: n, maxMoves: item.maxMoves } }), 1800);
