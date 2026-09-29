@@ -30,7 +30,7 @@ export function BreakTime({ kid, onBye, onContinue, resting = false }: { kid: Ki
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resting]);
   return (
-    <div className="k-overlay k-break-wrap" role="dialog" aria-label="Break time">
+    <div className="k-overlay k-break-wrap" role="dialog" aria-modal="true" aria-label="Break time">
       <div className="k-card k-break">
         <Pip mood="sleepy" size={140} />
         <h2 className="k-title">{title}</h2>

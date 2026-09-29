@@ -6,7 +6,7 @@
 // the gate (+10 minutes).
 import { useEffect, useSyncExternalStore } from 'react';
 import { dayKey } from '../../lib/srs';
-import { getKid, updateKid, type KidProfile, type KidSession } from '../store/kidsStore';
+import { getKid, updateKid, type KidProfile, type KidSession, type KidSettings } from '../store/kidsStore';
 
 const IDLE_MS = 120_000;
 const TICK_MS = 5_000;
@@ -16,7 +16,7 @@ export const BREAK_MS = 30 * 60_000;
 export const SESSION_GAP_MS = 30 * 60_000;
 
 /** In-memory part: which kid is being tracked, the last input and the not-yet-saved active time. */
-const live = { kidId: null as string | null, lastInput: Date.now(), unsaved: 0, freshBreak: null as string | null };
+const live = { kidId: null as string | null, lastInput: Date.now(), unsaved: 0, freshBreak: null as string | null, paused: 0 };
 const listeners = new Set<() => void>();
 let version = 0;
 const emit = () => {
@@ -29,7 +29,11 @@ const fresh = (now: number): KidSession => ({ start: now, last: now, min: 0, ext
 /** The kid's current session: the stored one, or a fresh one when the break or the time away is over. */
 export function currentSession(s: KidSession | undefined, now = Date.now()): KidSession {
   if (!s) return fresh(now);
-  if (s.breakAt != null) return now - s.breakAt < BREAK_MS ? s : fresh(now);
+  if (s.breakAt != null) {
+    // A clock set back by hours or days must not keep a child resting until it catches up again.
+    const since = now - s.breakAt;
+    return since > -BREAK_MS && since < BREAK_MS ? s : fresh(now);
+  }
   if (now - s.last > SESSION_GAP_MS || dayKey(s.last) !== dayKey(now)) return fresh(now);
   return s;
 }
@@ -38,6 +42,12 @@ export function currentSession(s: KidSession | undefined, now = Date.now()): Kid
 export function onBreak(kid: KidProfile | undefined | null, now = Date.now()): boolean {
   if (!kid || !kid.settings.sessionMin) return false;
   return currentSession(kid.session, now).breakAt != null;
+}
+
+/** Milliseconds until this kid's break is over (0 when the kid is not resting). */
+export function breakLeft(kid: KidProfile | undefined | null, now = Date.now()): number {
+  if (!onBreak(kid, now)) return 0;
+  return Math.min(2 * BREAK_MS, Math.max(0, kid!.session!.breakAt! + BREAK_MS - now));
 }
 
 /** Active minutes used this session, including time not saved yet. */
@@ -101,8 +111,38 @@ export function extendSession(kidId: string, min = 10, now = Date.now()) {
   emit();
 }
 
+/** A break whose cooldown is over is dropped from the saved session, so a Break time screen still up lets go. */
+export function endExpiredBreak(kidId: string, now = Date.now()): boolean {
+  const k = getKid(kidId);
+  if (!k?.session || k.session.breakAt == null || currentSession(k.session, now) === k.session) return false;
+  updateKid(kidId, (d) => void (d.session = currentSession(d.session, now)));
+  emit();
+  return true;
+}
+
+/** A grown-up changed the session limit: a break the new limit no longer calls for ends now. */
+export function setSessionLimit(kidId: string, min: KidSettings['sessionMin'], now = Date.now()) {
+  flush(kidId, now);
+  updateKid(kidId, (d) => {
+    d.settings.sessionMin = min;
+    const cur = currentSession(d.session, now);
+    if (d.session?.breakAt != null && (!min || cur.min < min + cur.extra)) {
+      const next: KidSession = { ...cur, last: now };
+      delete next.breakAt;
+      d.session = next;
+    }
+  });
+  emit();
+}
+
 export function noteInput() {
   live.lastInput = Date.now();
+}
+
+/** Time does not count toward the limit while a grown-up is in the grown-ups area. Call the result to resume. */
+export function pauseSession(): () => void {
+  live.paused++;
+  return () => void (live.paused = Math.max(0, live.paused - 1));
 }
 
 /** Mount once in KidsApp: tracks active time for the active kid. */
@@ -119,10 +159,13 @@ export function useSessionTracker(kidId: string | null) {
     window.addEventListener('keydown', onInput, true);
     const id = setInterval(() => {
       const now = Date.now();
-      const dt = Math.min(now - last, TICK_MS * 3);
+      // A clock set back gives a negative step: count nothing for it.
+      const dt = Math.max(0, Math.min(now - last, TICK_MS * 3));
       last = now;
       const visible = typeof document === 'undefined' || document.visibilityState === 'visible';
-      if (visible && now - live.lastInput < IDLE_MS) {
+      endExpiredBreak(kidId, now);
+      // A resting child's taps on the break screen are not play time, nor is a grown-up's time in Grown-ups.
+      if (visible && !live.paused && now - live.lastInput < IDLE_MS && !onBreak(getKid(kidId), now)) {
         live.unsaved += dt;
         emit();
         if (live.unsaved >= 30_000) flush(kidId, now);

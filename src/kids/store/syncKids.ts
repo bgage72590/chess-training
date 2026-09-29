@@ -8,7 +8,7 @@ import { dayKey } from '../../lib/srs';
 import { addSyncPart, sync, syncAvailable, tallyPart } from '../../sync';
 import { filterTally, maxTally, mergeTallied, readTally, type Tally } from '../../sync/tally';
 import { placementRating, unplaceFrom } from './progress';
-import { applySyncedKids, getKids, kidCounters, normalizeKids, subscribeKids, SEEN_MAX, FIRSTS_MAX, type DayRecord, type KidProfile, type KidsState, type NodeProgress } from './kidsStore';
+import { applySyncedKids, getKids, kidCounters, normalizeKids, subscribeKids, KIDS_KEEP_MAX, SEEN_MAX, FIRSTS_MAX, type DayRecord, type KidProfile, type KidsState, type NodeProgress } from './kidsStore';
 
 export type SyncedKids = Pick<KidsState, 'kids' | 'family' | 'removed' | 'updatedAt'>;
 
@@ -24,8 +24,10 @@ const union = <T>(a: T[] = [], b: T[] = []) => [...new Set([...a, ...b])];
 /** true if either side is true, else the later side's value (keeps merge(x, x) equal to x). */
 const either = (x: boolean | undefined, y: boolean | undefined, later: boolean | undefined) => (x || y ? true : later);
 
+/** `y` is from the side that changed last, so on a tie it wins: a skip, an easier buddy or a fast-track
+ *  offer taken on that side does not touch `last`, and must not be undone by the older copy. */
 function mergeNode(x: NodeProgress, y: NodeProgress): NodeProgress {
-  const later = y.last > x.last ? y : x;
+  const later = y.last >= x.last ? y : x;
   const out: NodeProgress = {
     ...later,
     stars: Math.max(x.stars, y.stars) as NodeProgress['stars'],
@@ -37,6 +39,16 @@ function mergeNode(x: NodeProgress, y: NodeProgress): NodeProgress {
     passed: either(x.passed, y.passed, later.passed),
   };
   if (x.won || y.won) out.won = union(x.won, y.won);
+  return out;
+}
+
+/** Personal bests where a smaller number is better (the activities' `best(key, value, 'lower')`). */
+const LOWER_BESTS = /^(ladder-moves|solo-resets|trek-)/;
+
+/** Keeps the better value of each personal best, whichever device set it. */
+function mergeBests(a: Rec<number> = {}, b: Rec<number> = {}): Rec<number> {
+  const out: Rec<number> = { ...a };
+  for (const [k, v] of Object.entries(b)) out[k] = k in out ? (LOWER_BESTS.test(k) ? Math.min(out[k], v) : Math.max(out[k], v)) : v;
   return out;
 }
 
@@ -71,6 +83,7 @@ export function kidSinceReset(k: KidProfile, at: number): KidProfile {
   };
   if (k.graduated && k.graduated.t < at) delete out.graduated;
   delete out.testedOut;
+  delete out.startAt; // the Starting world went with the test-outs it made
   const tally = filterTally(k.tally, (key) => key.slice(0, 10) > day);
   if (tally) out.tally = tally;
   else delete out.tally;
@@ -119,7 +132,7 @@ export function mergeKid(a: KidProfile, b: KidProfile): KidProfile {
       bestStreak: Math.max(a.puzzle.bestStreak, b.puzzle.bestStreak),
     },
     bots: mergeRecord(a.bots, b.bots, (x, y) => (x && y ? { w: Math.max(x.w, y.w), d: Math.max(x.d, y.d), l: Math.max(x.l, y.l) } : (x ?? y))),
-    bests: mergeRecord(a.bests, b.bests, (_x, y) => y),
+    bests: mergeBests(a.bests, b.bests),
     days,
     garden: Math.max(a.garden, b.garden),
     firsts: union(a.firsts, b.firsts).slice(-FIRSTS_MAX),
@@ -170,11 +183,21 @@ export function mergeSyncedKids(local: SyncedKids, remote: SyncedKids): SyncedKi
   const resetAt = Math.max(local.family.resetAt ?? 0, remote.family.resetAt ?? 0);
   const [lf, rf] = [local.family, remote.family].map((f) => ((f.resetAt ?? 0) < resetAt ? { stars: 0, parties: 0 } : f));
   const jar = mergeTallied({ stars: lf.stars }, lf.tally, { stars: rf.stars }, rf.tally);
-  const family: SyncedKids['family'] = { stars: jar.counts.stars, parties: Math.max(lf.parties, rf.parties, Math.floor(jar.counts.stars / 100)) };
+  const known = Math.max(lf.parties, rf.parties);
+  const family: SyncedKids['family'] = { stars: jar.counts.stars, parties: Math.max(known, Math.floor(jar.counts.stars / 100)) };
   if (jar.tally) family.tally = jar.tally;
   if (resetAt) family.resetAt = resetAt;
+  // A hundred reached only by adding the devices' stars up: neither device gave the party sticker (see
+  // addFamilyStars), so every kid gets it here.
+  const partyAt = Math.max(local.updatedAt, remote.updatedAt);
+  const withParty = (k: KidProfile): KidProfile => {
+    if (family.parties <= known) return k;
+    const stickers = { ...k.stickers };
+    for (let n = known + 1; n <= family.parties; n++) stickers[`st-family-${n}`] ??= partyAt;
+    return { ...k, stickers };
+  };
   const out: SyncedKids = {
-    kids: kids.filter((k) => !(k.id in removed)),
+    kids: kids.filter((k) => !(k.id in removed)).map(withParty),
     family,
     updatedAt: Math.max(local.updatedAt, remote.updatedAt),
   };
@@ -222,7 +245,7 @@ export function registerKidsSync() {
     read: () => pick(getKids()),
     write: (v) => applySyncedKids(v as SyncedKids),
     merge: (a, b, joining) => mergeSyncedKids(joining ? joiningCopy(a as SyncedKids, b as SyncedKids) : (a as SyncedKids), b as SyncedKids),
-    normalize: (v, parts) => withTallies(pick(normalizeKids({ ...(v as object), v: 1 })), parts[KIDS_TALLY]),
+    normalize: (v, parts) => withTallies(pick(normalizeKids({ ...(v as object), v: 1 }, KIDS_KEEP_MAX)), parts[KIDS_TALLY]),
   });
   addSyncPart(tallyPart(KIDS_TALLY, () => tallies(getKids())));
   subscribeKids(() => {

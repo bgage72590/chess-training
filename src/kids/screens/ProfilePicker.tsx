@@ -16,7 +16,7 @@ import { SpeechBubble } from '../ui/SpeechBubble';
 import { Confetti } from '../ui/Confetti';
 import { requireGate } from '../ui/ParentGate';
 import { sayAs, speech } from '../player/speech';
-import { extendSession, markBreak, noteInput, onBreak, sessionOver } from '../player/useSession';
+import { breakLeft, extendSession, markBreak, noteInput, onBreak, sessionOver } from '../player/useSession';
 import { go } from '../routes';
 import { isKidsLocked } from '../lock';
 import { toast } from '../../lib/toast';
@@ -32,7 +32,8 @@ export function pickKid(kid: KidProfile) {
     go.map();
     return;
   }
-  if (!kid.placed && kid.start !== 'new') go.placement();
+  // Placement is offered again only until the kid has played something (leaving it early is allowed).
+  if (!kid.placed && kid.start !== 'new' && !Object.keys(kid.nodes).length) go.placement();
   else if (!Object.keys(kid.nodes).length) go.play('w1-hello');
   else go.map();
 }
@@ -42,18 +43,27 @@ export function ProfilePicker() {
   const [splash, setSplash] = useState(s.kids.length === 1);
   const [party, setParty] = useState(0);
   useEffect(() => {
-    // A Family Party when the jar crossed a new hundred since the last visit.
+    // A Family Party when the jar crossed a new hundred since the last visit on this device.
     const key = 'tempo.kids.party.seen';
     try {
-      const seen = Number(sessionStorage.getItem(key) ?? '0');
+      const seen = Number(localStorage.getItem(key) ?? '0');
       if (s.family.parties > seen) {
         setParty(Date.now());
-        sessionStorage.setItem(key, String(s.family.parties));
-      }
+        localStorage.setItem(key, String(s.family.parties));
+      } else if (s.family.parties < seen) localStorage.setItem(key, String(s.family.parties)); // the jar was emptied
     } catch {
       /* ignore */
     }
   }, [s.family.parties]);
+
+  // A resting kid's tile and the resting splash wake up by themselves when the break ends.
+  const [, wake] = useState(0);
+  useEffect(() => {
+    const left = s.kids.map((k) => breakLeft(k)).filter((ms) => ms > 0);
+    if (!left.length) return;
+    const t = setTimeout(() => wake((x) => x + 1), Math.min(...left) + 500);
+    return () => clearTimeout(t);
+  }, [s.kids]);
 
   const addKid = () => (s.kids.length ? requireGate('Add a new player.', () => go.newKid()) : go.newKid());
 
@@ -103,9 +113,21 @@ export function ProfilePicker() {
 
   if (splash && s.kids.length === 1) {
     const k = s.kids[0];
+    // The whole screen takes a tap; the button role sits on the card, so the buttons beside it are not nested inside one.
     return (
-      <div className="k-screen k-picker k-splash" onClick={() => pickKid(k)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && pickKid(k)} aria-label={`Hi ${k.name || 'friend'}! Tap to play.`}>
-        <div className="k-splash-card">
+      <div className="k-screen k-picker k-splash" onClick={() => pickKid(k)}>
+        <div
+          className="k-splash-card"
+          role="button"
+          tabIndex={0}
+          aria-label={`Hi ${k.name || 'friend'}! Tap to play.`}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              pickKid(k);
+            }
+          }}
+        >
           <PawnBuddy color={k.avatar.color} face={k.avatar.face} hat={k.graduated ? 'crown' : k.avatar.hat} size={160} className="k-bob" />
           <h1 className="k-title k-splash-hi">Hi {k.name || 'friend'}!</h1>
           <p className="k-splash-tap">
