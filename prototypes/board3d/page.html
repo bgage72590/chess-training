@@ -1,0 +1,185 @@
+<title>Tempo 3D Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,400&family=Source+Sans+3:wght@400;600;700&display=swap" />
+<style>
+  :root {
+    --bg: #f3ecdf;
+    --surface: #fffaf0;
+    --surface-2: #efe5d2;
+    --ink: #2b2117;
+    --ink-2: #6b5a45;
+    --line: #dccdb2;
+    --brass: #a8741b;
+    --brass-strong: #8a5c10;
+    --brass-ink: #fff8e8;
+    --shadow: 0 1px 2px rgb(60 40 15 / 0.08), 0 10px 28px rgb(60 40 15 / 0.1);
+    --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
+    --font-body: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      color-scheme: dark;
+      --bg: #15110d;
+      --surface: #211a13;
+      --surface-2: #2c2319;
+      --ink: #f0e6d2;
+      --ink-2: #b3a288;
+      --line: #3a2f22;
+      --brass: #e0ac4c;
+      --brass-strong: #f0c675;
+      --brass-ink: #1d1407;
+      --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 28px rgb(0 0 0 / 0.35);
+    }
+  }
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --bg: #15110d;
+    --surface: #211a13;
+    --surface-2: #2c2319;
+    --ink: #f0e6d2;
+    --ink-2: #b3a288;
+    --line: #3a2f22;
+    --brass: #e0ac4c;
+    --brass-strong: #f0c675;
+    --brass-ink: #1d1407;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 28px rgb(0 0 0 / 0.35);
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding-inline: 16px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 400 1rem/1.55 var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding-block: 28px 56px; display: flex; flex-direction: column; gap: 18px; }
+  header { display: flex; flex-direction: column; gap: 6px; }
+  .eyebrow { font-weight: 700; font-size: 0.74rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass-strong); }
+  h1 { margin: 0; font: 600 clamp(1.9rem, 1.3rem + 2.4vw, 2.9rem)/1.05 var(--font-display); letter-spacing: -0.015em; text-wrap: balance; }
+  .lede { margin: 0; max-width: 62ch; color: var(--ink-2); font-size: 1.04rem; }
+  .stage {
+    position: relative;
+    height: clamp(380px, min(76vh, 118vw), 820px);
+    border-radius: 18px;
+    overflow: hidden;
+    background: #241e19;
+    box-shadow: var(--shadow);
+    touch-action: none;
+  }
+  .stage canvas { display: block; width: 100%; height: 100%; outline: none; }
+  .status {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: rgb(20 14 9 / 0.62);
+    color: #f6ead5;
+    font-weight: 600;
+    font-size: 0.95rem;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    pointer-events: none;
+  }
+  .loading[hidden] { display: none; }
+  /* A soft vignette over the scene, like a photograph of a lit table. */
+  .stage::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgb(0 0 0 / 0.38) 100%);
+  }
+  .loading {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #e9dcc4;
+    font: italic 400 1.2rem var(--font-display);
+  }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+    gap: 16px 22px;
+  }
+  .group { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .group > span { font-size: 0.76rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 42px;
+    padding: 8px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface-2);
+    color: var(--ink);
+    font: 600 0.95rem var(--font-body);
+    cursor: pointer;
+  }
+  .btn:hover { border-color: var(--brass); }
+  .btn.primary { background: var(--brass); border-color: var(--brass); color: var(--brass-ink); }
+  .btn.primary:hover { background: var(--brass-strong); }
+  .btn[aria-pressed='false'] { opacity: 0.75; }
+  .btn svg { width: 18px; height: 18px; flex: none; }
+  .seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; }
+  .seg button { border: 0; background: none; color: var(--ink-2); font: 600 0.92rem var(--font-body); padding: 7px 14px; border-radius: 7px; cursor: pointer; min-height: 36px; }
+  .seg button[aria-pressed='true'] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / 0.15); }
+  .looks { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+  .looks label { font-size: 0.9rem; color: var(--ink-2); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  button:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+  .tips { margin: 0; color: var(--ink-2); font-size: 0.93rem; max-width: 75ch; }
+  .tips strong { color: var(--ink); }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Prototype</span>
+    <h1>Tempo 3D Board</h1>
+    <p class="lede">Tempo's wooden Staunton pieces, now standing on a lacquered board you can walk around. Play a game against the computer to see how it feels, then try the board, finish and lighting options.</p>
+  </header>
+
+  <div class="stage" id="stage">
+    <div class="status" id="status" role="status" aria-live="polite">Setting up…</div>
+    <div class="loading" id="loading">Setting out the pieces…</div>
+  </div>
+
+  <p class="tips"><strong>Move:</strong> tap a piece, then a square, or drag it. <strong>Look around:</strong> drag the table or the space around the board to turn it, and pinch or scroll to zoom.</p>
+
+  <div class="panel">
+    <div class="group" role="group" aria-labelledby="g-game">
+      <span id="g-game">Game</span>
+      <div class="row">
+        <button class="btn primary" id="btn-new" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>New game</button>
+        <button class="btn" id="btn-undo" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Take back</button>
+        <button class="btn" id="btn-computer" type="button" aria-pressed="true"><span>Computer plays Black</span></button>
+        <button class="btn" id="btn-sound" type="button" aria-pressed="true"><span>Sound on</span></button>
+      </div>
+    </div>
+    <div class="group" role="group" aria-labelledby="g-view">
+      <span id="g-view">View</span>
+      <div class="row">
+        <button class="btn" id="btn-turn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Turn board</button>
+        <button class="btn" id="btn-angled" type="button">Player's view</button>
+        <button class="btn" id="btn-top" type="button">From above</button>
+      </div>
+    </div>
+    <div class="group" role="group" aria-labelledby="g-look">
+      <span id="g-look">Look</span>
+      <div class="looks">
+        <label>Board <span class="seg" id="opt-board"><button type="button" data-v="walnut" aria-pressed="true">Walnut</button><button type="button" data-v="marble" aria-pressed="false">Marble</button></span></label>
+        <label>Finish <span class="seg" id="opt-finish"><button type="button" data-v="satin" aria-pressed="true">Satin</button><button type="button" data-v="gloss" aria-pressed="false">Gloss</button></span></label>
+        <label>Light <span class="seg" id="opt-light"><button type="button" data-v="studio" aria-pressed="true">Studio</button><button type="button" data-v="lamp" aria-pressed="false">Lamp</button></span></label>
+      </div>
+    </div>
+  </div>
+</div>

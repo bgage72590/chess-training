@@ -1080,3 +1080,7 @@ export async function renderAll({ size = 1024, out = 256, only = null, debug = f
   }
   return result;
 }
+
+// Exports for the 3D board prototype (prototypes/board3d).
+export { buildPiece, PALETTE, W_FOOT, RADIUS, blobTexture, material, colorize };
+export const BUILDERS_FOR_BAKE = BUILDERS;

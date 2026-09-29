@@ -1,0 +1,70 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#3a3129"><script type="module">
+// Builds each piece at full detail, simplifies it and returns quantized geometry for the live board.
+import * as THREE from 'three';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { MeshoptSimplifier } from 'meshoptimizer';
+import { BUILDERS_FOR_BAKE } from '../../scripts/pieces/staunton3d.js';
+
+const TARGET = { P: 6000, R: 9000, B: 12000, Q: 12000, K: 12000, N: 26000 };
+const b64 = (arr) => { const u8 = new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength); let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+
+function prep(g) {
+  if (g.attributes.uv) g.deleteAttribute('uv');
+  if (!g.index) {
+    // Extruded parts come as separate triangles: weld them by position (smooth shading over their bevels).
+    g.deleteAttribute('normal');
+    g = mergeVertices(g, 1e-5);
+    g.computeVertexNormals();
+  }
+  if (!g.attributes.normal) g.computeVertexNormals();
+  if (!g.attributes.cavity) g.setAttribute('cavity', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count), 1));
+  return g;
+}
+
+function simplifyPart(g, target) {
+  const n = g.attributes.position.count;
+  const pos = g.attributes.position.array, nrm = g.attributes.normal.array, cav = g.attributes.cavity.array;
+  let out = new Uint32Array(g.index.array), err = 0;
+  if (target && out.length / 3 > target) {
+    const attrs = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) { attrs[i * 4] = nrm[i * 3]; attrs[i * 4 + 1] = nrm[i * 3 + 1]; attrs[i * 4 + 2] = nrm[i * 3 + 2]; attrs[i * 4 + 3] = cav[i]; }
+    [out, err] = MeshoptSimplifier.simplifyWithAttributes(out, new Float32Array(pos), 3, attrs, 4, [0.6, 0.6, 0.6, 0.8], null, target * 3, 0.02, ['LockBorder']);
+  }
+  const remap = new Int32Array(n).fill(-1); let m = 0;
+  for (const v of out) if (remap[v] < 0) remap[v] = m++;
+  const P = new Float32Array(m * 3), N = new Float32Array(m * 3), C = new Float32Array(m);
+  for (let i = 0; i < n; i++) { const j = remap[i]; if (j < 0) continue; P.set(pos.subarray(i * 3, i * 3 + 3), j * 3); N.set(nrm.subarray(i * 3, i * 3 + 3), j * 3); C[j] = cav[i]; }
+  return { P, N, C, I: Uint32Array.from(out, (v) => remap[v]), err };
+}
+
+async function bake(type) {
+  const raw = BUILDERS_FOR_BAKE[type]();
+    const parts = raw.map((g) => ({ simplify: true, g: prep(g) }));
+  const tris = (g) => g.index.count / 3;
+  const before = parts.reduce((s, p) => s + tris(p.g), 0);
+  const budget = TARGET[type] - parts.filter((p) => !p.simplify).reduce((s, p) => s + tris(p.g), 0);
+  const big = parts.filter((p) => p.simplify).reduce((s, p) => s + tris(p.g), 0);
+  const done = parts.map((p) => simplifyPart(p.g, p.simplify ? Math.max(200, Math.round((budget * tris(p.g)) / big)) : 0));
+  const m = done.reduce((s, d) => s + d.C.length, 0);
+  const P = new Float32Array(m * 3), N = new Float32Array(m * 3), C = new Float32Array(m), Iall = [];
+  let off = 0, err = 0;
+  for (const d of done) { P.set(d.P, off * 3); N.set(d.N, off * 3); C.set(d.C, off); for (const v of d.I) Iall.push(v + off); off += d.C.length; err = Math.max(err, d.err); }
+  const I = (m < 65536 ? Uint16Array : Uint32Array).from(Iall);
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < m; i++) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], P[i * 3 + k]); hi[k] = Math.max(hi[k], P[i * 3 + k]); }
+  const qP = new Int16Array(m * 3), qN = new Int8Array(m * 3), qC = new Uint8Array(m);
+  for (let i = 0; i < m; i++) {
+    for (let k = 0; k < 3; k++) { qP[i * 3 + k] = Math.round(((P[i * 3 + k] - lo[k]) / (hi[k] - lo[k])) * 65535 - 32768); qN[i * 3 + k] = Math.round(Math.max(-1, Math.min(1, N[i * 3 + k])) * 127); }
+    qC[i] = Math.round(Math.max(0, Math.min(1, C[i])) * 255);
+  }
+  return { type, before, after: I.length / 3, verts: m, err, lo, hi, pos: b64(qP), nrm: b64(qN), cav: b64(qC), idx: b64(I), idx32: I instanceof Uint32Array };
+}
+
+(async () => {
+  await MeshoptSimplifier.ready;
+  const out = {};
+  const only = new URLSearchParams(location.search).get('only');
+  for (const t of (only ? only.split(',') : ['P', 'R', 'B', 'Q', 'K', 'N'])) out[t] = await bake(t);
+  window.__bake = out;
+})().catch((e) => (window.__bake = { error: String(e && e.stack || e) }));
+</script>
