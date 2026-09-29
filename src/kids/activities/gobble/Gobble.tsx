@@ -90,7 +90,8 @@ function Eat({ item, player, onDone, band }: ActivityProps<EatItem>) {
   }, [stuck, safeStuck]);
 
   useEffect(() => {
-    const buttons: TrayButton[] = [{ id: 'jar', label: '', art: <CandyJar eaten={eaten} sprout={sprout} />, variant: 'plain', onPress: () => {} }];
+    const jar = eaten.reduce((n, p) => n + VALUE[p.toUpperCase()], 0);
+    const buttons: TrayButton[] = [{ id: 'jar', label: '', art: <CandyJar eaten={eaten} sprout={sprout} />, variant: 'plain', inert: true, ariaLabel: `Candy jar: ${jar} ${jar === 1 ? 'point' : 'points'}`, onPress: () => {} }];
     if (stuck || safeStuck) buttons.push({ id: 'reset', label: 'Reset', icon: 'again', variant: 'go', onPress: reset });
     player.setTray(buttons);
     // eslint-disable-next-line react-hooks/exhaustive-deps

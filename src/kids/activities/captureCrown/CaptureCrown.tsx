@@ -10,6 +10,7 @@ import { BigButton } from '../../ui/BigButton';
 import { Pip } from '../../ui/Pip';
 import { friendSeats, GameBar, ResultCard } from '../battle/GameBar';
 import { thinkMs } from '../battle/Battle';
+import { useSheetRoom } from '../useSheetRoom';
 import { crownMoves, crownOutcome, kingInDanger, playCrown, type CrownBotLevel, type CrownItem, type CrownOutcome, type CrownState } from './logic';
 import { crownBotMove, CROWN_VALUE } from './crownBot';
 import './crown.css';
@@ -32,6 +33,9 @@ export function CaptureCrown({ item, player, onDone, kid }: ActivityProps<CrownI
   const [result, setResult] = useState<{ outcome: ItemResult['outcome']; text: string } | null>(null);
   const [flip, setFlip] = useState(false);
   const [round, setRound] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
+  // The danger-bells sheet sits on the bottom of the screen: the board rises clear of it (the kid's king is down there).
+  const room = useSheetRoom(root, !!danger);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const later = (fn: () => void, ms: number) => timers.current.push(setTimeout(fn, ms));
   const clearTimers = () => {
@@ -167,7 +171,7 @@ export function CaptureCrown({ item, player, onDone, kid }: ActivityProps<CrownI
   const orientation = seats && flip && side === 'b' ? 'black' : 'white';
 
   return (
-    <div className="k-game k-crown">
+    <div ref={root} className={`k-game k-crown${room.className}`} style={room.style}>
       <GameBar friend={seats} turn={side} buddy={BUDDY[item.bot]} thinking={thinking} over={!!result} kidColor="w" />
       <div className="k-game-board">
         <KidsBoard
@@ -175,12 +179,13 @@ export function CaptureCrown({ item, player, onDone, kid }: ActivityProps<CrownI
           orientation={orientation}
           interactive={live}
           freeMoves={{ dests, onMove: (from, to) => live && play(st, { from, to }, true) }}
+          onMiss={() => player.sound('boop')}
           lastMove={last}
           art={art}
           arrows={danger ? [{ from: danger.attacker, to: myKing ?? danger.attacker, color: 'red' }] : undefined}
           wobble={wobble}
           hint={live && !seats ? player.hint : null}
-          showDests={(from) => player.band !== 'champion' || dotsFor(kid, st.pos[from])}
+          showDests={(from) => dotsFor(kid, st.pos[from])}
           label={seats ? `Capture the Crown. ${seats[side].name}'s turn.` : 'Capture the Crown board'}
         />
         {result && <ResultCard outcome={result.outcome ?? 'draw'} text={result.text} />}

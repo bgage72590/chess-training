@@ -134,3 +134,19 @@
 .k-player-main > .k-playbot.has-rules {
   width: min(100cqw, calc(100cqh - 180px), 720px);
 }
+
+/* Portrait: an open sheet (danger alarm, mission done, game over) lifts the board clear instead of covering the kid's back rank. */
+.k-player .k-player-main > .k-playbot {
+  transition:
+    width 220ms var(--k-ease-out),
+    margin-bottom 220ms var(--k-ease-out);
+}
+@media not all and (min-width: 700px) and (min-aspect-ratio: 11/10) {
+  .k-player-main > .k-playbot.has-sheet {
+    width: min(100cqw, max(220px, calc(100cqh - 112px - var(--k-room, 0px))), 720px);
+    margin-bottom: var(--k-room, 0px);
+  }
+  .k-player-main > .k-playbot.has-sheet.has-rules {
+    width: min(100cqw, max(220px, calc(100cqh - 180px - var(--k-room, 0px))), 720px);
+  }
+}

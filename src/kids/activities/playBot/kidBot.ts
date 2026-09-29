@@ -297,6 +297,8 @@ export async function wakeEngine(): Promise<boolean> {
  */
 export async function buddyMove(bot: BuddyId, fen: string, rng: () => number): Promise<{ move: Move | null; fellBack: boolean }> {
   if (!ENGINE_BUDDIES.includes(bot)) return { move: jsMove(bot, fen, rng), fellBack: false };
+  // A move that comes before the engine has finished loading waits for it: Bruno is only napping if it really cannot start.
+  if (engine.status === 'idle' || engine.status === 'loading') await wakeEngine();
   if (engine.status === 'ready') {
     try {
       const r = await withTimeout(engine.search(fen, bot === 'bruno' ? { skill: 0, depth: 3, multipv: 3 } : { skill: 3, depth: 6 }), 5000);

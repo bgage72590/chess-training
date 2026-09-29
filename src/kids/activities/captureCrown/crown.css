@@ -13,3 +13,16 @@
 .kids-app[data-motion='reduced'] .k-crown .k-art-danger {
   animation: none;
 }
+
+/* Portrait: the danger-bells sheet lifts the board clear instead of covering the kid's back rank and king. */
+.kids-app .k-player-main > .k-game.k-crown {
+  transition:
+    width 220ms var(--k-ease-out),
+    margin-bottom 220ms var(--k-ease-out);
+}
+@media not all and (min-width: 700px) and (min-aspect-ratio: 11/10) {
+  .kids-app .k-player-main > .k-game.k-crown.has-sheet {
+    width: min(100cqw, max(220px, calc(100cqh - 60px - var(--k-room, 0px))), 720px);
+    margin-bottom: var(--k-room, 0px);
+  }
+}

@@ -68,6 +68,9 @@ export interface TrayButton {
   label: BandText;
   icon?: KidsIconName;
   art?: ReactNode;
+  /** Shown like a button but only informs (the candy jar): no focus, no press, read out by `ariaLabel`. */
+  inert?: boolean;
+  ariaLabel?: string;
   variant?: 'primary' | 'go' | 'info' | 'boss' | 'magic' | 'plain';
   disabled?: boolean;
   onPress(): void;

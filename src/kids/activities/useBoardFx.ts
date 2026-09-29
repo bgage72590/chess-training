@@ -27,17 +27,26 @@ export interface Seen {
   cell: Cell;
   /** The piece's class (pc-bP), to draw it once more as it leaves. */
   cls: string;
+  /** Where a piece that moved came from (tells en passant from a plain step). */
+  from?: Cell;
 }
 
-/** Captures in one board update: pieces that vanished from a cell another colour just arrived on. A big reshuffle (a new puzzle) counts as none. */
+const isPawn = (s: Seen) => s.cls.endsWith('P');
+
+/** En passant: a pawn steps diagonally past an enemy pawn, which vanishes from the square it passed. */
+function passedBy(g: Seen, a: Seen): boolean {
+  return isPawn(g) && isPawn(a) && !!a.from && a.from[1] === g.cell[1] && a.cell[0] === g.cell[0] && Math.abs(a.cell[1] - g.cell[1]) === 1 && Math.abs(a.from[0] - a.cell[0]) === 1;
+}
+
+/** Captures in one board update: pieces that vanished from a cell another colour just arrived on (or, for a pawn, passed en passant). A big reshuffle (a new puzzle) counts as none. */
 export function capturedIn(gone: Seen[], arrived: Seen[]): Seen[] {
   if (gone.length > 3 || arrived.length > 3) return [];
-  return gone.filter((g) => arrived.some((a) => a.color !== g.color && a.cell[0] === g.cell[0] && a.cell[1] === g.cell[1]));
+  return gone.filter((g) => arrived.some((a) => a.color !== g.color && ((a.cell[0] === g.cell[0] && a.cell[1] === g.cell[1]) || passedBy(g, a))));
 }
 
-const seen = (el: HTMLElement, cell: Cell): Seen => {
+const seen = (el: HTMLElement, cell: Cell, from?: Cell): Seen => {
   const m = PIECE.exec(el.className);
-  return { color: m?.[1] ?? '', cell, cls: m?.[0] ?? '' };
+  return { color: m?.[1] ?? '', cell, cls: m?.[0] ?? '', from };
 };
 const isPiece = (n: Node): n is HTMLElement => n instanceof HTMLElement && n.classList.contains('piece') && !n.classList.contains('ghost');
 
@@ -51,6 +60,11 @@ function pieceAt(board: HTMLElement, sq: Sq, orientation: 'white' | 'black'): HT
 /** Scaling (squash, gulp) is done about the foot of the piece's own cell: the piece's transform already holds its position. */
 function anchor(el: HTMLElement, [c, r]: Cell) {
   el.style.transformOrigin = `${c * 100 + 50}% ${r * 100 + 92}%`;
+}
+
+/** The origin only belongs to the running squash or gulp: a drag scales the piece about its own centre. */
+function unanchor(el: HTMLElement) {
+  if (!el.classList.contains('k-land') && !el.classList.contains('k-incheck')) el.style.transformOrigin = '';
 }
 
 /** The dots ripple outward from the piece: 26 ms per square of distance. */
@@ -92,7 +106,13 @@ export function useBoardFx(root: RefObject<HTMLElement | null>, o: { reduced: bo
       }
       el.classList.add('k-land');
       window.clearTimeout(landing.get(el));
-      landing.set(el, later(() => el.classList.remove('k-land'), 900));
+      landing.set(
+        el,
+        later(() => {
+          el.classList.remove('k-land');
+          unanchor(el);
+        }, 900),
+      );
     };
     const poof = ({ cell, cls }: Seen) => {
       const pos = `translate(${cell[0] * 100}%, ${cell[1] * 100}%)`;
@@ -116,7 +136,7 @@ export function useBoardFx(root: RefObject<HTMLElement | null>, o: { reduced: bo
     };
 
     const mo = new MutationObserver((records) => {
-      const moved = new Map<HTMLElement, Cell>();
+      const moved = new Map<HTMLElement, { cell: Cell; from?: Cell }>();
       const added = new Map<HTMLElement, Cell>();
       const gone: Seen[] = [];
       for (const r of records) {
@@ -124,8 +144,9 @@ export function useBoardFx(root: RefObject<HTMLElement | null>, o: { reduced: bo
           const el = r.target as HTMLElement;
           const c = isPiece(el) ? cellOf(el.style.transform) : null;
           if (!c || at.get(el) === c.join()) continue;
+          const prev = at.get(el);
           at.set(el, c.join());
-          moved.set(el, c);
+          moved.set(el, { cell: c, from: prev ? (prev.split(',').map(Number) as Cell) : undefined });
           continue;
         }
         r.addedNodes.forEach((n) => {
@@ -143,16 +164,19 @@ export function useBoardFx(root: RefObject<HTMLElement | null>, o: { reduced: bo
           if (isPiece(n) && c) gone.push(seen(n, c));
         });
       }
-      const arrived = [...moved, ...added].map(([el, c]) => seen(el, c));
+      const arrived = [...[...moved].map(([el, m]) => seen(el, m.cell, m.from)), ...[...added].map(([el, c]) => seen(el, c))];
       capturedIn(gone, arrived).forEach(poof);
-      if (moved.size <= 3) moved.forEach((c, el) => land(el, c));
+      if (moved.size <= 3) moved.forEach((m, el) => land(el, m.cell));
     });
     mo.observe(board, { childList: true, attributes: true, attributeFilter: ['style'], subtree: true });
     return () => {
       mo.disconnect();
       timers.forEach((id) => window.clearTimeout(id));
       board.querySelectorAll('.k-poof, .k-puff').forEach((n) => n.remove());
-      board.querySelectorAll('.k-land').forEach((n) => n.classList.remove('k-land'));
+      board.querySelectorAll<HTMLElement>('.k-land').forEach((n) => {
+        n.classList.remove('k-land');
+        unanchor(n);
+      });
     };
   }, [root, reduced, orientation]);
 
@@ -160,7 +184,10 @@ export function useBoardFx(root: RefObject<HTMLElement | null>, o: { reduced: bo
   useLayoutEffect(() => {
     const board = root.current?.querySelector<HTMLElement>('.board');
     if (!board || reduced) return;
-    board.querySelectorAll('.k-lifted, .k-incheck').forEach((n) => n.classList.remove('k-lifted', 'k-incheck'));
+    board.querySelectorAll<HTMLElement>('.k-lifted, .k-incheck').forEach((n) => {
+      n.classList.remove('k-lifted', 'k-incheck');
+      unanchor(n);
+    });
     if (lift) pieceAt(board, lift, orientation)?.classList.add('k-lifted');
     if (from) board.querySelectorAll<HTMLElement>('.dest, .k-art-dot').forEach((d) => stagger(d, cellOfSq(from, orientation), orientation));
     const chk = board.querySelector<HTMLElement>('.sq.check')?.dataset.square;

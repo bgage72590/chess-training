@@ -12,8 +12,20 @@ const CHOICES = [
 export function KidsPromoPicker({ color, onPick, onCancel, speak }: { color: 'w' | 'b'; onPick(p: 'q' | 'r' | 'b' | 'n'): void; onCancel(): void; speak: boolean }) {
   const first = useRef<HTMLButtonElement>(null);
   useEffect(() => first.current?.focus(), []);
+  // Escape is the same as "Not yet", whichever element has the focus.
+  const cancel = useRef(onCancel);
+  cancel.current = onCancel;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      cancel.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   return (
-    <div className="k-promo" role="dialog" aria-label="Pick a piece for your pawn">
+    <div className="k-promo" role="dialog" aria-modal="true" aria-label="Pick a piece for your pawn">
       <div className="k-promo-card">
         <p className="k-promo-title">Your pawn becomes...</p>
         <div className="k-promo-grid">

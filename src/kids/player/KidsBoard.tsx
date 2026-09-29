@@ -175,6 +175,7 @@ export function KidsBoard(props: KidsBoardProps) {
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (promo) return; // the picker's own buttons take Enter and Space
     const dirs: Record<string, [number, number]> = { ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
     const cur = cursor ?? active ?? (orientation === 'black' ? 'h8' : 'a1');
     if (dirs[e.key]) {

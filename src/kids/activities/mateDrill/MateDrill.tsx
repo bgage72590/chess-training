@@ -6,8 +6,9 @@ import { Chess, type Move } from 'chess.js';
 import type { ActivityProps, HintStep, Sq, SquareTone } from '../types';
 import { standardScore } from '../types';
 import { KidsBoard, useBounce } from '../../player/KidsBoard';
+import { dotsFor } from '../../lib/dots';
 import { fenPlacement } from '../../lib/fen';
-import { engine } from '../../../engine/engine';
+import { engine, useEngineStatus } from '../../../engine/engine';
 import { defend } from './defense';
 import { drillScore, greedyWhiteMove, judgeKidMove, ladderRungs, queenBox, type MateDrillItem } from './logic';
 import './mateDrill.css';
@@ -54,7 +55,7 @@ async function defenderMove(fen: string): Promise<string | null> {
   return m ? uci(m) : null;
 }
 
-export function MateDrill({ item, player, onDone }: ActivityProps<MateDrillItem>) {
+export function MateDrill({ item, player, onDone, kid }: ActivityProps<MateDrillItem>) {
   const [fen, setFen] = useState(item.fen);
   const [lastMove, setLastMove] = useState<[Sq, Sq] | null>(null);
   const [moves, setMoves] = useState(0);
@@ -71,6 +72,8 @@ export function MateDrill({ item, player, onDone }: ActivityProps<MateDrillItem>
   const later = (fn: () => void, ms: number) => timers.current.push(setTimeout(fn, ms));
   const wait = (ms: number) => new Promise<void>((res) => later(res, ms));
   useEffect(() => {
+    // Set again on every mount: Strict Mode runs the cleanup once before the real mount.
+    alive.current = true;
     // Warm the engine up for the next positions; the JS defender covers until (or unless) it is ready.
     if (engine.status === 'idle') engine.init().catch(() => undefined);
     return () => {
@@ -80,8 +83,26 @@ export function MateDrill({ item, player, onDone }: ActivityProps<MateDrillItem>
     };
   }, []);
 
-  // Hints: the rule, then Pip's suggested move (greedy JS: mate, else squeeze without stalemate).
-  const suggestion = useMemo(() => (busy || done ? null : greedyWhiteMove(fen, seen.current)), [fen, busy, done]);
+  // Hints: the rule, then Pip's suggested move. The quick JS squeeze (mate, else squeeze without stalemate) is
+  // safe but slow to finish a ladder (about 3 times the target), so the engine's mating line replaces it once it runs.
+  const engineStatus = useEngineStatus();
+  const squeeze = useMemo(() => (busy || done ? null : greedyWhiteMove(fen, seen.current)), [fen, busy, done]);
+  const [pick, setPick] = useState<{ fen: string; move: Move } | null>(null);
+  useEffect(() => {
+    // Only Stockfish: the pure-JS backup engine searches by the clock and finds no mates.
+    if (busy || done || watching || engineStatus !== 'ready' || engine.kind !== 'stockfish') return;
+    let live = true;
+    void engineMove(fen, 10).then((u) => {
+      const r = u && live ? playUci(fen, u) : null;
+      // Never a move the drill would send back (a hanging piece, a stalemate).
+      const verdict = r && judgeKidMove(fen, r.move)?.verdict;
+      if (r && (verdict === 'ok' || verdict === 'mate')) setPick({ fen, move: r.move });
+    });
+    return () => {
+      live = false;
+    };
+  }, [fen, busy, done, watching, engineStatus]);
+  const suggestion = busy || done ? null : pick?.fen === fen ? pick.move : squeeze;
   useEffect(() => {
     const rule =
       item.method === 'ladder'
@@ -172,7 +193,7 @@ export function MateDrill({ item, player, onDone }: ActivityProps<MateDrillItem>
     for (let i = 0; i < 60 && alive.current; i++) {
       await wait(700);
       const g = greedyWhiteMove(cur, seen.current);
-      const w = (await engineMove(cur, 12)) ?? (g ? uci(g) : null);
+      const w = (engine.kind === 'stockfish' ? await engineMove(cur, 12) : null) ?? (g ? uci(g) : null);
       const r = w ? playUci(cur, w) : null;
       if (!r || !alive.current) break;
       cur = r.fen;
@@ -222,7 +243,7 @@ export function MateDrill({ item, player, onDone }: ActivityProps<MateDrillItem>
         tones={flash}
         overlay={overlay}
         hint={done || watching ? null : player.hint}
-        showDests={true}
+        showDests={(from) => mistakes > 0 || dotsFor(kid, fenPlacement(boardFen)[from]?.toUpperCase())}
         label={`Checkmate drill: move ${moves} of ${item.maxMoves}`}
       />
       <div className="k-matedrill-count" aria-live="polite">

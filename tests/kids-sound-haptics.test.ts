@@ -223,4 +223,25 @@ describe('board fx helpers', () => {
   it('finds a promotion capture (the new queen counts as an arrival)', () => {
     expect(capturedIn([seen('w', [4, 1]), seen('b', [3, 0])], [{ color: 'w', cell: [3, 0], cls: 'pc-wQ' }])).toHaveLength(1);
   });
+
+  it('finds en passant: the passed pawn vanishes beside the square the capturing pawn left', () => {
+    // White d5xe6 en passant: the black pawn on e5 (cell [4, 3]) goes, the white pawn steps [3, 3] -> [4, 2].
+    const passed = seen('b', [4, 3]);
+    const mover = { ...seen('w', [4, 2]), from: [3, 3] as [number, number] };
+    expect(capturedIn([passed], [mover])).toHaveLength(1);
+    // Black exd3 the other way round works too.
+    expect(capturedIn([seen('w', [3, 4])], [{ ...seen('b', [3, 5]), from: [4, 4] as [number, number] }])).toHaveLength(1);
+  });
+
+  it('does not call a pawn that merely stands beside another a capture', () => {
+    const passed = seen('b', [4, 3]);
+    const at = (cell: [number, number], from?: [number, number]) => ({ ...seen('w', cell), from });
+    expect(capturedIn([passed], [at([4, 2])])).toHaveLength(0); // no origin known
+    expect(capturedIn([passed], [at([4, 2], [4, 3])])).toHaveLength(0); // came from the passed pawn's own square
+    expect(capturedIn([passed], [at([4, 2], [3, 4])])).toHaveLength(0); // came from another rank
+    expect(capturedIn([passed], [at([5, 2], [4, 3])])).toHaveLength(0); // landed on another file
+    expect(capturedIn([passed], [{ ...at([4, 2], [3, 3]), cls: 'pc-wN' }])).toHaveLength(0); // not a pawn
+    expect(capturedIn([{ ...passed, cls: 'pc-bN' }], [at([4, 2], [3, 3])])).toHaveLength(0); // a knight is not passed
+    expect(capturedIn([passed], [{ ...at([4, 2], [3, 3]), color: 'b' }])).toHaveLength(0); // own colour
+  });
 });
