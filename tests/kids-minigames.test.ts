@@ -173,6 +173,39 @@ describe('miniBot', () => {
     }
     expect(wins).toBeGreaterThanOrEqual(6);
   });
+
+  // Knight vs three pawns is lost with best play, and a depth-2 bot with almost no slips never lets the kid win it. A node
+  // that shows its next item only after this one is won would then be stuck: every band's version must stay beatable.
+  it('the one-item battles can be won by a kid who thinks two moves ahead but slips now and then', () => {
+    const kid = { depth: 2, r: 0.6 };
+    const winRate = (item: BattleItem, games: number) => {
+      const rules = battleRules(item);
+      let wins = 0;
+      for (let seed = 1; seed <= games; seed++) {
+        const rng = mulberry32(seed * 97);
+        let st = initialState(item);
+        for (let ply = 0; ply < 300; ply++) {
+          const mover = st.turn;
+          const m = miniBotMove(rules, st, mover === 'w' ? kid : item.bot, rng);
+          if (!m) break;
+          const next = playBattle(st, m);
+          const o = battleOutcome(rules, next, mover, next.promoted);
+          if (o) {
+            if (o.winner === 'w') wins++;
+            break;
+          }
+          st = next;
+        }
+      }
+      return wins / games;
+    };
+    for (const band of BANDS) {
+      const knight = resolveItem(W6_BATTLES.items[0], band) as BattleItem;
+      expect(winRate(knight, 30), `knight vs pawns, ${band}`).toBeGreaterThanOrEqual(0.15);
+    }
+    const mini = resolveItem(LEVEL_SETS.get('w5-pawn-war-mini')!.items.find((i) => i.bands?.includes('champion'))!, 'champion') as BattleItem;
+    expect(winRate(mini, 30), 'little pawn war, champion').toBeGreaterThanOrEqual(0.15);
+  }, 120000);
 });
 
 describe('capture the crown', () => {

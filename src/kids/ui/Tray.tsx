@@ -7,12 +7,19 @@ export function Tray({ buttons, band }: { buttons: TrayButton[] | null; band: Ag
   if (!buttons?.length) return null;
   return (
     <div className={`k-tray cols-${band === 'sprout' ? Math.min(2, buttons.length) : Math.min(4, buttons.length)}`}>
-      {buttons.map((b) => (
-        <BigButton key={b.id} variant={b.variant ?? 'plain'} icon={b.icon} disabled={b.disabled} onClick={b.onPress}>
-          {b.art}
-          {bandText(b.label, band)}
-        </BigButton>
-      ))}
+      {buttons.map((b) =>
+        b.inert ? (
+          <div key={b.id} className={`k-btn k-btn-${b.variant ?? 'plain'} k-btn-static`} role="img" aria-label={b.ariaLabel ?? bandText(b.label, band)}>
+            {b.art}
+            {bandText(b.label, band)}
+          </div>
+        ) : (
+          <BigButton key={b.id} variant={b.variant ?? 'plain'} icon={b.icon} disabled={b.disabled} onClick={b.onPress} aria-label={b.ariaLabel}>
+            {b.art}
+            {bandText(b.label, band)}
+          </BigButton>
+        ),
+      )}
     </div>
   );
 }

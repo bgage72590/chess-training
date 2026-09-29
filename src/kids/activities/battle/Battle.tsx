@@ -44,8 +44,8 @@ export function Battle({ item, player, onDone, kid }: ActivityProps<BattleItem>)
   const finish = (o: BattleOutcome) => {
     const outcome: ItemResult['outcome'] = o.winner === null ? 'draw' : o.winner === kidColor ? 'win' : 'loss';
     let text: string;
-    if (seats) text = o.winner === null ? "Stuck! It's a tie." : `${seats[o.winner].name} wins!`;
-    else text = outcome === 'win' ? 'You won!' : outcome === 'draw' ? (o.reason === 'stuck' ? "Stuck! It's a tie" : "It's a tie!") : 'Good game!';
+    if (seats) text = o.winner === null ? (o.reason === 'stuck' ? "Stuck! It's a tie." : "It's a tie!") : `${seats[o.winner].name} wins!`;
+    else text = outcome === 'win' ? 'You won!' : outcome === 'draw' ? (o.reason === 'stuck' ? "Stuck! It's a tie." : "It's a tie!") : 'Good game!';
     setResult({ o, outcome, text });
     if (outcome === 'win' || seats) {
       player.sound('fanfare');
@@ -146,10 +146,11 @@ export function Battle({ item, player, onDone, kid }: ActivityProps<BattleItem>)
           orientation={orientation}
           interactive={live}
           freeMoves={{ dests, onMove }}
+          onMiss={() => player.sound('boop')}
           lastMove={last}
           area={item.area}
           hint={live && !seats ? player.hint : null}
-          showDests={(from) => player.band !== 'champion' || dotsFor(kid, st.pos[from])}
+          showDests={(from) => dotsFor(kid, st.pos[from])}
           label={seats ? `Pawn war board. ${seats[st.turn].name}'s turn.` : 'Battle board'}
         />
         {result && <ResultCard outcome={result.outcome ?? 'draw'} text={result.text} />}

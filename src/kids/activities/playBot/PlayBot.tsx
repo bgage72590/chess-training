@@ -6,6 +6,7 @@ import { Chess, type Move } from 'chess.js';
 import type { ActivityProps, Arrow, ArtKey, Sq, TrayButton } from '../types';
 import { KidsBoard } from '../../player/KidsBoard';
 import { useKidCtx } from '../../player/context';
+import { useSheetRoom } from '../useSheetRoom';
 import { BuddyFace, type BuddyMood } from '../../ui/BuddyFace';
 import { PawnBuddy } from '../../ui/PawnBuddy';
 import { DangerSheet } from '../../ui/DangerSheet';
@@ -79,8 +80,12 @@ export function PlayBot({ item, player, onDone, kid }: ActivityProps<PlayBotItem
   const [missionDone, setMissionDone] = useState<'open' | 'playing' | null>(null);
   const [finished, setFinished] = useState(false); // done: no sheet stays behind the results
   const [replay, setReplay] = useState(false);
+  const [flip, setFlip] = useState(false); // friend games: the board turns to face whoever moves
   const [mood, setMood] = useState<BuddyMood>('happy');
   const said = useRef({ blunder: false, nap: false });
+  const root = useRef<HTMLDivElement>(null);
+  // The alarm, "Mission done" and "Game over" sheets sit on the bottom of the screen: the board rises clear of them.
+  const room = useSheetRoom(root, !!alarm || (!finished && (missionDone === 'open' || !!ended)));
   const recorded = useRef(false);
   const token = useRef(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -238,6 +243,8 @@ export function PlayBot({ item, player, onDone, kid }: ActivityProps<PlayBotItem
     if (!flag) return commit(m, before);
     if (!alarmOn) return commit(m, before, true); // no-hang mission bookkeeping only
     setAlarm({ before, move: m, after: m.after, sq: flag.sq, piece: flag.piece });
+    // The sheet is text: Pip reads the question out for kids who cannot read it (a line that already has a recording).
+    if (band !== 'champion') player.say('Uh-oh, is your piece safe there?', 'wow');
   };
 
   // ---------- buddy moves ----------
@@ -330,9 +337,10 @@ export function PlayBot({ item, player, onDone, kid }: ActivityProps<PlayBotItem
       });
     if (!friend)
       buttons.push({ id: 'hint', label: `Hint (${hintsLeft})`, icon: 'bulb', variant: 'magic', disabled: hintsLeft <= 0 || !kidTurn || thinking || hintBusy, onPress: () => void hint() });
+    else buttons.push({ id: 'flip', label: flip ? 'Flip: on' : 'Flip: off', icon: 'again', variant: flip ? 'info' : 'plain', onPress: () => setFlip((f) => !f) });
     player.setTray(buttons.length ? buttons : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startFen, ended, missionDone, canUndo, takebacks, hintsLeft, kidTurn, thinking, hintBusy, fen]);
+  }, [startFen, ended, missionDone, canUndo, takebacks, hintsLeft, kidTurn, thinking, hintBusy, fen, flip]);
   useEffect(() => () => player.setTray(null), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Threat lights on the kid's turn.
@@ -377,7 +385,7 @@ export function PlayBot({ item, player, onDone, kid }: ActivityProps<PlayBotItem
   const zzz = easeMarks(np?.ease ?? 0);
 
   return (
-    <div className={`k-playbot${reducedMotion ? ' still' : ''}${ticks ? ' has-rules' : ''}`}>
+    <div ref={root} className={`k-playbot${reducedMotion ? ' still' : ''}${ticks ? ' has-rules' : ''}${room.className}`} style={room.style}>
       <div className="k-playbot-card top">
         {friend ? <KidsIcon name="user" size={40} /> : <BuddyFace id={bot} mood={thinking ? 'thinking' : mood} size={44} zzz={zzz} />}
         <span className="k-playbot-name">
@@ -399,10 +407,11 @@ export function PlayBot({ item, player, onDone, kid }: ActivityProps<PlayBotItem
       <div className="k-playbot-board">
         <KidsBoard
           fen={boardFen}
-          orientation={kidColor === 'w' ? 'white' : 'black'}
+          orientation={friend ? (flip && turn === 'b' ? 'black' : 'white') : kidColor === 'w' ? 'white' : 'black'}
           interactive={!ended && !alarm && !thinking && !checking && kidTurn && missionDone !== 'open'}
           playerColor={friend ? undefined : kidColor}
           onMove={(m) => void onMove(m)}
+          onMiss={() => player.sound('boop')}
           lastMove={lastMove}
           art={art}
           arrows={arrows}

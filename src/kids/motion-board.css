@@ -72,6 +72,11 @@
   display: none;
 }
 
+/* A dragged piece scales about its own centre, whatever origin a squash or gulp left on it. */
+.kids-board .board .piece.dragging {
+  transform-origin: 50% 50% !important;
+}
+
 /* The move dots are round. */
 .kids-board .dest:not(.capture) {
   border-radius: 50%;

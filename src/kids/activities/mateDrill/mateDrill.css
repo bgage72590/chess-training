@@ -10,9 +10,9 @@
   pointer-events: none;
 }
 .k-matedrill-rung {
-  background: repeating-linear-gradient(90deg, transparent 0 18%, rgb(63 134 198 / 0.28) 18% 26%, transparent 26% 74%, rgb(63 134 198 / 0.28) 74% 82%, transparent 82%);
-  border-top: 3px solid rgb(63 134 198 / 0.45);
-  border-bottom: 3px solid rgb(63 134 198 / 0.45);
+  background: repeating-linear-gradient(90deg, transparent 0 18%, rgb(63 134 198 / 0.4) 18% 26%, transparent 26% 74%, rgb(63 134 198 / 0.4) 74% 82%, transparent 82%);
+  border-top: 3px solid rgb(63 134 198 / 0.7);
+  border-bottom: 3px solid rgb(63 134 198 / 0.7);
 }
 .k-matedrill-box {
   background: rgb(154 127 230 / 0.26);
@@ -20,8 +20,9 @@
 }
 .k-matedrill-count {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  /* Above the frame, so it never covers a piece on the top rank (the mate often ends on h8). */
+  top: -34px;
+  right: 2px;
   z-index: 20;
   padding: 2px 12px;
   border-radius: var(--k-r-pill);

@@ -39,7 +39,7 @@ export const W5_PAWN_WAR_MINI: LevelSet<BattleItem> = {
   items: [
     { id: 'm-s', bands: S, ...MINI, bot: { depth: 1, r: 1.0 }, say: WAR_SAY, ease: [{ bot: { depth: 1, r: 3 } }, { black: { a7: 'p', b7: 'p' }, bot: { depth: 1, r: 3 } }] },
     { id: 'm-e', bands: E, ...MINI, bot: { depth: 1, r: 0.3 }, say: WAR_SAY, ease: [{ bot: { depth: 1, r: 1 } }, { bot: { depth: 1, r: 3 } }] },
-    { id: 'm-c', bands: C, ...MINI, bot: { depth: 2, r: 0.2 }, say: WAR_SAY, ease: [{ bot: { depth: 1, r: 0.5 } }, { bot: { depth: 1, r: 3 } }] },
+    { id: 'm-c', bands: C, ...MINI, bot: { depth: 2, r: 2.5 }, say: WAR_SAY, ease: [{ bot: { depth: 1, r: 0.5 } }, { bot: { depth: 1, r: 3 } }] },
   ] as Battle[],
 };
 
@@ -74,9 +74,11 @@ export const W6_BATTLES: LevelSet<BattleItem> = {
       white: { g1: 'N' },
       black: B3,
       win: 'stop-pawns',
-      bot: { depth: 2, r: 0.3 },
+      // With best play the pawns win this one and a depth-2 bot never slips, so it could not be beaten (and the node
+      // shows its next item only once this one is won): a gentler bot, one step harder for Champions.
+      bot: { depth: 1, r: 1.0 },
       say: { all: 'Knight against three pawns! Catch every pawn before one reaches your side.', sprout: 'Hop and catch the pawns!' },
-      tune: { sprout: { bot: { depth: 1, r: 1.0 } } },
+      tune: { champion: { bot: { depth: 2, r: 2.0 } } },
       ease: [{ bot: { depth: 1, r: 1 } }, { bot: { depth: 1, r: 3 } }, { black: { a7: 'p', b7: 'p' }, bot: { depth: 1, r: 3 } }],
     },
     {
