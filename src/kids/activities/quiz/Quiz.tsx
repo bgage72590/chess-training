@@ -97,7 +97,7 @@ function QuizCard({ item, player, onDone }: Props) {
         return {
           options: [
             { id: 'check', label: { all: 'Check!', sprout: 'Yes!' }, art: <KingFace mood="scared" /> },
-            { id: 'nothing', label: { all: 'All calm', sprout: 'No' }, art: <KingFace mood="calm" /> },
+            { id: 'nothing', label: { all: 'All fine', sprout: 'No' }, art: <KingFace mood="calm" /> },
           ],
           correct: item.answer,
         };
@@ -105,8 +105,8 @@ function QuizCard({ item, player, onDone }: Props) {
         return {
           options: [
             { id: 'check', label: 'Check', art: <KingFace mood="scared" /> },
-            { id: 'checkmate', label: { all: 'Checkmate', explorer: 'Mate!' }, art: <KingFace mood="mate" /> },
-            { id: 'stalemate', label: { all: 'Stalemate', explorer: 'Tie!' }, art: <KingFace mood="stuck" /> },
+            { id: 'checkmate', label: 'Checkmate', art: <KingFace mood="mate" /> },
+            { id: 'stalemate', label: 'Stalemate', art: <KingFace mood="stuck" /> },
             { id: 'nothing', label: 'All fine', art: <KingFace mood="calm" /> },
           ],
           correct: item.answer,
@@ -273,6 +273,7 @@ function QuizCard({ item, player, onDone }: Props) {
         } else {
           setShownFen(null);
           setLastMove(null);
+          setScale(null);
           setPhase('ask');
           oops(e.say, id);
         }
@@ -470,24 +471,27 @@ function pathTones(fen: string, side: 'k' | 'q'): Record<Sq, SquareTone> {
   return Object.fromEntries(files.map((f) => [f + r, 'hint' as SquareTone]));
 }
 
+// Fixed dark ink: the face is always cream, so bedtime colors must not turn its features light.
+const INK = '#1f2a44';
+
 /** Scared / calm / checkmated / stuck king faces for the answer buttons. */
 function KingFace({ mood }: { mood: 'scared' | 'calm' | 'mate' | 'stuck' }) {
   return (
     <svg className="k-quiz-face" viewBox="0 0 40 40" aria-hidden="true">
-      <path d="M8 14l5 4 7-9 7 9 5-4-2 10H10z" fill="var(--k-sun)" stroke="var(--k-ink)" strokeWidth="2.5" strokeLinejoin="round" />
-      <circle cx="20" cy="29" r="9" fill="#fffaf0" stroke="var(--k-ink)" strokeWidth="2.5" />
+      <path d="M8 14l5 4 7-9 7 9 5-4-2 10H10z" fill="var(--k-sun)" stroke={INK} strokeWidth="2.5" strokeLinejoin="round" />
+      <circle cx="20" cy="29" r="9" fill="#fffaf0" stroke={INK} strokeWidth="2.5" />
       {mood === 'mate' ? (
-        <path d="M14.5 25.5l3 3M17.5 25.5l-3 3M22.5 25.5l3 3M25.5 25.5l-3 3" stroke="var(--k-ink)" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M14.5 25.5l3 3M17.5 25.5l-3 3M22.5 25.5l3 3M25.5 25.5l-3 3" stroke={INK} strokeWidth="1.8" strokeLinecap="round" />
       ) : (
         <>
-          <circle cx="16.5" cy="27" r={mood === 'scared' ? 2 : 1.5} fill="var(--k-ink)" />
-          <circle cx="23.5" cy="27" r={mood === 'scared' ? 2 : 1.5} fill="var(--k-ink)" />
+          <circle cx="16.5" cy="27" r={mood === 'scared' ? 2 : 1.5} fill={INK} />
+          <circle cx="23.5" cy="27" r={mood === 'scared' ? 2 : 1.5} fill={INK} />
         </>
       )}
-      {mood === 'calm' && <path d="M16 31.5c2 2 6 2 8 0" fill="none" stroke="var(--k-ink)" strokeWidth="1.8" strokeLinecap="round" />}
-      {mood === 'scared' && <ellipse cx="20" cy="33" rx="2.2" ry="2.6" fill="var(--k-ink)" />}
-      {mood === 'mate' && <path d="M16 34c2-2 6-2 8 0" fill="none" stroke="var(--k-ink)" strokeWidth="1.8" strokeLinecap="round" />}
-      {mood === 'stuck' && <path d="M16 33h8" stroke="var(--k-ink)" strokeWidth="1.8" strokeLinecap="round" />}
+      {mood === 'calm' && <path d="M16 31.5c2 2 6 2 8 0" fill="none" stroke={INK} strokeWidth="1.8" strokeLinecap="round" />}
+      {mood === 'scared' && <ellipse cx="20" cy="33" rx="2.2" ry="2.6" fill={INK} />}
+      {mood === 'mate' && <path d="M16 34c2-2 6-2 8 0" fill="none" stroke={INK} strokeWidth="1.8" strokeLinecap="round" />}
+      {mood === 'stuck' && <path d="M16 33h8" stroke={INK} strokeWidth="1.8" strokeLinecap="round" />}
       {mood === 'scared' && <path d="M33 2l-5 9h4l-4 8" fill="none" stroke="var(--k-coral-edge)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
     </svg>
   );

@@ -41,6 +41,15 @@
   background-repeat: no-repeat;
   background-position: center;
   vertical-align: middle;
+  /* White pieces sit on cream buttons: a soft dark edge keeps them easy to see. */
+  filter: drop-shadow(0 1px 1.5px rgb(31 42 68 / 0.6));
+}
+
+/* A landscape phone is short: the tray of piece buttons (setup, Magic Memory) takes two columns so all six pieces stay on screen. */
+@media (min-width: 700px) and (min-aspect-ratio: 11/10) and (max-height: 520px) {
+  .k-tray:has(.k-bv-tray-pc) {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 /* Gobble: the candy jar, capture poof, guard eyes and solo capture badges. */

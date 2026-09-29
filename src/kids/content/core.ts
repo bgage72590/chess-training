@@ -9,6 +9,8 @@ import { findMoveActivity } from '../activities/findMove';
 type Star = StarItem & ItemMeta;
 type FM = FindMoveItem & ItemMeta;
 const S: AgeBand[] = ['sprout'];
+const SE: AgeBand[] = ['sprout', 'explorer'];
+const E: AgeBand[] = ['explorer'];
 const EC: AgeBand[] = ['explorer', 'champion'];
 const C: AgeBand[] = ['champion'];
 
@@ -26,8 +28,8 @@ export const W1_HELLO: LevelSet<StarItem> = {
       say: { all: "I'm Pip! This is the rook. It zooms in straight lines, like a train!", champion: 'This is the rook. It moves in straight lines.' },
       pieces: { a1: 'R' },
       arrows: [
-        { from: 'a1', to: 'a8' },
-        { from: 'a1', to: 'h1' },
+        { from: 'a2', to: 'a8' },
+        { from: 'b1', to: 'h1' },
       ],
     },
     { say: 'Watch me!', pieces: { a1: 'R' }, art: { a4: 'star' }, move: ['a1', 'a4'], ms: 1200 },
@@ -35,12 +37,12 @@ export const W1_HELLO: LevelSet<StarItem> = {
     { say: 'Which one is the rook?', pick: { answer: 'R', options: ['N', 'R', 'B'] } },
   ],
   items: [
-    { id: 'h1', pieces: { a1: 'R' }, stars: ['a3'], par: 1, say: { all: 'Move the rook to the star!', sprout: 'Rook to the star!' }, ...sproutArea('a1:d4') },
-    { id: 'h2', pieces: { a1: 'R' }, stars: ['c1'], par: 1, say: { all: 'Now zoom sideways!', sprout: 'Zoom to the star!' }, ...sproutArea('a1:d4') },
-    { id: 'h3', pieces: { b2: 'R' }, stars: ['b4', 'd4'], par: 2, say: 'Get both stars!', ...sproutArea('a1:d4') },
-    { id: 'h4', pieces: { a1: 'R' }, stars: ['a4', 'd4', 'd1'], par: 3, say: 'Three stars! Go!', ...sproutArea('a1:d4') },
-    { id: 'h5', pieces: { a1: 'R' }, stars: ['a8'], par: 1, tier: 2, say: 'Zoom all the way!' },
-    { id: 'h6', pieces: { a1: 'R' }, stars: ['a8', 'h8'], par: 2, tier: 2, say: 'Up and across!' },
+    { id: 'h1', noMirror: true, bands: SE, pieces: { a1: 'R' }, stars: ['a3'], par: 1, say: { all: 'Move the rook to the star!', sprout: 'Rook to the star!' }, ...sproutArea('a1:d4') },
+    { id: 'h2', noMirror: true, bands: SE, pieces: { a1: 'R' }, stars: ['c1'], par: 1, say: { all: 'Now zoom sideways!', sprout: 'Zoom to the star!' }, ...sproutArea('a1:d4') },
+    { id: 'h3', noMirror: true, pieces: { b2: 'R' }, stars: ['b4', 'd4'], par: 2, say: 'Get both stars!', ...sproutArea('a1:d4') },
+    { id: 'h4', noMirror: true, pieces: { a1: 'R' }, stars: ['a4', 'd4', 'd1'], par: 3, say: 'Three stars! Go!', ...sproutArea('a1:d4') },
+    { id: 'h5', noMirror: true, pieces: { a1: 'R' }, stars: ['a8'], par: 1, tier: 2, say: 'Zoom all the way!' },
+    { id: 'h6', noMirror: true, pieces: { a1: 'R' }, stars: ['a8', 'h8'], par: 2, tier: 2, say: 'Up and across!' },
   ],
 };
 
@@ -57,17 +59,22 @@ export const W1_ROOK_STARS: LevelSet<StarItem> = {
     { id: 'r5', pieces: { e4: 'R' }, rocks: ['e6'], stars: ['e7', 'b7', 'b2'], par: 4, tier: 2, say: rookSay },
     { id: 'r6', pieces: { h1: 'R' }, rocks: ['h5', 'e1', 'e3'], stars: ['a8'], par: 3, tier: 2, say: 'Find a way around!' },
     { id: 'r7', pieces: { a1: 'R' }, rocks: ['e1', 'c6'], stars: ['h1', 'h8', 'c8', 'c3'], par: 6, tier: 3, bands: EC, say: 'A long trip. Plan your road!' },
+    { id: 'r8', pieces: { h8: 'R' }, rocks: ['h6', 'f8', 'e5'], stars: ['a8', 'a1', 'h1'], par: 5, tier: 2, bands: EC, say: 'Find a way around!' },
+    { id: 'r9', pieces: { d1: 'R' }, rocks: ['d3', 'b1', 'f1'], stars: ['a4', 'h4', 'd8'], par: 6, tier: 3, bands: EC, say: 'A long trip. Plan your road!' },
   ],
 };
 
 export const W1_BOSS: LevelSet<StarItem> = {
   id: 'w1-boss',
   activity: 'stars',
+  perRun: { explorer: 3, champion: 3 },
   items: [
     { id: 'b1', bands: S, pieces: { a1: 'R' }, rocks: ['b2', 'c3', 'd1'], stars: ['a4', 'd4', 'e2'], area: 'a1:e5', par: 4, say: 'The Rook Maze! Get every star!' },
     { id: 'b2', pieces: { a1: 'R' }, rocks: ['a5', 'b3', 'c3', 'd6', 'f2'], stars: ['a4', 'd4', 'd8', 'h8'], par: 5, tier: 2, say: 'The Rook Maze! Get every star!' },
     { id: 'b3', pieces: { a1: 'R' }, rocks: ['a3', 'c1', 'c4', 'f5', 'g2'], stars: ['b3', 'h3', 'h8', 'a8'], par: 5, tier: 2, say: 'Twisty roads. You can do it!' },
     { id: 'b4', pieces: { e1: 'R' }, rocks: ['e3', 'b1', 'h4', 'b6'], stars: ['a2', 'h2', 'h8', 'a8', 'e5'], par: 7, tier: 3, bands: EC, say: 'Five stars in the maze!' },
+    { id: 'b5', pieces: { h1: 'R' }, rocks: ['h3', 'e1', 'd2', 'g5', 'b6'], stars: ['h2', 'g8', 'a8', 'a3'], par: 6, tier: 2, bands: EC, say: 'Twisty roads. You can do it!' },
+    { id: 'b6', pieces: { a8: 'R' }, rocks: ['a6', 'c8', 'e5', 'c2', 'f3'], stars: ['a7', 'h7', 'h1', 'c1'], par: 4, tier: 2, say: 'The Rook Maze! Get every star!' },
   ],
 };
 
@@ -77,7 +84,7 @@ export const W2_BISHOP_STARS: LevelSet<StarItem> = {
   id: 'w2-bishop-stars',
   activity: 'stars',
   intro: [
-    { say: { all: 'This is the bishop. She slides on slanty lines!', champion: 'The bishop moves diagonally.' }, pieces: { c1: 'B' }, arrows: [{ from: 'c1', to: 'h6' }, { from: 'c1', to: 'a3' }] },
+    { say: { all: 'This is the bishop. She slides on slanty lines!', champion: 'The bishop moves diagonally.' }, pieces: { c1: 'B' }, arrows: [{ from: 'd2', to: 'h6' }, { from: 'b2', to: 'a3' }] },
     { say: 'Watch me!', pieces: { c1: 'B' }, art: { f4: 'star' }, move: ['c1', 'f4'], ms: 1200 },
     { say: 'Your turn!', ms: 600 },
     { say: 'Which one is the bishop?', pick: { answer: 'B', options: ['R', 'B', 'N'] } },
@@ -90,16 +97,21 @@ export const W2_BISHOP_STARS: LevelSet<StarItem> = {
     { id: 's5', pieces: { f1: 'B' }, stars: ['h3', 'c8', 'a6'], par: 3, tier: 2, say: bishopSay },
     { id: 's6', pieces: { c1: 'B' }, rocks: ['e3'], stars: ['f4', 'h6', 'd2'], par: 5, tier: 2, say: 'A rock is in the way!' },
     { id: 's7', pieces: { f1: 'B' }, rocks: ['d3'], stars: ['h1', 'a6'], par: 4, tier: 3, say: 'Think before you slide!' },
+    { id: 's8', pieces: { c1: 'B' }, stars: ['h6', 'a3', 'e7'], par: 4, tier: 2, say: bishopSay },
+    { id: 's9', pieces: { e1: 'B' }, stars: ['a5', 'h4', 'c7'], par: 4, tier: 2, say: 'Think before you slide!' },
   ],
 };
 
 export const W2_BOSS: LevelSet<StarItem> = {
   id: 'w2-boss',
   activity: 'stars',
+  perRun: { explorer: 2, champion: 2 },
   items: [
     { id: 'b1', bands: S, pieces: { a1: 'R', c1: 'B' }, stars: ['a4', 'b2', 'd2'], area: 'a1:d4', par: 4, say: 'Two friends! Tap the one you want to move.' },
     { id: 'b2', pieces: { a1: 'R', f1: 'B' }, stars: ['a8', 'h3', 'c4'], par: 4, say: 'Rook and bishop work together!' },
     { id: 'b3', pieces: { a1: 'R', c1: 'B' }, rocks: ['a5', 'd2'], stars: ['a4', 'g5', 'h8', 'e3'], par: 6, tier: 2, say: 'Which friend should go first?' },
+    { id: 'b4', pieces: { a1: 'R', f1: 'B' }, rocks: ['a3', 'e2'], stars: ['a8', 'h3', 'c8', 'g4'], par: 5, tier: 2, say: 'Which friend should go first?' },
+    { id: 'b5', pieces: { h1: 'R', c1: 'B' }, rocks: ['h5', 'f4'], stars: ['h8', 'a3', 'e8'], par: 4, say: 'Rook and bishop work together!' },
   ],
 };
 
@@ -109,7 +121,7 @@ export const W3_QUEEN_STARS: LevelSet<StarItem> = {
   id: 'w3-queen-stars',
   activity: 'stars',
   intro: [
-    { say: { all: 'This is the queen. She goes straight AND slanty!', champion: 'The queen moves like a rook and a bishop.' }, pieces: { d1: 'Q' }, arrows: [{ from: 'd1', to: 'd8' }, { from: 'd1', to: 'h5' }, { from: 'd1', to: 'a4' }] },
+    { say: { all: 'This is the queen. She goes straight AND slanty!', champion: 'The queen moves like a rook and a bishop.' }, pieces: { d1: 'Q' }, arrows: [{ from: 'd2', to: 'd8' }, { from: 'e2', to: 'h5' }, { from: 'c2', to: 'a4' }] },
     { say: 'Watch me!', pieces: { d1: 'Q' }, art: { h5: 'star' }, move: ['d1', 'h5'], ms: 1200 },
     { say: 'Your turn!', ms: 600 },
     { say: 'Which one is the queen?', pick: { answer: 'Q', options: ['K', 'Q', 'B'] } },
@@ -120,6 +132,8 @@ export const W3_QUEEN_STARS: LevelSet<StarItem> = {
     { id: 'q3', pieces: { d1: 'Q' }, rocks: ['d4', 'e2', 'c2'], stars: ['d8', 'h5', 'a8'], par: 5, tier: 2, say: 'Rocks all around!' },
     { id: 'q4', pieces: { d1: 'Q' }, rocks: ['d4'], stars: ['d8', 'a5', 'h5', 'h1', 'a1'], par: 5, tier: 2, say: 'Five stars for the queen!' },
     { id: 'q5', pieces: { h1: 'Q' }, rocks: ['g2', 'h4', 'e1'], stars: ['a8', 'b1'], par: 5, tier: 3, say: 'Find the secret road!' },
+    { id: 'q6', pieces: { d1: 'Q' }, stars: ['a4', 'h5', 'h8', 'a1'], par: 4, tier: 2, say: queenSay },
+    { id: 'q7', pieces: { a1: 'Q' }, rocks: ['b2', 'a3', 'b1'], stars: ['h8', 'a8', 'h1'], par: 5, tier: 3, bands: EC, say: 'Find the secret road!' },
   ],
 };
 
@@ -140,6 +154,8 @@ export const W3_KING_STARS: LevelSet<StarItem> = {
     { id: 'k3', pieces: { e1: 'K' }, stars: ['e2', 'f3', 'g2'], par: 3, say: kingSay },
     { id: 'k4', pieces: { a1: 'K' }, rocks: ['b2', 'b1', 'a3', 'c3'], stars: ['a4'], par: 3, tier: 2, say: 'Squeeze past the rocks!' },
     { id: 'k5', pieces: { e1: 'K' }, stars: ['e8'], par: 7, tier: 2, say: 'The king walks slowly!' },
+    { id: 'k6', pieces: { d1: 'K' }, stars: ['d3', 'f3', 'f5'], par: 6, tier: 2, say: kingSay },
+    { id: 'k7', pieces: { h1: 'K' }, rocks: ['g2', 'h2'], stars: ['g1', 'h4'], par: 4, tier: 2, say: 'Squeeze past the rocks!' },
   ],
 };
 
@@ -148,6 +164,7 @@ const lavaSay = { all: "Get the star, but don't step in the lava!", sprout: 'No 
 export const W3_KING_LAVA: LevelSet<StarItem> = {
   id: 'w3-king-lava',
   activity: 'stars',
+  perRun: { explorer: 3, champion: 3 },
   intro: [
     { say: { all: 'This knight statue is sleeping. The glowing squares are lava!', champion: 'Squares the statue attacks are lava.' }, pieces: { e1: 'K' }, fen: '8/8/8/4n3/8/8/8/4K3 w - - 0 1', art: { d3: 'lava', f3: 'lava', c4: 'lava', g4: 'lava', c6: 'lava', g6: 'lava', d7: 'lava', f7: 'lava' } },
     { say: 'The king never steps where he can be taken.', ms: 1200 },
@@ -157,17 +174,23 @@ export const W3_KING_LAVA: LevelSet<StarItem> = {
     { id: 'l2', pieces: { e1: 'K' }, statues: { e5: 'n' }, stars: ['e8'], par: 7, say: lavaSay },
     { id: 'l3', pieces: { e1: 'K' }, statues: { d5: 'b' }, stars: ['e8'], par: 7, tier: 2, say: lavaSay },
     { id: 'l4', pieces: { a1: 'K' }, statues: { c3: 'n', e6: 'b' }, stars: ['h8'], par: 8, tier: 3, bands: EC, say: 'Two statues. Careful!' },
+    { id: 'l5', pieces: { h1: 'K' }, statues: { g4: 'n' }, stars: ['h8'], par: 7, say: lavaSay },
+    { id: 'l6', pieces: { h1: 'K' }, statues: { f4: 'b' }, stars: ['h8'], par: 7, tier: 2, say: lavaSay },
+    { id: 'l7', pieces: { e1: 'K' }, statues: { c4: 'n', g5: 'b' }, stars: ['e8'], par: 7, tier: 3, bands: EC, say: 'Two statues. Careful!' },
   ],
 };
 
 export const W3_BOSS: LevelSet<StarItem> = {
   id: 'w3-boss',
   activity: 'stars',
+  perRun: { explorer: 3, champion: 3 },
   items: [
     { id: 'b1', bands: S, pieces: { a1: 'Q' }, statues: { c3: 'n' }, stars: ['d4', 'b4'], area: 'a1:d4', par: 3, say: lavaSay },
     { id: 'b2', pieces: { d1: 'Q' }, statues: { f6: 'n' }, stars: ['d8', 'h4'], par: 3, say: lavaSay },
     { id: 'b3', pieces: { e1: 'K' }, statues: { c4: 'b', f5: 'n' }, stars: ['e8'], par: 7, tier: 2, say: 'Walk the king through the garden!' },
     { id: 'b4', pieces: { d1: 'Q' }, rocks: ['d3'], statues: { f5: 'r' }, stars: ['d8', 'h1', 'a4'], par: 5, tier: 2, say: 'Rocks and lava!' },
+    { id: 'b5', pieces: { d1: 'Q' }, statues: { e5: 'b' }, stars: ['d8', 'h1', 'a5'], par: 4, say: lavaSay },
+    { id: 'b6', pieces: { h1: 'K' }, statues: { f5: 'n', d3: 'b' }, stars: ['h8'], par: 7, tier: 3, bands: EC, say: 'Walk the king through the garden!' },
   ],
 };
 
@@ -190,27 +213,36 @@ export const W4_KNIGHT_HOPS: LevelSet<StarItem> = {
     { id: 'n5', pieces: { b1: 'N' }, stars: ['c3', 'e4', 'g5'], par: 3, tier: 2, say: knightSay },
     { id: 'n6', pieces: { a1: 'N' }, stars: ['b1'], par: 3, tier: 2, say: 'Right next door takes 3 hops!' },
     { id: 'n7', pieces: { a1: 'N' }, stars: ['b2'], par: 4, tier: 3, say: 'A tricky one!' },
+    { id: 'n8', pieces: { g1: 'N' }, stars: ['f3', 'd4', 'b5'], par: 3, say: knightSay },
+    { id: 'n9', pieces: { a1: 'N' }, stars: ['c2', 'b4', 'd5'], par: 3, tier: 2, say: 'A tricky one!' },
   ],
 };
 
 export const W4_KNIGHT_JUMP: LevelSet<StarItem> = {
   id: 'w4-knight-jump',
   activity: 'stars',
+  perRun: { explorer: 3, champion: 3 },
   items: [
     { id: 'j1', pieces: { b1: 'N' }, rocks: ['a1', 'a2', 'b2', 'c2', 'c1'], stars: ['c3', 'e2'], par: 2, say: 'Knights jump over!' },
     { id: 'j2', pieces: { g1: 'N' }, rocks: ['f1', 'h1', 'f2', 'g2', 'h2'], stars: ['f3', 'h3'], par: 3, say: 'Jump over the rocks!' },
     { id: 'j3', pieces: { d4: 'N' }, rocks: ['c4', 'e4', 'd3', 'd5', 'c3', 'e3', 'c5', 'e5'], stars: ['e6', 'b3', 'f2'], par: 6, tier: 2, say: 'Hop out of the rock ring!' },
+    { id: 'j4', pieces: { d1: 'N' }, rocks: ['c1', 'e1', 'c2', 'd2', 'e2'], stars: ['b2', 'f2'], par: 3, say: 'Jump over the rocks!' },
+    { id: 'j5', pieces: { e1: 'N' }, rocks: ['d1', 'f1', 'd2', 'e2', 'f2'], stars: ['c2', 'g2', 'd3'], par: 5, tier: 2, bands: EC, say: 'Knights jump over!' },
+    { id: 'j6', pieces: { d4: 'N' }, rocks: ['c4', 'e4', 'd3', 'd5', 'c3', 'e3', 'c5', 'e5', 'b3', 'f5'], stars: ['b5', 'f3', 'd2'], par: 4, tier: 3, bands: EC, say: 'Hop out of the rock ring!' },
   ],
 };
 
 export const W4_BOSS: LevelSet<StarItem> = {
   id: 'w4-boss',
   activity: 'stars',
+  perRun: { explorer: 2, champion: 3 },
   items: [
     { id: 'b1', bands: S, pieces: { b1: 'N' }, stars: ['c3', 'd5'], area: 'a1:d6', par: 2, say: 'Knight Trek! Hop hop!' },
     { id: 'b2', pieces: { b1: 'N' }, stars: ['c3', 'e4', 'g5', 'h7'], par: 4, say: 'Knight Trek! Hop to every star!' },
     { id: 'b3', pieces: { b1: 'N' }, rocks: ['c3', 'd2'], stars: ['e4', 'g5', 'f7'], par: 6, tier: 2, say: 'The easy hops are blocked!' },
     { id: 'b4', pieces: { a1: 'N' }, stars: ['h8'], par: 6, tier: 3, bands: C, say: 'Corner to corner! How few hops can you do it in?', awardOnDone: 'st-knight-trek', bestKey: 'trek-a1h8' },
+    { id: 'b5', bands: SE, pieces: { b1: 'N' }, rocks: ['c3', 'a3'], stars: ['d2', 'e4', 'f6'], par: 3, say: 'Knight Trek! Hop to every star!' },
+    { id: 'b6', bands: E, pieces: { g1: 'N' }, rocks: ['f3', 'h3'], stars: ['e2', 'd4', 'b5', 'a7'], par: 4, tier: 2, say: 'The easy hops are blocked!' },
   ],
 };
 
@@ -218,7 +250,7 @@ export const W5_PAWN_STEPS: LevelSet<StarItem> = {
   id: 'w5-pawn-steps',
   activity: 'stars',
   intro: [
-    { say: { all: 'This is a pawn. Pawns march straight ahead, one step at a time.', champion: 'Pawns move straight forward.' }, pieces: { e2: 'P' }, arrows: [{ from: 'e2', to: 'e4' }] },
+    { say: { all: 'This is a pawn. Pawns march straight ahead, one step at a time.', champion: 'Pawns move straight forward.' }, pieces: { e2: 'P' }, arrows: [{ from: 'e3', to: 'e4' }] },
     { say: 'On its first move, a pawn may take two steps!', pieces: { e2: 'P' }, art: { e4: 'star' }, move: ['e2', 'e4'], ms: 1200 },
     { say: 'Your turn!', ms: 600 },
     { say: 'Which one is the pawn?', pick: { answer: 'P', options: ['P', 'K', 'B'] } },
@@ -228,16 +260,21 @@ export const W5_PAWN_STEPS: LevelSet<StarItem> = {
     { id: 'p2', pieces: { e2: 'P' }, stars: ['e3', 'e5'], par: 3, say: 'March to both stars!' },
     { id: 'p3', pieces: { d2: 'P' }, stars: ['d4', 'd6'], par: 3, say: 'March, march!' },
     { id: 'p4', pieces: { a2: 'P', h2: 'P' }, stars: ['a4', 'h4'], par: 2, tier: 2, say: 'Two pawns, two stars!' },
+    { id: 'p5', pieces: { c2: 'P' }, stars: ['c3', 'c5'], par: 3, say: 'March, march!' },
+    { id: 'p6', pieces: { b2: 'P', g2: 'P' }, stars: ['b4', 'g3'], par: 2, tier: 2, say: 'Two pawns, two stars!' },
   ],
 };
 
 export const W5_PROMO: LevelSet<StarItem> = {
   id: 'w5-promo',
   activity: 'stars',
+  perRun: { explorer: 3, champion: 3 },
   items: [
     { id: 'm1', pieces: { b7: 'P' }, stars: ['b8', 'h2'], par: 2, say: 'Reach the end and become a queen!' },
     { id: 'm2', pieces: { e6: 'P' }, stars: ['e8', 'a4'], par: 3, say: 'March, then fly as a queen!' },
     { id: 'm3', pieces: { g5: 'P' }, stars: ['g8', 'a2'], par: 4, tier: 2, say: 'Crown the pawn!' },
+    { id: 'm4', pieces: { a6: 'P' }, stars: ['a8', 'h1'], par: 3, tier: 2, say: 'March, then fly as a queen!' },
+    { id: 'm5', pieces: { d5: 'P', h6: 'P' }, stars: ['d8', 'h8', 'a1'], par: 5, tier: 3, bands: EC, say: 'Crown the pawn!' },
   ],
 };
 
@@ -251,6 +288,7 @@ export const W6_LAVA: LevelSet<StarItem> = {
     { id: 'v4', pieces: { c1: 'B' }, statues: { f6: 'p', b6: 'n' }, stars: ['h6', 'a3'], par: 3, tier: 2, say: lavaSay },
     { id: 'v5', pieces: { h1: 'R' }, statues: { d4: 'q' }, stars: ['a8'], par: 3, tier: 2, say: 'A queen statue makes lots of lava!' },
     { id: 'v6', pieces: { e1: 'K' }, statues: { e5: 'n' }, stars: ['e8'], par: 7, tier: 2, say: 'Walk the king safely!' },
+    { id: 'v7', pieces: { g1: 'N' }, statues: { e5: 'r' }, stars: ['h6', 'd3'], par: 6, tier: 2, bands: EC, say: 'The rook statue guards a whole road!' },
   ],
 };
 
@@ -289,7 +327,7 @@ export const W7_CHECK: LevelSet<FindMoveItem> = {
   id: 'w7-check',
   activity: 'find-move',
   intro: [
-    { say: { all: "Check means the king is standing in lava! Let's attack the king.", champion: 'Check: the king is attacked.' }, fen: '4k3/8/8/8/8/8/8/R3K3 w - - 0 1', arrows: [{ from: 'a1', to: 'a8' }] },
+    { say: { all: "Check means the king is standing in lava! Let's attack the king.", champion: 'Check: the king is attacked.' }, fen: '4k3/8/8/8/8/8/8/R3K3 w - - 0 1', arrows: [{ from: 'a2', to: 'a8' }] },
     { say: 'Watch me!', fen: '4k3/8/8/8/8/8/8/R3K3 w - - 0 1', move: ['a1', 'a8'], ms: 1400 },
     { say: 'Your turn!', ms: 600 },
   ],

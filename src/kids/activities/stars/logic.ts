@@ -3,6 +3,7 @@ import type { AgeBand, ItemMeta, Placement, Sq } from '../types';
 import { isSq } from '../../lib/fen';
 import { starLava, starSolve, sqRange, type StarPuzzle } from '../../lib/miniRules';
 import { pick, shuffle } from '../../lib/rng';
+import { flipArea, flipPlacement, flipSqs } from '../../lib/mirror';
 import { SQUARE_RE } from '../../lib/pronounce';
 import { bandText } from '../types';
 
@@ -17,6 +18,23 @@ export interface StarItem extends StarPuzzle {
   bestKey?: string;
   /** Moment sticker granted when the item is completed (e.g. st-knight-trek). */
   awardOnDone?: string;
+  /** Never shown reflected (the very first lessons). */
+  noMirror?: boolean;
+}
+
+/** May a run show this item reflected left to right? Not the first lessons, best-score items or sticker items. */
+export const canMirror = (item: StarItem) => !item.noMirror && !item.bestKey && !item.awardOnDone;
+
+/** The item reflected left to right; par and solvability are unchanged. */
+export function mirrorStar<T extends StarItem>(item: T): T {
+  return {
+    ...item,
+    pieces: flipPlacement(item.pieces),
+    stars: flipSqs(item.stars),
+    ...(item.rocks ? { rocks: flipSqs(item.rocks) } : {}),
+    ...(item.statues ? { statues: flipPlacement(item.statues) } : {}),
+    ...(item.area ? { area: flipArea(item.area) } : {}),
+  };
 }
 
 export const PIECE_NAME: Record<string, string> = { K: 'king', Q: 'queen', R: 'rook', B: 'bishop', N: 'knight', P: 'pawn' };

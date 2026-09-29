@@ -1,16 +1,20 @@
 // Star Collector: move your piece(s) by their own rules to collect every star. Rocks block,
 // sleeping statues make lava (landing there bounces back), pawns promote into queens.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { ActivityProps, ArtKey, HintStep, Placement, Sq } from '../types';
+import type { ActivityProps, ArtKey, HintStep, PieceCode, Placement, Sq } from '../types';
 import { standardScore } from '../types';
 import { applyMove, attacks, starDests, starLava, starSolve } from '../../lib/miniRules';
 import { placementFen } from '../../lib/fen';
 import { KidsBoard, useBounce } from '../../player/KidsBoard';
 import { dotsFor } from '../../lib/dots';
-import { ruleFor, starScore, PIECE_NAME, type StarItem } from './logic';
+import { plural } from '../../lib/plural';
+import { canMirror, mirrorStar, ruleFor, starScore, PIECE_NAME, type StarItem } from './logic';
 import './stars.css';
 
-export function StarCollector({ item, player, onDone, kid }: ActivityProps<StarItem>) {
+export function StarCollector({ item: authored, player, onDone, kid }: ActivityProps<StarItem>) {
+  // Half the runs see the board reflected left to right, so a replay is not the same picture.
+  const [mirrored] = useState(() => canMirror(authored) && player.rng() < 0.5);
+  const item = useMemo(() => (mirrored ? mirrorStar(authored) : authored), [mirrored, authored]);
   const [pieces, setPieces] = useState<Placement>(item.pieces);
   const [collected, setCollected] = useState<Sq[]>([]);
   const [moves, setMoves] = useState(0);
@@ -22,7 +26,7 @@ export function StarCollector({ item, player, onDone, kid }: ActivityProps<StarI
   const [dotsUntil, setDotsUntil] = useState(0);
   const [wobble, setWobble] = useState<Sq | null>(null);
   const [lastMove, setLastMove] = useState<[Sq, Sq] | null>(null);
-  const [demo, setDemo] = useState<{ pieces: Placement; trail: Sq[]; last: [Sq, Sq] | null } | null>(null);
+  const [demo, setDemo] = useState<{ pieces: Placement; trail: [Sq, PieceCode][]; last: [Sq, Sq] | null } | null>(null);
   const [done, setDone] = useState(false);
   const { shown, bounce, bouncing } = useBounce();
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -66,11 +70,11 @@ export function StarCollector({ item, player, onDone, kid }: ActivityProps<StarI
     if (player.hintLevel !== 4 || demoFor.current === moves || !route?.path.length) return;
     demoFor.current = moves;
     let p = pieces;
-    const trail: Sq[] = [];
+    const trail: [Sq, PieceCode][] = [];
     setDemo({ pieces: p, trail: [], last: null });
     route.path.forEach(([a, b], i) => {
       later(() => {
-        trail.push(a);
+        trail.push([a, p[a] ?? 'R']); // the trail shows the piece that left each square
         p = applyMove(p, a, b);
         setDemo({ pieces: p, trail: [...trail], last: [a, b] });
         player.sound('move');
@@ -159,7 +163,7 @@ export function StarCollector({ item, player, onDone, kid }: ActivityProps<StarI
   if (lavaVisible) for (const sq of lava) if (!statues[sq] && !item.rocks?.includes(sq)) add(sq, 'lava');
   for (const r of item.rocks ?? []) add(r, 'rock');
   for (const s of remaining) if (!demo || !Object.keys(shownPieces).includes(s)) add(s, 'star');
-  for (const t of demo?.trail ?? []) add(t, `ghost:${pieces[t] ?? 'R'}` as ArtKey);
+  for (const [t, pc] of demo?.trail ?? []) add(t, `ghost:${pc}` as ArtKey);
   const overlay: Partial<Record<Sq, ReactNode>> = {};
   for (const [sq, t] of Object.entries(pops)) overlay[sq] = <span key={t} className="k-star-pop" aria-hidden="true" />;
   for (const s of Object.keys(statues)) overlay[s] = <StatueBadge awake={woke === s} />;
@@ -168,7 +172,7 @@ export function StarCollector({ item, player, onDone, kid }: ActivityProps<StarI
   const dests = useMemo(() => starDests(item, pieces), [item, pieces]);
 
   return (
-    <div className="k-stars">
+    <div className="k-stars" data-mirrored={mirrored ? 1 : undefined}>
       <KidsBoard
         fen={fen}
         interactive={!bouncing && !demo && !done}
@@ -181,7 +185,7 @@ export function StarCollector({ item, player, onDone, kid }: ActivityProps<StarI
         overlay={overlay}
         hint={demo ? null : player.hint}
         showDests={showDots}
-        label={`Star board: ${remaining.length} stars left`}
+        label={`Star board: ${plural(remaining.length, 'star')} left`}
       />
     </div>
   );

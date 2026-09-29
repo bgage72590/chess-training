@@ -74,7 +74,7 @@ export const NODES: NodeDef[] = [
   ...w('w2', [
     { id: 'w2-bishop-stars', title: 'Bishop Slide', activity: 'stars', owner: 'F', skills: ['move-bishop'], piece: 'B', fact: 'Bishops slide on slanty lines called diagonals.' },
     { id: 'w2-bishop-paint', title: 'Where can Bishop go?', activity: 'paint', owner: 'A', skills: ['move-bishop'], piece: 'B', fact: 'A bishop can never change the color of its square.' },
-    { id: 'w2-bishop-color', title: 'Bishop stays on her color', activity: 'quiz', owner: 'C', skills: ['move-bishop'], piece: 'B', fact: 'Each player has one light-square bishop and one dark-square bishop.' },
+    { id: 'w2-bishop-color', title: 'Bishop stays on her color', activity: 'quiz', owner: 'C', skills: ['move-bishop', 'board-colors'], piece: 'B', fact: 'Each player has one light-square bishop and one dark-square bishop.' },
     { id: 'w2-bishop-gobble', title: "Bishop's Lunch", activity: 'gobble', owner: 'A', skills: ['move-bishop', 'capture'], piece: 'B', fact: 'Bishops are worth about 3 pawns.' },
     { id: 'w2-treasure-map', title: 'Treasure map', activity: 'board-vision', owner: 'A', bands: EC, skills: ['square-names'], fact: 'Every square has a name, like e4: the file letter, then the rank number.' },
     { id: 'w2-boss', title: 'Two Friends', activity: 'stars', owner: 'F', boss: true, skills: ['move-rook', 'move-bishop'], piece: 'B', fact: 'Rook and bishop make a great team!' },

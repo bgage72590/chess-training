@@ -14,6 +14,7 @@ const EC: AgeBand[] = ['explorer', 'champion'];
 const C: AgeBand[] = ['champion'];
 
 // ---------- w2: the bishop stays on her color ----------
+// The intro bishop stands on f1, a light square, because the words say she lives on sunny light squares.
 
 const reachSay = { all: 'Can the bishop ever reach the star?', sprout: 'Can the bishop get the star?' };
 const reach = (id: string, from: string, star: string, answer: boolean, extra: Partial<Q> = {}): Q => ({ id, kind: 'bishop-reach', pieces: { [from]: 'B' }, star, answer, say: reachSay, ...extra }) as Q;
@@ -22,8 +23,8 @@ export const W2_BISHOP_COLOR: LevelSet<QuizItem> = {
   id: 'w2-bishop-color',
   activity: 'quiz',
   intro: [
-    { say: { all: 'This bishop lives on sunny light squares. She can never step on a dark moon square!', champion: 'A bishop stays on one square color forever.' }, pieces: { c1: 'B' }, arrows: [{ from: 'c1', to: 'h6' }, { from: 'c1', to: 'a3' }] },
-    { say: 'Is the star on her color? Then she can reach it!', pieces: { c1: 'B' }, art: { e3: 'star' }, move: ['c1', 'e3'], ms: 1200 },
+    { say: { all: 'This bishop lives on sunny light squares. She can never step on a dark moon square!', champion: 'A bishop stays on one square color forever.' }, pieces: { f1: 'B' }, arrows: [{ from: 'g2', to: 'h3' }, { from: 'e2', to: 'a6' }] },
+    { say: 'Is the star on her color? Then she can reach it!', pieces: { f1: 'B' }, art: { d3: 'star' }, move: ['f1', 'd3'], ms: 1200 },
   ],
   items: [
     reach('b1', 'c1', 'c2', false),
@@ -32,6 +33,8 @@ export const W2_BISHOP_COLOR: LevelSet<QuizItem> = {
     reach('b4', 'f1', 'a6', true),
     reach('b5', 'c1', 'e3', true),
     reach('b6', 'f1', 'f2', false, { tier: 2 }),
+    reach('b7', 'f1', 'g1', false),
+    reach('b8', 'c1', 'd2', true, { tier: 2 }),
   ],
 };
 
@@ -47,6 +50,8 @@ export const W4_KNIGHT_COUNT: LevelSet<QuizItem> = {
     { id: 'k3', kind: 'count', pieces: { b1: 'N' }, answer: 3, say: countSay },
     { id: 'k4', kind: 'count', pieces: { g2: 'N' }, answer: 4, tier: 2, say: countSay },
     { id: 'k5', kind: 'count', pieces: { d4: 'R' }, answer: 14, tier: 3, say: { all: 'Surprise! How many squares can the rook zoom to?', champion: 'Bonus: how many squares does the rook reach?' } },
+    { id: 'k6', kind: 'count', pieces: { h5: 'N' }, answer: 4, tier: 2, say: countSay },
+    { id: 'k7', kind: 'count', pieces: { b4: 'N' }, answer: 6, tier: 2, say: countSay },
   ],
 };
 
@@ -97,6 +102,8 @@ export const W6_TRADE: LevelSet<QuizItem> = {
     { id: 't2', kind: 'trade', fen: '4k3/8/8/4n3/8/8/8/4RK2 w - - 0 1', move: ['e1', 'e5'], answer: true, say: tradeSay },
     { id: 't3', kind: 'trade', fen: '4k3/8/3p4/4q3/8/8/8/4RK2 w - - 0 1', move: ['e1', 'e5'], answer: true, say: tradeSay },
     { id: 't4', kind: 'trade', fen: '4k3/8/5p2/4n3/8/8/8/4QK2 w - - 0 1', move: ['e1', 'e5'], answer: false, tier: 2, say: tradeSay },
+    { id: 't5', kind: 'trade', fen: '4k3/8/8/4p3/8/8/8/4RK2 w - - 0 1', move: ['e1', 'e5'], answer: true, say: tradeSay },
+    { id: 't6', kind: 'trade', fen: '4k3/8/2n5/4r3/8/8/8/4QK2 w - - 0 1', move: ['e1', 'e5'], answer: false, tier: 2, say: tradeSay },
   ],
 };
 

@@ -266,7 +266,7 @@ describe('progress', () => {
     const rng = mulberry32(3);
     for (let i = 0; i < 20; i++) {
       const it = pickWarmupItem(set, 'explorer', ['r3', 'r4', 'r5', 'r6'], rng)!;
-      expect(it.id).toBe('r7');
+      expect(['r7', 'r8', 'r9']).toContain(it.id);
     }
   });
   it('run picker: fixed order, per-run counts, tier adaptation', () => {

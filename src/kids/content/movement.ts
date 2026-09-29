@@ -14,6 +14,8 @@ import { memoryActivity } from '../activities/memory';
 type BV = BoardVisionItem & ItemMeta;
 type Gob = GobbleItem & ItemMeta;
 const S: AgeBand[] = ['sprout'];
+const E: AgeBand[] = ['explorer'];
+const C: AgeBand[] = ['champion'];
 const EC: AgeBand[] = ['explorer', 'champion'];
 
 // ---------- Board Explorer ----------
@@ -32,7 +34,7 @@ export const W1_ROADS: LevelSet<BoardVisionItem> = {
   items: [
     { id: 'rd1', kind: 'tap-line', through: 'a1', line: 'file', say: { all: 'Light up the up-and-down road! It is a file.', sprout: 'Light up the up-and-down road!' } } as BV,
     { id: 'rd2', kind: 'tap-line', through: 'd4', line: 'rank', say: { all: 'Now the side-to-side road! It is a rank.', sprout: 'Now the side-to-side road!' } } as BV,
-    { id: 'rd3', kind: 'tap-line', through: 'h8', line: 'file', say: roadSay } as BV,
+    { id: 'rd3', bands: S, kind: 'tap-line', through: 'h8', line: 'file', say: roadSay } as BV,
     { id: 'rd4', kind: 'tap-line', through: 'c1', line: 'diagonal', bands: EC, say: 'A slanty road! It is a diagonal.' } as BV,
   ],
 };
@@ -59,8 +61,8 @@ export const W2_TREASURE_MAP: LevelSet<BoardVisionItem> = {
   ],
   items: [
     { id: 'tm1', bands: EC, kind: 'find-square', squares: ['a1', 'h8', 'e4', 'd5', 'c3'], rounds: 5, fadeCoords: true, say: 'Find the treasure squares!' } as BV,
-    { id: 'tm2', bands: EC, kind: 'find-square', squares: 'random', rounds: 8, say: 'Eight treasures! Find each square.' } as BV,
-    { id: 'tm3', bands: EC, kind: 'find-square', squares: 'random', rounds: 6, fadeCoords: true, tier: 2, say: 'The map labels will fade away!' } as BV,
+    { id: 'tm2', bands: E, kind: 'find-square', squares: 'random', rounds: 8, say: 'Eight treasures! Find each square.' } as BV,
+    { id: 'tm3', bands: C, kind: 'find-square', squares: 'random', rounds: 6, fadeCoords: true, tier: 2, say: 'The map labels will fade away!' } as BV,
   ],
 };
 
@@ -69,7 +71,6 @@ const armySay = (name: string) => ({ all: `Where is the ${name}? Tap it!` });
 export const W5_ARMY: LevelSet<BoardVisionItem> = {
   id: 'w5-army',
   activity: 'board-vision',
-  order: 'fixed',
   perRun: { sprout: 3, explorer: 5, champion: 6 },
   items: [
     { id: 'ar1', kind: 'name-piece', fen: START_FEN, ask: 'k', say: armySay('king') } as BV,
@@ -106,6 +107,8 @@ export const W1_ROOK_PAINT: LevelSet<PaintItem> = {
     { id: 'rp2', pieces: { h1: 'R' }, blockers: ['h4'], enemies: { c1: 'b' }, say: { all: 'Friends block the road. Enemies can be eaten!', sprout: 'Where can the rook go?' } },
     { id: 'rp3', pieces: { a1: 'R' }, enemies: { a5: 'p', e1: 'n' }, say: { all: 'The rook can eat enemies, but stops there.', sprout: 'Where can the rook go?' } },
     { id: 'rp4', pieces: { e4: 'R' }, blockers: ['e6', 'c4'], tier: 2, say: paintSay('rook') },
+    { id: 'rp5', pieces: { e2: 'R' }, blockers: ['e4', 'g2'], enemies: { a2: 'p' }, say: paintSay('rook') },
+    { id: 'rp6', pieces: { f3: 'R' }, blockers: ['f5', 'c3'], enemies: { f1: 'n', h3: 'b' }, tier: 2, say: paintSay('rook') },
   ],
 };
 
@@ -117,6 +120,8 @@ export const W2_BISHOP_PAINT: LevelSet<PaintItem> = {
     { id: 'bp2', pieces: { f1: 'B' }, say: paintSay('bishop') },
     { id: 'bp3', pieces: { d4: 'B' }, blockers: ['f6'], enemies: { b2: 'p' }, say: { all: 'Slanty roads! Watch out for friends in the way.', sprout: 'Where can the bishop go?' } },
     { id: 'bp4', pieces: { e4: 'B' }, tier: 2, say: paintSay('bishop') },
+    { id: 'bp5', pieces: { b1: 'B' }, enemies: { d3: 'r' }, say: paintSay('bishop') },
+    { id: 'bp6', pieces: { e3: 'B' }, blockers: ['g5', 'd2'], enemies: { b6: 'n' }, tier: 2, say: paintSay('bishop') },
   ],
 };
 
@@ -129,6 +134,8 @@ export const W3_QUEEN_PAINT: LevelSet<PaintItem> = {
     { id: 'qp3', pieces: { h8: 'Q' }, blockers: ['g7'], enemies: { h5: 'r' }, say: paintSay('queen') },
     { id: 'qp4', pieces: { e1: 'K' }, say: 'Where can the king step?' },
     { id: 'qp5', pieces: { d4: 'Q' }, tier: 2, say: 'The queen in the middle. So many squares!' },
+    { id: 'qp6', pieces: { c3: 'Q' }, blockers: ['c5', 'e3'], enemies: { a2: 'p', f6: 'n' }, tier: 2, say: paintSay('queen') },
+    { id: 'qp7', pieces: { h3: 'Q' }, blockers: ['g3', 'h4'], enemies: { d7: 'p' }, tier: 2, say: paintSay('queen') },
   ],
 };
 
@@ -141,6 +148,8 @@ export const W4_KNIGHT_PAINT: LevelSet<PaintItem> = {
     { id: 'np3', pieces: { a1: 'N' }, say: { all: 'A knight in the corner. How many hops?', sprout: 'Where can the knight go?' } },
     { id: 'np4', pieces: { d4: 'N' }, say: { all: 'A knight in the middle has lots of hops!', sprout: 'Where can the knight go?' } },
     { id: 'np5', pieces: { e4: 'N' }, blockers: ['f6', 'd2'], tier: 2, say: 'Friends are on two squares. Hop around them!' },
+    { id: 'np6', pieces: { h2: 'N' }, say: paintSay('knight') },
+    { id: 'np7', pieces: { c6: 'N' }, blockers: ['a5', 'e7', 'd4'], enemies: { b4: 'p' }, tier: 2, say: paintSay('knight') },
   ],
 };
 
