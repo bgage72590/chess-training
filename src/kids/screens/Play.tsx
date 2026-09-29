@@ -26,7 +26,7 @@ export function NodePlay({ kid, nodeId }: { kid: KidProfile; nodeId: string }) {
         <div className="k-card k-place-card">
           <Pip mood="think" size={120} />
           <SpeechBubble text={!set ? 'This one is coming soon!' : "This path isn't open yet. Let's play the one before it!"} tail="top" />
-          <BigButton variant="primary" icon="map" onClick={() => go.map()} autoFocus>
+          <BigButton variant="primary" icon="map" onClick={() => go.upToMap()} autoFocus>
             Map
           </BigButton>
         </div>
@@ -74,5 +74,5 @@ export function Warmup({ kid }: { kid: KidProfile }) {
         </div>
       </div>
     );
-  return <ActivityPlayer mode="warmup" kid={kid} plan={plan} title="Warm-up" onContinue={continueToNode} onExit={() => (warmupDone.add(kid.id), go.map())} />;
+  return <ActivityPlayer mode="warmup" kid={kid} plan={plan} title="Warm-up" onContinue={continueToNode} onExit={() => (warmupDone.add(kid.id), go.upToMap())} />;
 }

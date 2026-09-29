@@ -30,7 +30,7 @@ export function Playground({ kid, entryId }: { kid: KidProfile; entryId?: string
   if (entry && open) return <PlaygroundGame kid={kid} entry={entry} />;
   return (
     <div className="k-screen k-playground">
-      <MapBar kid={kid} stars={totalStars(kid)} back={() => go.map()} playgroundOpen={open} />
+      <MapBar kid={kid} stars={totalStars(kid)} back={() => go.upToMap()} playgroundOpen={open} />
       <div className="k-page-head">
         <h1 className="k-title">Playground</h1>
       </div>
@@ -38,7 +38,7 @@ export function Playground({ kid, entryId }: { kid: KidProfile; entryId?: string
         <div className="k-card k-empty-card">
           <Pip mood="think" size={110} />
           <p className="k-body">The Playground opens after Rank 5: Pawn Parade. Keep going!</p>
-          <BigButton variant="primary" icon="map" onClick={() => go.map()}>
+          <BigButton variant="primary" icon="map" onClick={() => go.upToMap()}>
             Map
           </BigButton>
         </div>
@@ -93,6 +93,9 @@ function PlaygroundGame({ kid, entry }: { kid: KidProfile; entry: PlaygroundEntr
               <span className="k-avatar-name">Guest</span>
             </button>
           </div>
+          <BigButton variant="plain" icon="back" onClick={() => go.upToPlayground()}>
+            Back
+          </BigButton>
         </div>
       </div>
     );
@@ -106,7 +109,7 @@ function PlaygroundGame({ kid, entry }: { kid: KidProfile; entry: PlaygroundEntr
       title={bandText(entry.title, kid.band)}
       opponent={entry.friend ? { kind: 'friend', kidId: friend?.kidId ?? null } : { kind: 'bot' }}
       onAgain={() => setRound((r) => r + 1)}
-      onExit={() => go.playground()}
+      onExit={() => go.upToPlayground()}
     />
   );
 }

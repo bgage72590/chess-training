@@ -2,7 +2,7 @@
 import type { NodeDef } from '../curriculum/worlds';
 import type { NodeProgress } from '../store/kidsStore';
 import { KidsIcon } from './KidsIcon';
-import { StarRow } from './StarRow';
+import { StarRow, starsText } from './StarRow';
 
 export type NodeState = 'locked' | 'open' | 'soon';
 
@@ -33,7 +33,7 @@ export function NodeBubble({
   children?: React.ReactNode;
 }) {
   const shape = node.final ? 'tower' : node.boss ? 'castle' : node.bonus ? 'flower' : 'round';
-  const label = `${node.title}${state === 'locked' ? ', locked' : state === 'soon' ? ', coming soon' : np?.stars ? `, ${np.stars} stars` : ''}`;
+  const label = `${node.title}${state === 'locked' ? ', locked' : state === 'soon' ? ', coming soon' : np?.skipped ? ', come back later' : np?.tested && !np.plays ? ', tested out' : np?.stars ? `, ${starsText(np.stars)}` : ''}`;
   return (
     <div className={`k-node ${shape} ${state}${current ? ' current' : ''}${np?.skipped ? ' skipped' : ''}${fresh ? ' fresh' : ''}`} style={{ ['--acc' as string]: accent }}>
       <button type="button" className="k-node-btn" onClick={onPress} disabled={state !== 'open'} aria-label={label}>

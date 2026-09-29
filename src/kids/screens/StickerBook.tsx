@@ -38,7 +38,7 @@ export function StickerBook({ kid, tab }: { kid: KidProfile; tab: Tab }) {
 
   return (
     <div className="k-screen k-book">
-      <MapBar kid={kid} stars={totalStars(kid)} back={() => go.map()} playgroundOpen={kid.start === 'games' || worldPassed(kid, 'w5', REGISTRY)} />
+      <MapBar kid={kid} stars={totalStars(kid)} back={() => go.upToMap()} playgroundOpen={kid.start === 'games' || worldPassed(kid, 'w5', REGISTRY)} />
       <div className="k-tabs" role="tablist" aria-label="Sticker book">
         {(
           [
@@ -47,7 +47,7 @@ export function StickerBook({ kid, tab }: { kid: KidProfile; tab: Tab }) {
             ['wardrobe', 'Dress up', 'heart'],
           ] as const
         ).map(([id, label, icon]) => (
-          <button key={id} type="button" role="tab" aria-selected={t === id} className={`k-tab${t === id ? ' on' : ''}`} onClick={() => (id === 'stickers' ? go.stickers() : go.stickers(id))}>
+          <button key={id} type="button" role="tab" aria-selected={t === id} className={`k-tab${t === id ? ' on' : ''}`} onClick={() => go.stickers(id === 'stickers' ? undefined : id, true)}>
             <KidsIcon name={icon} size={24} /> {label}
           </button>
         ))}
@@ -141,14 +141,14 @@ function Wardrobe({ kid }: { kid: KidProfile }) {
             <KidsIcon name="x" size={26} />
           </button>
           {HATS.map((h) => {
-            // Hats come from the star total (tested-out stars count too) or special unlocks.
+            // Hats come from the star total (stars earned by playing; test-out stars do not count) or special unlocks.
             const owned = kid.wardrobe.includes(h.id as HatId) || (h.stars != null && stars >= h.stars);
             return owned ? (
               <button key={h.id} type="button" className={`k-facebtn${kid.avatar.hat === h.id ? ' on' : ''}`} aria-label={h.label} onClick={() => set((a) => void (a.hat = h.id))}>
                 <PawnBuddy color={kid.avatar.color} face={kid.avatar.face} hat={h.id} size={44} />
               </button>
             ) : (
-              <span key={h.id} className="k-facebtn locked" aria-label={`${h.label}: ${h.how}`}>
+              <span key={h.id} className="k-facebtn locked" role="img" aria-label={`${h.label}: ${h.how}`}>
                 <KidsIcon name="lock" size={20} />
                 <small>{h.stars ? `${Math.max(0, h.stars - stars)} more` : 'Crown!'}</small>
               </span>

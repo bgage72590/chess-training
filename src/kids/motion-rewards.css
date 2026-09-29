@@ -385,6 +385,25 @@
   animation-delay: 300ms;
 }
 
+/* A plain note on the card (Pip eased a boss on his own). */
+.k-results-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: var(--k-r-pill);
+  background: var(--k-card-2);
+  border: 2px solid var(--k-line);
+  font-family: var(--k-font-display);
+  font-weight: 600;
+  font-size: calc(var(--k-body) - 2px);
+  color: var(--k-ink);
+}
+.k-results-note .k-icon {
+  color: var(--k-sea);
+}
+
 /* A new sticker or badge is stamped on: it slams down big, settles, and rings like an ink press. */
 .k-results-gifts.wait {
   visibility: hidden;
@@ -499,7 +518,8 @@
   isolation: isolate;
 }
 .k-graduate {
-  overflow-x: clip;
+  /* The big rays reach past the screen: clip them on both axes so the page does not grow a scroll. */
+  overflow: clip;
 }
 .k-crown-ring {
   position: absolute;
@@ -581,6 +601,128 @@
 }
 .k-break-stickers > :nth-child(6) {
   animation-delay: 450ms;
+}
+
+/* ================= Short screens ================= */
+/* A small phone in portrait (360 x 640, say): the results card packs in tighter, so a boss pass with
+   its sticker, crown and hat still shows the stars and the buttons without scrolling. */
+@media (max-height: 700px) and (orientation: portrait) {
+  /* Room above the card for Pip's head, which peeks over its top edge. */
+  .k-results-wrap {
+    padding-top: 52px;
+  }
+  .k-results {
+    gap: 8px;
+    padding: 12px 16px 14px;
+  }
+  .kids-app:not([data-band='sprout']) .k-results .k-btn {
+    min-height: 48px;
+  }
+  .k-results-pip {
+    margin-top: -44px;
+  }
+  .k-results-pip .k-pip,
+  .k-results-pip .k-pip svg {
+    width: 72px !important;
+    height: 72px !important;
+  }
+  .k-results-title {
+    font-size: 26px;
+  }
+  .k-results-stars .k-star {
+    width: 42px;
+    height: 42px;
+  }
+  .k-results-open {
+    padding: 6px 12px;
+    font-size: 16px;
+  }
+  .k-results-gifts {
+    gap: 6px 12px;
+  }
+  .k-results-gifts .k-sticker-art {
+    width: 52px !important;
+    height: 52px !important;
+  }
+  .k-results-gifts .k-trophy-mini {
+    width: 52px;
+    height: 52px;
+  }
+}
+
+/* ================= Short landscape (a phone on its side) ================= */
+/* The results card is two columns there (Pip, title and stars beside the recap, gifts and buttons),
+   so it fits without scrolling. Everywhere else the two wrappers add no box of their own. */
+.k-results-head,
+.k-results-body {
+  display: contents;
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .k-results {
+    width: min(740px, 100%);
+    flex-direction: row;
+    gap: 22px;
+    padding: 14px 20px;
+  }
+  .k-results-head {
+    display: flex;
+    flex: 0 0 210px;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .k-results-body {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .k-results-pip {
+    margin-top: 0;
+  }
+  .k-results-title {
+    font-size: 26px;
+  }
+  .k-results-gifts {
+    gap: 10px;
+  }
+  .k-results-gifts .k-sticker-art {
+    width: 56px !important;
+    height: 56px !important;
+  }
+  .k-results-gifts .k-trophy-mini {
+    width: 56px;
+    height: 56px;
+  }
+  /* Pawn Buddy on the graduation stage, and the cards that hold Pip: smaller so nothing sits below the fold. */
+  .k-grad-stage {
+    gap: 8px;
+    padding-top: 6px;
+  }
+  .k-grad-avatar .k-buddy {
+    width: 118px;
+    height: 142px;
+  }
+  .k-grad-piece {
+    width: 64px;
+    height: 64px;
+    right: -44px;
+  }
+  .k-center {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .k-place-card {
+    gap: 10px;
+    padding: 16px 20px;
+  }
+  .k-place-card > .k-pip,
+  .k-place-card > .k-pip svg {
+    width: 84px !important;
+    height: 84px !important;
+  }
 }
 
 /* ================= Confetti bits ================= */

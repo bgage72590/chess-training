@@ -38,7 +38,7 @@ export function WorldScreen({ kid, worldId }: { kid: KidProfile; worldId: WorldI
 
   return (
     <div className="k-screen k-worldscreen" style={{ ['--wbg' as string]: world.bg, ['--acc' as string]: world.accent }}>
-      <MapBar kid={kid} stars={totalStars(kid)} back={() => go.map()} playgroundOpen={kid.start === 'games' || worldPassed(kid, 'w5', REGISTRY)} />
+      <MapBar kid={kid} stars={totalStars(kid)} back={() => go.upToMap()} playgroundOpen={kid.start === 'games' || worldPassed(kid, 'w5', REGISTRY)} />
       <div className="k-world-banner">
         <div>
           <span className="k-rank">Rank {world.rank}</span>

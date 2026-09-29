@@ -1056,7 +1056,7 @@ It uses the existing `navigate()`, `useRoute()` and `routeParts()`. Routes:
 
 Rules:
 - With no active kid, any route except `kids` and `kids/new` redirects to `kids`.
-- Browser back works.
+- Browser back works. A screen's own close or back button steps back through the history when the entry before it is the screen it goes to, and otherwise replaces its own entry, so Back never reopens an activity the kid just left. Results Next, "Try the boss!" and "Practice first" replace the activity's entry, and asking for the screen already showing adds nothing.
 - The player guards leaving only mid-item.
 - `speech.cancel()` runs on every route change.
 

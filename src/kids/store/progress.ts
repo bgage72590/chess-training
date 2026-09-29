@@ -290,7 +290,9 @@ export function recordRun(kid: KidProfile, run: RunSummary, reg: Registry, today
   const outcome = run.game ? run.results[0]?.outcome : undefined;
   const score: 1 | 2 | 3 = outcome ? outcomeScore(outcome) : nodeScore(run.results.map((r) => r.score));
   const golden = !outcome && score === 3 && run.results.length > 0 && run.results.every((r) => r.golden);
-  const starsBefore = np.skipped ? 0 : np.stars;
+  // A test-out star (paper plane) was never earned by playing, so the first real play earns the lot.
+  // A skipped node keeps the stars it already paid into the jar, so a later pass adds only the rest.
+  const starsBefore = np.tested ? 0 : np.stars;
 
   np.plays += 1;
   np.last = now;

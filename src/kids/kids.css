@@ -58,6 +58,11 @@
   --k-6: 32px;
   --k-7: 48px;
   --k-gutter: 16px;
+  /* the notch, the status bar and the home bar on a phone that installed the app (0 elsewhere) */
+  --k-safe-t: env(safe-area-inset-top, 0px);
+  --k-safe-r: env(safe-area-inset-right, 0px);
+  --k-safe-b: env(safe-area-inset-bottom, 0px);
+  --k-safe-l: env(safe-area-inset-left, 0px);
   /* motion */
   --k-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --k-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -139,6 +144,8 @@
   -webkit-font-smoothing: antialiased;
   isolation: isolate;
   overscroll-behavior: contain;
+  /* Screens start below the notch and clear its sides; the bottom is handled where bars sit there. */
+  padding: var(--k-safe-t) var(--k-safe-r) 0 var(--k-safe-l);
 }
 .kids-app *,
 .kids-app *::before,
@@ -770,8 +777,8 @@
   --tray-h: 0px;
   display: flex;
   flex-direction: column;
-  height: 100svh;
-  height: 100dvh;
+  height: calc(100svh - var(--k-safe-t));
+  height: calc(100dvh - var(--k-safe-t));
   padding: 0 var(--k-gutter) max(12px, env(safe-area-inset-bottom, 0px));
   overflow: hidden;
 }
@@ -1097,7 +1104,9 @@
   z-index: 50;
   display: grid;
   place-items: center;
-  padding: 16px;
+  /* A card taller than the screen scrolls from its top instead of losing it above the edge. */
+  place-items: safe center;
+  padding: max(16px, var(--k-safe-t)) max(16px, var(--k-safe-r)) max(16px, var(--k-safe-b)) max(16px, var(--k-safe-l));
   background: rgb(31 42 68 / 0.4);
   animation: k-fade-in 200ms var(--k-ease-out);
   overflow-y: auto;
@@ -1114,8 +1123,8 @@
 }
 .k-sheet {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: var(--k-safe-l);
+  right: var(--k-safe-r);
   bottom: 0;
   z-index: 45;
   display: flex;
@@ -1769,8 +1778,8 @@
 }
 .k-corners {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: var(--k-safe-l);
+  right: var(--k-safe-r);
   bottom: 0;
   display: flex;
   justify-content: space-between;
@@ -2110,13 +2119,17 @@
   padding: 2px;
 }
 .k-facebtn.locked {
-  opacity: 0.6;
+  opacity: 0.75;
   cursor: default;
   font-size: 12px;
   line-height: 1.1;
   text-align: center;
   align-content: center;
   gap: 2px;
+}
+.k-facebtn.locked small {
+  font-size: 12px;
+  font-weight: 600;
 }
 
 /* ================= Placement ================= */
@@ -2174,8 +2187,8 @@
 .k-map {
   display: flex;
   flex-direction: column;
-  height: 100svh;
-  height: 100dvh;
+  height: calc(100svh - var(--k-safe-t));
+  height: calc(100dvh - var(--k-safe-t));
   padding: 0;
 }
 .k-mapbar {
@@ -2307,15 +2320,15 @@
 }
 .k-map-play {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: var(--k-safe-l);
+  right: var(--k-safe-r);
   bottom: 0;
   padding: 16px var(--k-gutter) max(16px, env(safe-area-inset-bottom, 0px));
   background: linear-gradient(180deg, transparent, var(--k-meadow) 45%);
   z-index: 20;
 }
 .k-map.landscape .k-map-play {
-  right: 380px;
+  right: calc(380px + var(--k-safe-r));
 }
 .k-map-shore {
   height: 40px;
@@ -2739,6 +2752,18 @@
 .k-boss-req .k-star {
   color: var(--k-ink-soft);
 }
+.k-boss-short {
+  display: none;
+}
+/* On the map's narrow column the pill would cover the next stone: icons (and "Win!") only. */
+@media (max-width: 519px) {
+  .k-path-node .k-boss-long {
+    display: none;
+  }
+  .k-path-node .k-boss-short {
+    display: inline;
+  }
+}
 .k-boss-req.done {
   border-color: var(--k-grass-edge);
   color: var(--k-good-ink);
@@ -2996,6 +3021,19 @@
   font-weight: 600;
   font-size: 21px;
   text-align: center;
+}
+/* A phone holds two tiles a row, so the list of games is half as long to scroll. */
+@media (max-width: 519px) {
+  .k-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .k-tile {
+    padding: 16px 8px;
+  }
+  .k-tile-title {
+    font-size: 19px;
+  }
 }
 .k-empty-card {
   display: flex;
@@ -3938,7 +3976,7 @@
 /* ================= Toasts ================= */
 .k-toasts {
   position: fixed;
-  top: calc(10px + env(safe-area-inset-top, 0px));
+  top: max(10px, var(--k-safe-t));
   left: 50%;
   translate: -50% 0;
   /* Without a width, a fixed box at left 50% may only grow to half the screen: long messages wrapped in a sliver. */
@@ -4058,6 +4096,24 @@
     display: none;
   }
 }
+/* A 320 px screen: the five buttons shrink to 46 px (still a comfortable tap) so the bar fits. */
+@media (max-width: 359px) {
+  .kids-app .k-mapbar {
+    gap: 4px;
+    padding: 0 10px;
+  }
+  .kids-app .k-mapbar .k-round,
+  .kids-app .k-mapbar .k-pillbtn,
+  .kids-app .k-mapbar > .k-avatar-chip {
+    width: 46px;
+    min-width: 46px;
+    height: 46px;
+  }
+  .kids-app .k-mapbar .k-stars-total {
+    padding: 0 8px;
+    font-size: 19px;
+  }
+}
 
 /* Player: Pip's row keeps one height in portrait, so the board never jumps while a kid aims. */
 .k-player-coach {
@@ -4104,7 +4160,7 @@
   }
   .k-player .k-sheet {
     left: auto;
-    right: var(--k-gutter);
+    right: max(var(--k-gutter), var(--k-safe-r));
     top: 50%;
     bottom: auto;
     translate: 0 -50%;
@@ -4114,7 +4170,7 @@
   }
   .k-player.left-handed .k-sheet {
     right: auto;
-    left: var(--k-gutter);
+    left: max(var(--k-gutter), var(--k-safe-l));
   }
   .k-player .k-sheet-card {
     border-radius: var(--k-r-lg);

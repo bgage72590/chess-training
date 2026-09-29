@@ -21,6 +21,9 @@ if (typeof window !== 'undefined') {
   window.addEventListener('popstate', sync);
 }
 
+/** The route being shown (what `useRoute` returns), for code that acts on it outside a component. */
+export const currentRoute = () => route;
+
 export function navigate(to: string, opts: { replace?: boolean } = {}) {
   route = to || 'home';
   try {
@@ -64,8 +67,14 @@ export function useRoute(): string {
   );
 }
 
-/** Splits "lesson/abc" into ["lesson", "abc"]. */
+/** Splits "lesson/abc" into ["lesson", "abc"]. A stray "%" in a typed address stays as text. */
 export function routeParts(r: string): [string, string | undefined] {
   const i = r.indexOf('/');
-  return i < 0 ? [r, undefined] : [r.slice(0, i), decodeURIComponent(r.slice(i + 1))];
+  if (i < 0) return [r, undefined];
+  const rest = r.slice(i + 1);
+  try {
+    return [r.slice(0, i), decodeURIComponent(rest)];
+  } catch {
+    return [r.slice(0, i), rest];
+  }
 }

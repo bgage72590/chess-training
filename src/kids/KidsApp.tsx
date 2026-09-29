@@ -37,8 +37,9 @@ registerKidsSync();
 
 /** Screens that belong to grown-ups: a gate pass lives only while one of these is open. */
 const GROWNUP_SCREENS = ['grownups', 'certificate'];
-/** Calm screens between plays, where a reached session limit turns into Break time right away. */
-const BOUNDARY_SCREENS = ['map', 'world', 'stickers', 'warmup', 'graduate'];
+/** Calm screens between plays, where a reached session limit turns into Break time right away.
+ *  Not the warm-up: its route also holds the items, and the player ends those at an item boundary. */
+const BOUNDARY_SCREENS = ['map', 'world', 'stickers', 'graduate'];
 
 /** A locked device lands on the active kid's map once per launch; after that #/kids is the picker. */
 let lockedLandingUsed = false;
@@ -199,7 +200,7 @@ export function KidsApp({ route }: { route: string }) {
             onBye={() => {
               clearFreshBreak();
               setActiveKid(null);
-              go.picker();
+              go.picker(true);
             }}
             onContinue={clearFreshBreak}
           />
@@ -225,7 +226,7 @@ function Gated({ reason, children }: { reason: string; children: React.ReactNode
       <div className="k-card k-place-card">
         <Pip mood="think" size={110} />
         <p className="k-body">This part is for grown-ups.</p>
-        <BigButton variant="primary" icon="home" onClick={() => go.picker()}>
+        <BigButton variant="primary" icon="home" onClick={() => go.picker(true)}>
           Back
         </BigButton>
       </div>

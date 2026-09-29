@@ -1,6 +1,9 @@
 // 1-3 stars: outlined when empty, sun with an ink outline when earned; a golden star sparkles.
 import '../motion-rewards.css';
 
+/** "1 star", "2 stars": for labels read aloud by a screen reader. */
+export const starsText = (n: number) => `${n} ${n === 1 ? 'star' : 'stars'}`;
+
 export function StarShape({ filled, size = 28, golden, className, style }: { filled: boolean; size?: number; golden?: boolean; className?: string; style?: React.CSSProperties }) {
   return (
     <svg className={`k-star ${filled ? 'on' : 'off'} ${golden ? 'golden' : ''} ${className ?? ''}`} viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" style={style}>
