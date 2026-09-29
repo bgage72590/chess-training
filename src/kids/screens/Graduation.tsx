@@ -29,7 +29,7 @@ export function Graduation({ kid }: { kid: KidProfile }) {
         <div className="k-card k-place-card">
           <Pip mood="think" size={120} />
           <p className="k-body">Climb all the way up Crown Tower first!</p>
-          <BigButton variant="primary" icon="map" onClick={() => go.map()}>
+          <BigButton variant="primary" icon="map" onClick={() => go.upToMap()}>
             Map
           </BigButton>
         </div>
@@ -71,7 +71,7 @@ export function Graduation({ kid }: { kid: KidProfile }) {
           </div>
         ) : (
           <div className="k-grad-pick">
-            <BigButton variant="go" icon="map" onClick={() => go.map()}>
+            <BigButton variant="go" icon="map" onClick={() => go.upToMap()}>
               Map
             </BigButton>
             <button type="button" className="k-linkbtn" onClick={() => requireGate('Print the certificate.', () => go.certificate(kid.id), { keep: true })}>

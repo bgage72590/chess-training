@@ -26,6 +26,7 @@ import { hintTarget, pipReact } from '../ui/pipEvents';
 import { Coach } from '../ui/Coach';
 import { Tray } from '../ui/Tray';
 import { BigButton } from '../ui/BigButton';
+import { KidsIcon } from '../ui/KidsIcon';
 import { Confetti } from '../ui/Confetti';
 import type { PipState } from '../ui/ProgressPips';
 import type { PipMood } from '../ui/Pip';
@@ -119,6 +120,21 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
   const [coach, setCoach] = useState<{ text: string; lines?: string[]; token?: number }>({ text: '' });
   const [mood, setMood] = useState<PipMood>('idle');
   const moodTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // "That one is tricky!" waits a moment after the third slip; it must not outlive the item.
+  const offerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearOfferTimer = () => {
+    if (offerTimer.current) clearTimeout(offerTimer.current);
+    offerTimer.current = null;
+  };
+  useEffect(
+    () => () => {
+      clearOfferTimer();
+      if (moodTimer.current) clearTimeout(moodTimer.current);
+    },
+    [],
+  );
+  /** The item already scored, so a repeated tap or a late timer cannot score it twice. */
+  const scoredKey = useRef('');
   const setMoodFor = (m: PipMood, ms = 1400) => {
     setMood(m);
     if (m === 'cheer' || m === 'oops' || m === 'wow') pipReact(m);
@@ -210,6 +226,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       const ease = isGame ? np?.ease ?? 0 : 0;
       let item = resolveItem(run.item, band, { super: opts.superStar, ease: Math.min(ease, run.item.ease?.length ?? 0) });
       if (opts.lowerBand) item = { ...item, ...(run.item.tune?.[opts.lowerBand] ?? {}) };
+      clearOfferTimer();
       itemMistakes.current = 0;
       easierOffered.current = false;
       pops.current = 0;
@@ -258,7 +275,9 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
 
   const onDone = useCallback(
     (r: ItemResult) => {
-      if (!current) return;
+      if (!current || scoredKey.current === current.key) return;
+      scoredKey.current = current.key;
+      clearOfferTimer();
       const i = results.current.length;
       const res: ItemResult = { ...r, golden: r.golden || (current.superStar && r.score === 3) };
       results.current.push(res);
@@ -389,7 +408,8 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       say(band === 'sprout' && hintLine ? hintLine : [...lines(oops), ...lines(hintLine)], 'oops');
       if (n >= 3 && !easierOffered.current && mode !== 'placement' && !isGame) {
         easierOffered.current = true;
-        setTimeout(() => setOffer('easier'), 900);
+        clearOfferTimer();
+        offerTimer.current = setTimeout(() => setOffer('easier'), 900);
       }
       resetIdle();
     },
@@ -453,7 +473,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
   const exit = () => {
     speech.cancel();
     if (props.onExit) props.onExit();
-    else go.map();
+    else go.upToMap();
   };
   const guardLeave = itemLive && results.current.length < total;
   const onX = () => (guardLeave ? setConfirmLeave(true) : exit());
@@ -509,7 +529,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
           trophies={[]}
           hats={[]}
           onAgain={props.onAgain}
-          onMap={() => go.playground()}
+          onMap={() => go.upToPlayground()}
           mapLabel="Playground"
           onSpeak={(t) => say(t)}
         />
@@ -538,8 +558,14 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
         need={below && nextWorld ? { stars: bossPassMark(band), rank: nextWorld.rank } : null}
         onSpeak={(t) => say(t)}
         extra={
-          (offers.practice || offers.skip || offers.easeOffer || fast) && (
+          (offers.practice || offers.skip || offers.easeOffer || fast || outcome.easeAuto) && (
             <div className="k-results-offers">
+              {outcome.easeAuto && (
+                // The third loss eases the boss on its own; the card says so (nothing is secretly weakened).
+                <p className="k-results-note">
+                  <KidsIcon name="cloud" size={22} fill /> Pip will play sleepier next time.
+                </p>
+              )}
               {fast && (
                 <>
                   <p className="k-results-fast">Wow, no mistakes! Want to try the boss now?</p>
@@ -548,7 +574,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
                     icon="castle"
                     onClick={() => {
                       updateKid(kid.id, (d) => acceptFastTrack(d, fast.id));
-                      go.play(fast.id);
+                      go.play(fast.id, true);
                     }}
                   >
                     Try the boss!
@@ -561,7 +587,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
                 </BigButton>
               )}
               {lowest && (
-                <BigButton variant="info" icon="again" onClick={() => go.play(lowest.id)}>
+                <BigButton variant="info" icon="again" onClick={() => go.play(lowest.id, true)}>
                   Practice first
                 </BigButton>
               )}
@@ -572,7 +598,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
                   onClick={() => {
                     updateKid(kid.id, (d) => skipNode(d, node!.id));
                     sayAs(kid, ["We'll come back to this one later!"], { keep: true });
-                    go.map();
+                    go.upToMap();
                   }}
                 >
                   Skip for now
@@ -583,7 +609,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
         }
         onNext={
           nextN && nextN.id !== node?.id
-            ? () => (nextN.world !== node?.world || outcome.worldOpened ? go.map() : go.play(nextN.id))
+            ? () => (nextN.world !== node?.world || outcome.worldOpened ? go.upToMap() : go.play(nextN.id, true))
             : undefined
         }
         onAgain={props.onAgain}
@@ -637,7 +663,8 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
         onSpeaker={coach.text ? () => say(coach.lines ?? coach.text, undefined, true) : undefined}
       />
       {props.header}
-      <div className="k-player-body">
+      {/* Under the results card the board and buttons are out of reach of the keyboard and screen readers. */}
+      <div className="k-player-body" inert={phase === 'results' || undefined}>
         <aside className="k-player-coach">
           <Coach text={coach.text} mood={mood} token={coach.token} size={band === 'sprout' ? 80 : 72} />
         </aside>

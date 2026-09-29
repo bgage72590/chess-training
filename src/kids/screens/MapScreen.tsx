@@ -13,7 +13,7 @@ import { PlayButton, BigButton } from '../ui/BigButton';
 import { KidsIcon } from '../ui/KidsIcon';
 import { BossRequirement } from '../ui/BossCard';
 import { Pip } from '../ui/Pip';
-import { StarRow } from '../ui/StarRow';
+import { StarRow, starsText } from '../ui/StarRow';
 import { useIsLandscape } from '../ui/useLayout';
 import { go } from '../routes';
 import { markOpened, newlyOpened, openIds } from '../lib/unlockSeen';
@@ -96,15 +96,15 @@ export function MapBar({ kid, stars, playgroundOpen, back }: { kid: KidProfile; 
           <span className="k-avatar-chip-name">{kid.name}</span>
         </button>
       )}
-      <span className="k-stars-total" aria-label={`${stars} stars`}>
+      <span className="k-stars-total" role="img" aria-label={starsText(stars)}>
         <KidsIcon name="star" size={26} fill /> {stars}
       </span>
       <span className="k-mapbar-gap" />
       <button
         type="button"
         className={`k-round k-round-plain k-mute${kid.settings.muted ? ' on' : ''}`}
-        aria-label={kid.settings.muted ? 'Turn sound on' : 'Turn sound off'}
-        aria-pressed={kid.settings.muted}
+        aria-label="Sound"
+        aria-pressed={!kid.settings.muted}
         title={kid.settings.muted ? 'Sound is off' : 'Sound is on'}
         onClick={() => {
           const muted = !kid.settings.muted;
@@ -215,7 +215,7 @@ function MapSide({ kid, next }: { kid: KidProfile; next: NodeDef | null }) {
     <aside className="k-map-side">
       <div className="k-card k-garden">
         <h3 className="k-card-title">Pip&rsquo;s Garden</h3>
-        <div className="k-pots" aria-label={`${kid.garden} flowers planted`}>
+        <div className="k-pots" role="img" aria-label={`${kid.garden} ${kid.garden === 1 ? 'flower' : 'flowers'} planted`}>
           {[0, 1, 2, 3, 4].map((i) => (
             <span key={i} className={`k-pot${i < flowers ? ' bloom' : ''}`}>
               <Flower on={i < flowers} i={i} />

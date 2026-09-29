@@ -14,11 +14,12 @@ export function StickerArt({ def, size = 96 }: { def: StickerDef; size?: number 
 export function StickerSlot({ def, earned, onTap, hint }: { def: StickerDef; earned: boolean; onTap?: () => void; hint?: string }) {
   if (!earned)
     return (
-      <div className="k-sticker missing" aria-label={`Not yet: ${hint ?? def.title}`}>
+      <div className="k-sticker missing" role="img" aria-label={`Not yet: ${hint ?? def.title}`}>
         <span className="k-sticker-art ghost">
           {def.art.piece ? <span className={`k-sticker-piece pc-w${def.art.piece.toUpperCase()}`} aria-hidden="true" /> : <KidsIcon name={def.art.icon ?? 'star'} size={40} />}
         </span>
-        <span className="k-sticker-title">{hint ?? `Play ${def.title.replace(/[!?.]$/, '')}!`}</span>
+        {/* A node sticker says which game earns it; a special one is a moment to find, so it just names it. */}
+        <span className="k-sticker-title">{hint ?? (def.page === 'special' ? def.title : `Play ${def.title.replace(/[!?.]$/, '')}!`)}</span>
       </div>
     );
   return (

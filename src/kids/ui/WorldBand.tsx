@@ -116,7 +116,7 @@ export function WorldBand({
           <span className="k-world-name">{world.title}</span>
           {starsText && <span className="k-world-stars">{starsText}</span>}
         </button>
-        <span className={`k-crown-slot ${crown ?? 'none'}`} aria-label={crown ? `${crown} crown` : 'No crown yet'}>
+        <span className={`k-crown-slot ${crown ?? 'none'}`} role="img" aria-label={crown ? `${crown} crown` : 'No crown yet'}>
           <KidsIcon name="crown" size={30} fill={!!crown} />
         </span>
         {opening && (
