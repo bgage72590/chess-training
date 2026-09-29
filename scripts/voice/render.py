@@ -89,7 +89,7 @@ def pace():
 
 
 def speak_google(text, use_rate=True):
-    import urllib.error, urllib.request
+    import http.client, urllib.error, urllib.request
     import numpy as np
     config = {'audioEncoding': 'LINEAR16', 'sampleRateHertz': 24000}
     if use_rate:
@@ -114,6 +114,11 @@ def speak_google(text, use_rate=True):
                 continue
             hint = ' (no key reached Google: set GOOGLE_TTS_API_KEY or add an X-Goog-Api-Key credential for texttospeech.googleapis.com)' if e.code in (401, 403) or 'API key' in msg else ''
             raise RuntimeError(f'Google TTS {e.code}: {msg}{hint}') from None
+        except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError):
+            # The connection dropped or the answer was cut off: try again a little later.
+            if attempt == 11:
+                raise
+            time.sleep(min(2 ** attempt, 30) + random.random() * 3)
     with wave.open(io.BytesIO(base64.b64decode(data['audioContent']))) as w:
         sr = w.getframerate()
         pcm = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768
