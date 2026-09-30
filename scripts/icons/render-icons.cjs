@@ -1,13 +1,17 @@
 // Renders the app icon set into public/icons with Chromium (Playwright):
 //   icon.svg (favicon), icon-192.png, icon-512.png (rounded tile), maskable-512.png and
-//   apple-touch-icon.png (full-bleed squares that the OS masks itself).
+//   apple-touch-icon.png (full-bleed squares that the OS masks itself), and for the native apps
+//   native/icons/app-1024.png (the same full-bleed square at 1024 px, opaque: App Store Connect wants no
+//   transparency; `npx tauri icon` and the iOS icon set are made from it, see native/README.md).
 // Usage: node scripts/icons/render-icons.cjs
 const fs = require('fs');
 const path = require('path');
 const { launch } = require('../dev/harness.cjs');
 
 const out = path.join(__dirname, '../../public/icons');
+const nativeOut = path.join(__dirname, '../../native/icons');
 fs.mkdirSync(out, { recursive: true });
+fs.mkdirSync(nativeOut, { recursive: true });
 
 // The cburnett white knight (Colin M.L. Burnett; GPLv2+ / GFDL / BSD) as drawn on the board, 45x45 units.
 const KNIGHT = `<g fill="none" fill-rule="evenodd" stroke="#141d27" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10c10.5 1 16.5 8 16 29H15c0-9 10-6.5 8-21" fill="#fff"/><path d="M24 18c.38 2.91-5.55 7.37-8 9-3 2-2.82 4.34-5 4-1.042-.94 1.41-3.04 0-3-1 0 .19 1.23-1 2-1 0-4.003 1-4-4 0-2 6-12 6-12s1.89-1.9 2-3.5c-.73-.994-.5-2-.5-3 1-1 3 2.5 3 2.5h2s.78-1.992 2.5-3c1 0 1 3 1 3" fill="#fff"/><path d="M9.5 25.5a.5.5 0 1 1-1 0 .5.5 0 1 1 1 0zm5.433-9.75a.5 1.5 30 1 1-.866-.5.5 1.5 30 1 1 .866.5z" fill="#141d27"/></g>`;
@@ -32,15 +36,16 @@ function icon({ rounded, knightScale }) {
   fs.writeFileSync(path.join(out, 'icon.svg'), any);
   const browser = await launch();
   const page = await browser.newPage();
-  const png = async (svg, size, file) => {
+  const png = async (svg, size, file, dir = out) => {
     await page.setViewportSize({ width: size, height: size });
     await page.setContent(`<body style="margin:0;background:transparent">${svg.replace('<svg ', `<svg width="${size}" height="${size}" `)}</body>`);
-    await page.screenshot({ path: path.join(out, file), omitBackground: true, clip: { x: 0, y: 0, width: size, height: size } });
+    await page.screenshot({ path: path.join(dir, file), omitBackground: true, clip: { x: 0, y: 0, width: size, height: size } });
   };
   await png(any, 192, 'icon-192.png');
   await png(any, 512, 'icon-512.png');
   await png(maskable, 512, 'maskable-512.png');
   await png(maskable, 180, 'apple-touch-icon.png');
+  await png(maskable, 1024, 'app-1024.png', nativeOut);
   await browser.close();
   console.log('icons written to', path.relative(process.cwd(), out));
 })();

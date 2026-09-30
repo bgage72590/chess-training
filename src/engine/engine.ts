@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from 'react';
 import BackupWorker from './fallback.worker.ts?worker&inline';
 import { turnOf } from '../chess/utils';
+import { IS_NATIVE } from '../pwa/native';
 import { goCommand, parseInfo, whitePov, type PvLine, type Score } from './score';
 
 export { formatScore, scoreToCp, whitePov, winPercent, type PvLine, type Score } from './score';
@@ -208,6 +209,7 @@ class Engine {
 async function probeWasm() {
   if (typeof WebAssembly !== 'object') throw new Error('no WebAssembly');
   await WebAssembly.compile(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]));
+  if (IS_NATIVE) return; // the engine ships inside the app, and a custom-scheme handler may not answer HEAD
   const res = await fetch(new URL('engine/stockfish.wasm', document.baseURI).href, { method: 'HEAD' });
   if (res.status === 404 || res.status >= 500) throw new Error(`engine file unavailable (${res.status})`);
 }

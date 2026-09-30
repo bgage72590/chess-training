@@ -46,4 +46,4 @@ export function askWorker(container: Pick<ServiceWorkerContainer, 'controller'>,
 }
 
 /** Whether this build has an offline copy to report on at all. */
-export const offlineSupported = () => import.meta.env.PROD && import.meta.env.MODE !== 'single' && typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
+export const offlineSupported = () => import.meta.env.PROD && import.meta.env.MODE !== 'single' && import.meta.env.MODE !== 'native' && typeof navigator !== 'undefined' && 'serviceWorker' in navigator;

@@ -1,6 +1,7 @@
 node_modules
 dist
 dist-single
+dist-native
 public/engine
 *.log
 .DS_Store

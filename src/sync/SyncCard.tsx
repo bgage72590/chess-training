@@ -5,6 +5,7 @@ import { QrCode } from '../components/QrCode';
 import { StorageSplitNote } from '../components/StorageSplitNote';
 import { toast } from '../lib/toast';
 import { APP_URL } from '../pwa/install';
+import { IS_NATIVE } from '../pwa/native';
 import { APP_ADDRESS } from '../components/InstallCard';
 import { useSyncState } from '../store/cloud';
 import { formatSyncCode, newSyncCode, normalizeSyncCode, syncLink } from './code';
@@ -141,7 +142,8 @@ export function SyncCard() {
     );
   }
 
-  const url = syncLink(s.code);
+  // Inside the native app the address is capacitor:// or tauri://, which nothing else can open: hand out the web app's.
+  const url = syncLink(s.code, IS_NATIVE ? APP_URL : undefined);
   return (
     <section className="card settings-section sync-card">
       <h2>Sync across devices</h2>

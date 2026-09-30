@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PipVoice } from '../player/speech';
 import { formatSize, isIos, megabytes, mustAskFirst, packView, useVoicePack, voicePacks, type PackRun } from '../player/voicePack';
+import { IS_NATIVE } from '../../pwa/native';
 import './VoicePackRow.css';
 
 const STOPPED: Record<NonNullable<PackRun['reason']>, string> = {
@@ -16,6 +17,8 @@ const STOPPED: Record<NonNullable<PackRun['reason']>, string> = {
 /** The row for the voice picked in the list above it. One voice at a time: never all eight. */
 export function VoicePackRow({ voices, selected }: { voices: PipVoice[]; selected: string }) {
   const voice = voices.find((v) => v.id === selected);
+  // The app carries its voices inside it (scripts/build-native.mjs): nothing to download.
+  if (IS_NATIVE) return voice ? <p className="k-pack-note">This voice is saved in the app and plays without the internet.</p> : null;
   return voice ? <PackRow key={voice.id} voice={voice} /> : null;
 }
 

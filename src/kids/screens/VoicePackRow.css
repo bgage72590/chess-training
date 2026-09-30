@@ -31,3 +31,9 @@
   color: var(--k-ink-soft);
   font-size: 13px;
 }
+
+.k-pack-note {
+  margin: 8px 0 0;
+  font-size: 0.92rem;
+  color: var(--k-ink-2, inherit);
+}

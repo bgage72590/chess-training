@@ -1,0 +1,10 @@
+{
+  "appId": "io.github.bgage72590.tempo",
+  "appName": "Tempo",
+  "webDir": "../dist-native",
+  "ios": {
+    "contentInset": "never",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "backgroundColor": "#12100e"
+}

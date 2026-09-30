@@ -10,6 +10,7 @@ import { isQuiet } from '../store/quiet';
 import { clipKey, spokenText } from '../lib/clipKey';
 import { addUnlock, silentWav, type UnlockHandle } from '../../lib/audio';
 import { voicePacks } from './voicePack';
+import { IS_NATIVE } from '../../pwa/native';
 
 interface SpeakOpts {
   /** Device-voice speed (the band's pace unless a grown-up set one). */
@@ -215,6 +216,7 @@ const clipUrl = (id: string, m: VoiceManifest, key: string) => voiceUrl(`${id}/$
 export const AUTO_SAVE_SETTLE_MS = 30_000;
 
 function autoSavePack() {
+  if (IS_NATIVE) return; // the app's voices are inside it
   const kid = getActiveKid();
   if (!kid || !voiceList) return;
   const id = kid.settings.pipVoice || voiceList.default;

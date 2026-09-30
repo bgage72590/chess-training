@@ -5,6 +5,7 @@
 // on the device is always counted from that cache, never trusted from a flag: browsers can clear it.
 import { useEffect, useSyncExternalStore } from 'react';
 import { requestPersistence } from '../../lib/storage';
+import { IS_NATIVE } from '../../pwa/native';
 
 /** Cache names shared with the service worker (a test keeps the two in step). */
 export const VOICE_LISTS_CACHE = 'tempo-voice-lists';
@@ -379,7 +380,7 @@ export function createVoicePacks(env: PackEnv) {
      * Returns whether a download ran.
      */
     async autoDownload(id: string, connection = env.connection()): Promise<boolean> {
-      if (!env.caches || running() || !isUnmetered(connection)) return false;
+      if (IS_NATIVE || !env.caches || running() || !isUnmetered(connection)) return false;
       const m = await loadManifest(id);
       if (!m || !Object.keys(m.clips).length) return false;
       const version = m.version ?? '';

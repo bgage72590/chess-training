@@ -1,6 +1,7 @@
 // Installing Tempo as an app: registers the offline service worker and captures the browser's
 // install prompt so the app can offer its own "Install" button.
 import { useSyncExternalStore } from 'react';
+import { IS_NATIVE } from './native';
 import { recoverFromMissingFiles, watchForUpdates } from './update';
 
 interface InstallPromptEvent extends Event {
@@ -32,7 +33,7 @@ export function resolveAppUrl(raw: string | undefined): string {
 export const APP_URL = resolveAppUrl(import.meta.env.VITE_APP_URL);
 
 /** How this browser installs Tempo when it has no install prompt. */
-export type InstallHow = 'ios' | 'safari-mac' | 'safari-old' | 'in-app' | 'menu' | 'unsupported' | 'elsewhere';
+export type InstallHow = 'ios' | 'safari-mac' | 'safari-old' | 'in-app' | 'menu' | 'unsupported' | 'elsewhere' | 'native';
 
 export type InstallState = {
   /** Running as an installed app (its own window or home-screen icon). */
@@ -69,13 +70,15 @@ export function detectHow(ua: string, touchPoints: number, elsewhere: boolean): 
 
 function currentHow(): InstallHow {
   if (typeof window === 'undefined') return 'unsupported';
+  if (IS_NATIVE) return 'native';
   // Inside another page (e.g. the claude.ai viewer) or the single-file build: install from the hosted app.
   return detectHow(navigator.userAgent, navigator.maxTouchPoints, window.top !== window.self || import.meta.env.MODE === 'single');
 }
 
 let prompt: InstallPromptEvent | null = null;
 let state: InstallState = {
-  installed: typeof window !== 'undefined' && (matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true),
+  // The native app is the installed app.
+  installed: IS_NATIVE || (typeof window !== 'undefined' && (matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true)),
   canPrompt: false,
   how: currentHow(),
   ios: typeof window !== 'undefined' && isIosDevice(navigator.userAgent, navigator.maxTouchPoints),
@@ -88,6 +91,7 @@ const set = (s: Partial<InstallState>) => {
 
 /** Call once at start-up, before the browser may fire its install prompt. */
 export function setupInstall() {
+  if (IS_NATIVE) return; // nothing to register or install: new versions arrive as new builds of the app
   if (import.meta.env.PROD && import.meta.env.MODE !== 'single') recoverFromMissingFiles();
   if (import.meta.env.PROD && import.meta.env.MODE !== 'single' && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => void navigator.serviceWorker.register('./sw.js').then((reg) => reg && watchForUpdates(reg)).catch(() => undefined));

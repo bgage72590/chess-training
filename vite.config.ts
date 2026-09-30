@@ -64,18 +64,20 @@ const git = (args: string[]) => {
 function buildLabel(mode: string) {
   const last = git(['log', '-1', '--abbrev=7', '--format=%cd · %h', '--date=format-local:%Y-%m-%d %H:%M UTC', ...APP_INPUTS]) || 'development';
   const changed = git(['status', '--porcelain', ...APP_INPUTS]) ? ' + local changes' : '';
-  return `${last}${changed}${mode === 'single' ? ' · claude.ai copy' : ''}`;
+  return `${last}${changed}${mode === 'single' ? ' · claude.ai copy' : mode === 'native' ? ' · app' : ''}`;
 }
 
 // `--mode single` inlines all JS/CSS into index.html (the Stockfish worker and wasm stay
 // as separate files in dist-single/engine). Used for hosts that only accept one page.
+// `--mode native` is the build the Mac app and the iPhone/iPad app carry (dist-native, then
+// scripts/build-native.mjs): no service worker, the files ship inside the app. See native/README.md.
 // The normal build is the installable app: manifest, icons and an offline service worker.
 export default defineConfig(({ mode }) => ({
   base: './',
   define: { __BUILD__: JSON.stringify(buildLabel(mode)) },
-  plugins: [react(), ...(mode === 'single' ? [viteSingleFile({ removeViteModuleLoader: true })] : [serviceWorker()])],
+  plugins: [react(), ...(mode === 'single' ? [viteSingleFile({ removeViteModuleLoader: true })] : mode === 'native' ? [] : [serviceWorker()])],
   build: {
-    outDir: mode === 'single' ? 'dist-single' : 'dist',
+    outDir: mode === 'single' ? 'dist-single' : mode === 'native' ? 'dist-native' : 'dist',
     chunkSizeWarningLimit: 2000,
   },
   test: {

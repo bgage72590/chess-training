@@ -27,6 +27,8 @@ import { SyncJoinPage } from './sync/SyncJoinPage';
 import { SoundToggle, useSoundShortcut } from './components/SoundToggle';
 import { isKidsLocked } from './kids/lock';
 const KidsApp = lazy(() => import('./kids/KidsApp').then((m) => ({ default: m.KidsApp })));
+// Only the native builds carry the diagnostics page (src/native/diagnostics.ts).
+const NativeDiag = import.meta.env.MODE === 'native' ? lazy(() => import('./native/NativeDiag')) : null;
 
 interface NavItem {
   route: string;
@@ -239,6 +241,14 @@ function Page({ route }: { route: string }): ReactNode {
       return <TrainPage />;
     case 'sync':
       return <SyncJoinPage code={arg} />;
+    case 'diag':
+      return NativeDiag ? (
+        <Suspense fallback={null}>
+          <NativeDiag />
+        </Suspense>
+      ) : (
+        <HomePage />
+      );
     default:
       return <HomePage />;
   }

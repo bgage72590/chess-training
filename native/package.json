@@ -1,0 +1,17 @@
+{
+  "name": "tempo-native",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Tooling for the Mac app (Tauri) and the iPhone and iPad app (Capacitor). Kept apart from the web app so its install and lockfile stay small.",
+  "scripts": {
+    "icons": "tauri icon icons/app-1024.png --output src-tauri/icons",
+    "sync:ios": "cap sync ios",
+    "build:mac": "tauri build --target universal-apple-darwin --bundles app,dmg --ci"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
+    "@tauri-apps/cli": "^2.12.0"
+  }
+}

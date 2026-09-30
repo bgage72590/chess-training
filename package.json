@@ -11,6 +11,7 @@
     "prebuild": "node scripts/copy-engine.mjs",
     "build": "tsc -b && vite build",
     "build:single": "node scripts/copy-engine.mjs && tsc -b && vite build --mode single && node scripts/build-artifact.mjs",
+    "build:native": "node scripts/copy-engine.mjs && tsc -b && vite build --mode native && node scripts/build-native.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test": "vitest run",

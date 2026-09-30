@@ -1,0 +1,244 @@
+name: Native apps (Mac and iPhone/iPad)
+
+# Manual only: Actions -> Native apps -> Run workflow. Builds Tempo as
+#   - a Mac app (Tauri, universal Intel + Apple silicon, ad-hoc signed: macOS asks once before opening it), and
+#   - an iPhone and iPad app for the iOS Simulator (proof that it runs; a real phone needs signing, see native/README.md).
+# With `smoke` on, each app opens its diagnostics page (#/diag) and posts what works inside it (secure context,
+# the engine's wasm file, voices, the sync service...) to a listener on the runner; the reports are printed in the log.
+# GitHub-hosted macOS runners are free for a public repository. Nothing here signs or uploads to any store.
+on:
+  workflow_dispatch:
+    inputs:
+      mac:
+        description: Build the Mac app
+        type: boolean
+        default: true
+      ios:
+        description: Build the iPhone/iPad app and run it in the simulator
+        type: boolean
+        default: true
+      smoke:
+        description: Open the diagnostics page in each app and report what works
+        type: boolean
+        default: true
+      release:
+        description: Attach the Mac app to a GitHub release (needs a tag name below)
+        type: boolean
+        default: false
+      tag:
+        description: Release tag, for example mac-2026-09-30 (only used with release)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_ID: io.github.bgage72590.tempo
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # The history (without old file contents) dates the version shown in Settings: vite.config.ts.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build the web bundle the apps carry
+        env:
+          VITE_NATIVE_SMOKE: ${{ inputs.smoke && '1' || '' }}
+          VITE_NATIVE_REPORT_URL: ${{ inputs.smoke && 'http://127.0.0.1:8765/report' || '' }}
+        run: npm run build:native
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-native
+          path: dist-native
+          retention-days: 3
+
+  mac:
+    if: ${{ inputs.mac }}
+    needs: web
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: native
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: native/package-lock.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-native
+          path: dist-native
+      - run: npm ci
+        working-directory: native
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/src-tauri/target
+          key: tauri-mac-${{ hashFiles('native/src-tauri/Cargo.lock') }}
+          restore-keys: tauri-mac-
+      - name: Build the Mac app
+        working-directory: native
+        run: npx tauri build --target universal-apple-darwin --bundles app,dmg --ci
+      - name: Package it
+        run: |
+          BUNDLE=native/src-tauri/target/universal-apple-darwin/release/bundle
+          find "$BUNDLE" -maxdepth 3 | head -30
+          mkdir -p out
+          ditto -c -k --sequesterRsrc --keepParent "$BUNDLE/macos/Tempo.app" out/Tempo-mac.zip
+          cp "$BUNDLE"/dmg/*.dmg out/Tempo-mac.dmg
+          ls -lh out
+          ls "$BUNDLE/macos/Tempo.app/Contents/MacOS"
+          for f in "$BUNDLE/macos/Tempo.app/Contents/MacOS/"*; do lipo -archs "$f" || true; done
+          codesign -dv "$BUNDLE/macos/Tempo.app" 2>&1 | head -8 || true
+          echo "BUNDLE=$BUNDLE" >> "$GITHUB_ENV"
+      - name: Open the app and collect its report
+        if: ${{ inputs.smoke }}
+        continue-on-error: true
+        run: |
+          python3 native/ci/report-listener.py 8765 reports.ndjson &
+          sleep 1
+          open -n "$BUNDLE/macos/Tempo.app"
+          for i in $(seq 1 90); do [ -s reports.ndjson ] && break; sleep 2; done
+          sleep 3
+          screencapture -x mac-window.png || echo "no screenshot"
+          if [ -s reports.ndjson ]; then
+            { echo '### Mac app report'; echo '```json'; tail -1 reports.ndjson; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::The Mac app posted no report within 3 minutes"
+          fi
+          pkill -f "Tempo.app" || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tempo-mac
+          path: |
+            out/Tempo-mac.zip
+            out/Tempo-mac.dmg
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && inputs.smoke }}
+        with:
+          name: mac-smoke
+          path: |
+            reports.ndjson
+            mac-window.png
+          if-no-files-found: ignore
+          retention-days: 14
+
+  ios:
+    if: ${{ inputs.ios }}
+    needs: web
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: native
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: native/package-lock.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-native
+          path: dist-native
+      - name: Copy the web bundle into the iOS project
+        working-directory: native
+        run: |
+          npm ci
+          npx cap sync ios
+      - name: Build for the simulator
+        working-directory: native/ios/App
+        run: |
+          set -o pipefail
+          xcodebuild -version
+          xcodebuild -project App.xcodeproj -scheme App -sdk iphonesimulator -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/build" \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tail -60
+          test -d "$RUNNER_TEMP/build/Build/Products/Debug-iphonesimulator/App.app"
+      - name: Run it on an iPhone and an iPad simulator
+        if: ${{ inputs.smoke }}
+        continue-on-error: true
+        run: |
+          APP="$RUNNER_TEMP/build/Build/Products/Debug-iphonesimulator/App.app"
+          python3 native/ci/report-listener.py 8765 reports.ndjson &
+          sleep 1
+          pick() {
+            xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          prefix = sys.argv[1]
+          devices = [d for runtime, ds in json.load(sys.stdin)['devices'].items() if 'iOS' in runtime for d in ds if d['isAvailable'] and d['name'].startswith(prefix)]
+          print(devices[-1]['udid'] if devices else '')
+          " "$1"
+          }
+          for kind in iPhone iPad; do
+            UDID=$(pick "$kind")
+            if [ -z "$UDID" ]; then echo "::warning::no $kind simulator"; continue; fi
+            echo "== $kind $UDID"
+            before=$(wc -l < reports.ndjson 2>/dev/null || echo 0)
+            xcrun simctl boot "$UDID" || true
+            xcrun simctl bootstatus "$UDID" -b
+            xcrun simctl install "$UDID" "$APP"
+            xcrun simctl launch "$UDID" "$APP_ID"
+            for i in $(seq 1 90); do
+              now=$(wc -l < reports.ndjson 2>/dev/null || echo 0)
+              [ "$now" -gt "$before" ] && break
+              sleep 2
+            done
+            sleep 3
+            xcrun simctl io "$UDID" screenshot "ios-$kind.png" || true
+            xcrun simctl terminate "$UDID" "$APP_ID" || true
+            xcrun simctl shutdown "$UDID" || true
+            if [ "$(wc -l < reports.ndjson 2>/dev/null || echo 0)" -gt "$before" ]; then
+              { echo "### iOS app report ($kind simulator)"; echo '```json'; tail -1 reports.ndjson; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::warning::The app posted no report on the $kind simulator"
+            fi
+          done
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && inputs.smoke }}
+        with:
+          name: ios-smoke
+          path: |
+            reports.ndjson
+            ios-*.png
+          if-no-files-found: ignore
+          retention-days: 14
+
+  release:
+    if: ${{ inputs.mac && inputs.release && inputs.tag != '' }}
+    needs: mac
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: tempo-mac
+          path: out
+      - name: Publish the Mac app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.tag }}" out/Tempo-mac.zip out/Tempo-mac.dmg \
+            --repo "$GITHUB_REPOSITORY" --title "Tempo for Mac ${{ inputs.tag }}" \
+            --notes "Unsigned Mac app (universal). Open it once with a right-click, or see native/README.md."
