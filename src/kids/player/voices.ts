@@ -19,6 +19,9 @@ const NOVELTY =
   /^(albert|bad news|bahh|bells|boing|bubbles|cellos|deranged|good news|hysterical|jester|organ|pipe organ|superstar|trinoids|whisper|wobble|zarvox|princess)\b/i;
 /** Old or formant voices that sound robotic (macOS MacinTalk and Eloquence, eSpeak, SAPI desktop). */
 const ROBOTIC = /^(fred|junior|kathy|ralph|agnes|bruce|vicki|victoria|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b|espeak|^microsoft (david|zira|mark|hazel|george|susan)\b(?!.*natural)/i;
+/** Apple's downloaded voices carry their tier in the voiceURI (com.apple.voice.premium.en-US.Zoe), and some system versions leave it out of the name. */
+const PREMIUM_URI = /[._]premium\b/i;
+const ENHANCED_URI = /[._]enhanced\b/i;
 /** Good everyday voices (Apple and others) that are not tagged premium. */
 const GOOD = /^(samantha|ava|zoe|allison|susan|karen|moira|tessa|serena|daniel|nicky|aaron|evan|joelle|noelle|nathan|tom|kate|oliver|jamie|matilda|fiona|veena|rishi)\b/i;
 
@@ -31,8 +34,8 @@ export function voiceScore(v: VoiceLike): number {
   if (NOVELTY.test(name)) return -Infinity;
   let s = 40;
   if (/\b(natural|neural)\b/i.test(name)) s = 100;
-  else if (/premium/i.test(name)) s = 92;
-  else if (/enhanced/i.test(name)) s = 84;
+  else if (/premium/i.test(name) || PREMIUM_URI.test(v.voiceURI)) s = 92;
+  else if (/enhanced/i.test(name) || ENHANCED_URI.test(v.voiceURI)) s = 84;
   else if (/^google (us|uk) english/i.test(name)) s = 75;
   else if (GOOD.test(name)) s = 62;
   else if (ROBOTIC.test(name) || ROBOTIC.test(v.voiceURI)) s = 5;

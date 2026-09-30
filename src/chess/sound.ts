@@ -1,19 +1,9 @@
 // Tiny synthesized sound kit (no audio files): wooden "tock" for moves, softer chimes for results.
+// The audio context, its unlock and its recovery after an interruption live in lib/audio.ts.
 import { getSettings } from '../store/profile';
+import { withRunningContext } from '../lib/audio';
 
 type SoundName = 'move' | 'capture' | 'check' | 'castle' | 'mate' | 'good' | 'bad' | 'complete' | 'tick';
-
-let ctx: AudioContext | null = null;
-function audio(): AudioContext | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    ctx ??= new AudioContext();
-    if (ctx.state === 'suspended') void ctx.resume();
-    return ctx;
-  } catch {
-    return null;
-  }
-}
 
 // Every sound goes through one gain node set to the volume in Settings.
 let master: GainNode | null = null;
@@ -79,8 +69,10 @@ function tone(a: AudioContext, t: number, freq: number, dur: number, gain = 0.08
 export function sound(name: SoundName) {
   const st = getSettings();
   if (!st.sound || st.volume === 0) return;
-  const a = audio();
-  if (!a) return;
+  withRunningContext((a) => play(a, name));
+}
+
+function play(a: AudioContext, name: SoundName) {
   const t = a.currentTime + 0.005;
   switch (name) {
     case 'move':

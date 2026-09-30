@@ -89,7 +89,13 @@ export function KidsApp({ route }: { route: string }) {
   }, [kid, r.screen]);
   useEffect(() => kidsSound.setEnabled(kid ? kid.settings.sound && !kid.settings.muted : true), [kid]);
   useEffect(() => speech.setVoice(s.device.voiceURI), [s.device.voiceURI]);
-  useEffect(() => speech.setPipVoice(kid?.settings.pipVoice), [kid?.settings.pipVoice]);
+  useEffect(() => void speech.setPipVoice(kid?.settings.pipVoice), [kid?.settings.pipVoice]);
+  // Sound is Pip's voice: while Kids mode is open the audio session is 'playback', and the first gesture of any
+  // kind (a tap, a key press, VoiceOver or Switch Control) unlocks the sounds and the voice (lib/audio.ts).
+  useEffect(() => {
+    const stops = [kidsSound.enter(), speech.enter()];
+    return () => stops.forEach((stop) => stop());
+  }, []);
   useEffect(() => {
     const prev = document.title;
     document.title = "Pip's Chess Quest";
@@ -180,10 +186,6 @@ export function KidsApp({ route }: { route: string }) {
         data-screen={r.screen}
         data-veil={veil ? '1' : undefined}
         style={{ ['--k-btn-h' as string]: `${tuning.buttonPx}px` }}
-        onPointerDownCapture={() => {
-          speech.unlock();
-          kidsSound.unlock();
-        }}
       >
         <div className="k-sky-deco" aria-hidden="true">
           <span className="k-cloud c1" />

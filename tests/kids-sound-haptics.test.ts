@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HAPTIC_PATTERNS, haptic } from '../src/kids/player/haptics';
+import { HAPTIC_PATTERNS, NATIVE_HAPTICS, haptic } from '../src/kids/player/haptics';
 import { MASTER, TRIM_DB, playKidSound, type KidSound } from '../src/kids/player/kidSounds';
 import { capturedIn, cellOf, cellOfSq } from '../src/kids/activities/useBoardFx';
 
@@ -50,6 +50,52 @@ describe('kid haptics', () => {
     expect(haptic('capture')).toBe(false);
     vi.stubGlobal('navigator', { vibrate: () => false });
     expect(haptic('capture')).toBe(false);
+  });
+
+  it("uses a native wrapper's Haptics plugin when there is one, and not the web vibration", () => {
+    const impact = vi.fn(async () => undefined);
+    const notification = vi.fn(async () => undefined);
+    const vibrate = vi.fn(() => true);
+    vi.stubGlobal('navigator', { vibrate });
+    vi.stubGlobal('window', { Capacitor: { Plugins: { Haptics: { impact, notification } } } });
+    expect(haptic('move')).toBe(true);
+    expect(haptic('capture')).toBe(true);
+    expect(haptic('fanfare')).toBe(true);
+    expect(haptic('whoosh')).toBe(false); // still nothing for sounds without a pattern
+    expect(impact.mock.calls).toEqual([[{ style: 'LIGHT' }], [{ style: 'MEDIUM' }]]);
+    expect(notification.mock.calls).toEqual([[{ type: 'SUCCESS' }]]);
+    expect(vibrate).not.toHaveBeenCalled();
+    // Every sound with a web pattern has a native one.
+    expect(Object.keys(NATIVE_HAPTICS).sort()).toEqual(Object.keys(HAPTIC_PATTERNS).sort());
+  });
+
+  it('never throws from a native plugin, and falls back to the web when the plugin lacks the call', async () => {
+    const vibrate = vi.fn(() => true);
+    vi.stubGlobal('navigator', { vibrate });
+    vi.stubGlobal('window', { Capacitor: { Plugins: { Haptics: { impact: async () => Promise.reject(new Error('no haptics')) } } } });
+    expect(haptic('move')).toBe(true);
+    await Promise.resolve(); // the rejected promise is swallowed
+    vi.stubGlobal('window', {
+      Capacitor: {
+        Plugins: {
+          Haptics: {
+            impact: () => {
+              throw new Error('bridge down');
+            },
+          },
+        },
+      },
+    });
+    expect(haptic('move')).toBe(true);
+    expect(vibrate).toHaveBeenCalledWith(8); // the throwing plugin fell back to the web
+    vibrate.mockClear();
+    vi.stubGlobal('window', { Capacitor: { Plugins: { Haptics: { impact: vi.fn() } } } });
+    expect(haptic('fanfare')).toBe(true); // no notification call in this plugin: the web pattern
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    vi.stubGlobal('window', { Capacitor: { Plugins: {} } });
+    vibrate.mockClear();
+    expect(haptic('pop')).toBe(true);
+    expect(vibrate).toHaveBeenCalledWith([10, 30, 10]);
   });
 
   it('follows the kid sound switch: nothing while muted or off, a tap when on', async () => {
