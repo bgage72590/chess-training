@@ -1,0 +1,33 @@
+/* Grown-ups: a voice's offline row (VoicePackRow.tsx). Sits in the same list as the .k-gu-row settings. */
+.k-pack-row {
+  align-items: flex-start;
+}
+.k-pack-row .k-gu-label {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.k-pack-ask {
+  display: grid;
+  gap: 8px;
+  flex: 1 1 260px;
+  font-size: 14px;
+  color: var(--k-ink);
+}
+.k-pack-bar {
+  flex: 1 0 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--k-line);
+  overflow: hidden;
+}
+.k-pack-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--k-sea-edge);
+}
+.k-pack-keep {
+  flex: 1 0 100%;
+  color: var(--k-ink-soft);
+  font-size: 13px;
+}

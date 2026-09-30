@@ -14,6 +14,8 @@ const ROOT = path.resolve(import.meta.dirname, '../../src/kids');
 
 /** Grown-up screens and what only they show: read, never spoken (the parent gate is never spoken at all). */
 const GROWN_UP_ONLY = new Set(['screens/Grownups.tsx', 'ui/ParentGate.tsx', 'ui/Keypad.tsx', 'curriculum/skills.ts']);
+// The voice download row and its downloader (grown-up copy, shown in Grownups.tsx).
+for (const f of ['screens/VoicePackRow.tsx', 'player/voicePack.ts']) GROWN_UP_ONLY.add(f);
 
 function files(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {

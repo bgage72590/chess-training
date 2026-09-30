@@ -9,9 +9,12 @@ import './styles/pages.css';
 import { App } from './App';
 import { startCloudSync } from './store/cloud';
 import { setupInstall } from './pwa/install';
+import { persistAfterProgress } from './lib/storage';
+import { getProfile, subscribeProfile } from './store/profile';
 import { startSync } from './sync';
 
 setupInstall();
+persistAfterProgress(subscribeProfile, () => getProfile().xp > 0);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -83,6 +83,19 @@ npx tsx scripts/voice/collect.ts > /tmp/lines.json
 python3 scripts/voice/render.py /tmp/lines.json --id sunny            # once per voice
 python3 scripts/voice/try_voices.py /tmp/try --engine google Leda Puck   # audition voices
 ```
+
+Recorded clips stream as they are used and are kept for next time. To use a voice without the
+internet, open the grown-ups area, pick the voice and tap **Download** under the voice list (about
+40 to 48 MB, one voice at a time, with progress, Pause and Resume). It asks first unless the
+connection reports Wi-Fi or ethernet, and always on iPhone and iPad, where the screen has to stay
+open while it downloads. Only on a connection that says it is Wi-Fi or ethernet is the voice of the
+child in use saved without asking (once per recording). **Settings, Offline** shows whether the app
+is saved for offline use, which voice is on the device, and whether the browser will keep the data
+(Tempo asks it to after your first finished lesson, puzzle or game; a Safari tab can still be
+cleared after a week without a visit, so turn on sync as a backup or add Tempo to the Home Screen).
+`scripts/voice/render.py` writes each voice's size into its `manifest.json`; for manifests recorded
+before that, `python3 scripts/voice/sizes.py` adds it without touching anything else.
+
 ## Getting started
 
 ```bash
@@ -106,7 +119,7 @@ Other scripts:
 
 `.github/workflows/pages.yml` publishes `dist/` to GitHub Pages on every push to the default branch. Enable it once under **Settings → Pages → Source: GitHub Actions**. The engine is single-threaded WASM, so no special cross-origin headers are needed.
 
-The normal build is the installable app: `public/manifest.webmanifest`, the icons in `public/icons/` (regenerate with `node scripts/icons/render-icons.cjs`), and `sw.js`, a service worker written at build time from `src/pwa/sw.template.js` that precaches every built file for offline use.
+The normal build is the installable app: `public/manifest.webmanifest`, the icons in `public/icons/` (regenerate with `node scripts/icons/render-icons.cjs`), and `sw.js`, a service worker written at build time from `src/pwa/sw.template.js` that precaches every built file for offline use. Pip's clips are cached as they are used, one cache per voice (`tempo-voice-<id>`, the voice lists in `tempo-voice-lists`), so a new recording of one voice clears only that voice; the worker moves the single `tempo-voice` cache older versions made into these when it updates.
 
 ## How the content is made trustworthy
 

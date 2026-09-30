@@ -8,6 +8,7 @@ import { toast } from '../lib/toast';
 import { REPLY_SPEED_LABELS, type ReplySpeed } from '../lib/replyPace';
 import { useSyncState } from '../store/cloud';
 import { InstallCard } from '../components/InstallCard';
+import { OfflineCard } from '../components/OfflineCard';
 import { SyncCard } from '../sync/SyncCard';
 import { useSync } from '../sync';
 import { sinceReset } from '../sync/merge';
@@ -157,6 +158,7 @@ export function SettingsPage() {
         </section>
         <SyncCard />
         <InstallCard />
+        <OfflineCard />
         <section className="card settings-section">
           <h2>Your data</h2>
           <p className="muted">

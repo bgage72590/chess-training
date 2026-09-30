@@ -3,9 +3,10 @@
 // karaoke highlighting (with a timed fallback when the engine sends no boundary events).
 import { useSyncExternalStore } from 'react';
 import { BAND_TUNING } from '../curriculum/tuning';
-import { getKid, updateKid, type KidProfile } from '../store/kidsStore';
+import { getActiveKid, getKid, subscribeKids, updateKid, type KidProfile } from '../store/kidsStore';
 import { rankVoices } from './voices';
 import { clipKey, spokenText } from '../lib/clipKey';
+import { voicePacks } from './voicePack';
 
 interface SpeakOpts {
   /** Device-voice speed (the band's pace unless a grown-up set one). */
@@ -173,32 +174,37 @@ const activeManifest = (): { id: string; m: VoiceManifest } | null => {
 };
 const clipUrl = (id: string, m: VoiceManifest, key: string) => voiceUrl(`${id}/${key}.mp3${m.version ? `?v=${encodeURIComponent(m.version)}` : ''}`);
 
-/** Fetches every clip of the active voice once in the background (the service worker keeps them for offline play). */
-const prefetched = new Set<string>();
-function prefetchClips() {
-  const a = activeManifest();
-  if (!a || prefetched.has(a.id) || typeof navigator === 'undefined' || !navigator.serviceWorker?.controller) return;
-  // About 30 MB a voice: not on metered or cellular connections (clips still load as they are used).
-  const conn = (navigator as Navigator & { connection?: { saveData?: boolean; type?: string } }).connection;
-  if (conn?.saveData || conn?.type === 'cellular') return;
-  prefetched.add(a.id);
-  const keys = Object.keys(a.m.clips);
-  let i = 0;
-  const step = () => {
-    if (i >= keys.length) return;
-    if (!navigator.onLine || activeId() !== a.id) return void prefetched.delete(a.id); // interrupted: resume later
-    fetch(clipUrl(a.id, a.m, keys[i++]))
-      .then((r) => r.arrayBuffer())
-      .catch(() => undefined)
-      .finally(() => setTimeout(step, 60));
-  };
-  setTimeout(step, 4000);
+/**
+ * Saves the voice of the kid in use for offline play (voicePack.ts), on its own only where the
+ * connection is known to be unmetered and data saving is off: Safari cannot tell, so on an iPhone or
+ * Mac the grown-ups' screen has a Download button instead. Never before a kid is picked.
+ */
+function autoSavePack() {
+  const kid = getActiveKid();
+  if (!kid || !voiceList) return;
+  const id = kid.settings.pipVoice || voiceList.default;
+  if (id !== DEVICE_VOICE && voiceList.voices.some((v) => v.id === id)) void voicePacks.autoDownload(id);
 }
 
 if (typeof window !== 'undefined' && RECORDED) {
-  const warm = () => void ready(10_000).then(prefetchClips);
+  const warm = () => void ready(10_000).then(autoSavePack);
   warm();
-  window.addEventListener('online', warm); // a list that failed to load, or a prefetch cut off, picks up again
+  window.addEventListener('online', warm); // a list that failed to load, or a download cut off, picks up again
+  try {
+    (navigator as Navigator & { connection?: EventTarget }).connection?.addEventListener('change', warm);
+  } catch {
+    /* no connection information (Safari) */
+  }
+  // A kid picked (or a new voice for the kid in use) starts the check.
+  let saving = '';
+  subscribeKids(() => {
+    const kid = getActiveKid();
+    const now = kid ? `${kid.id}:${kid.settings.pipVoice ?? ''}` : '';
+    if (now !== saving) {
+      saving = now;
+      if (kid) warm();
+    }
+  });
 }
 
 let runGen = 0;
@@ -363,7 +369,7 @@ export const speech = {
   setPipVoice(id: string | undefined) {
     if ((id ?? '') === pipVoice) return;
     pipVoice = id ?? '';
-    void ready(10_000).then(prefetchClips);
+    void ready(10_000);
   },
   /** Call from the first pointerdown (iOS): unlocks audio playback and speech inside the tap. */
   unlock() {

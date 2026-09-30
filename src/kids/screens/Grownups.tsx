@@ -20,6 +20,7 @@ import { PawnBuddy } from '../ui/PawnBuddy';
 import { KidsIcon } from '../ui/KidsIcon';
 import { DEVICE_VOICE, RECORDED, speech } from '../player/speech';
 import { VOICE_PREVIEW, voiceNote, voiceScore } from '../player/voices';
+import { VoicePackRow } from './VoicePackRow';
 import { toast } from '../../lib/toast';
 import { plural } from '../lib/plural';
 import { go } from '../routes';
@@ -319,6 +320,7 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
           </div>
         </div>
       )}
+      {speech.supported() && <VoicePackRow voices={pipVoices} selected={pipVoice} />}
       {speech.supported() && noRecorded && (
         <p className="k-gu-note">
           {RECORDED ? (

@@ -55,7 +55,7 @@ describe("the service worker and Pip's clips", () => {
     expect(first.headers.get('Content-Range')).toBe('bytes 0-999/1000');
     expect(new Uint8Array(await first.arrayBuffer())).toEqual(bytes);
     await Promise.resolve();
-    expect(stores.get('tempo-voice')?.get(CLIP)?.status).toBe(200); // the whole clip is kept
+    expect(stores.get('tempo-voice-sunny')?.get(CLIP)?.status).toBe(200); // the whole clip is kept, in its voice's cache
 
     online = false;
     const part = await get(CLIP, 'bytes=500-');
