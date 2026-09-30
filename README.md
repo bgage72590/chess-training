@@ -47,9 +47,12 @@ No account needed. In **Settings → Sync across devices**, tap **Turn on sync**
 sync code (with a QR code and a link). On your other phones, tablets and computers, scan the QR
 code, open the link, or type the code under **I have a sync code**. Progress from every linked
 device is combined, never overwritten: lessons, puzzles, openings, games, streaks and XP made on
-any of them add up, and settings follow the device where they were changed last. Syncing happens
-in the background a few seconds after you train, when you come back to the app, and when a
-device comes back online.
+any of them add up, and every setting (sound and volume, Pip's voice, reading mode, speech speed
+...) follows the device where that setting was changed last, one setting at a time. Players in Kids
+mode sync too. The device voice, the parent PIN, the Kids lock, Kids quiet mode and downloaded
+voices stay on each device. Syncing happens in the background a few seconds after you train, when
+you come back to the app, when a device comes back online, and about every minute while the app is
+open.
 
 The code works like a password: anyone who has it can see and change that progress. **Stop
 syncing on this device** keeps the device's progress but unlinks it; **Delete synced copy**

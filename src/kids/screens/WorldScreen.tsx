@@ -1,6 +1,7 @@
 // A world up close: the banner, crown progress, Pip's world intro, and a card per node.
 import { useEffect, useState } from 'react';
 import type { KidProfile } from '../store/kidsStore';
+import { isQuiet } from '../store/quiet';
 import { REGISTRY } from '../packs';
 import { WORLDS, WORLD_BY_ID, nodesOf, type WorldId } from '../curriculum/worlds';
 import { bossPassed, crownOf, mastered, nextNode, nodeUnlocked, totalStars, visibleTo, worldPassed, worldUnlocked } from '../store/progress';
@@ -29,7 +30,7 @@ export function WorldScreen({ kid, worldId }: { kid: KidProfile; worldId: WorldI
   // Pip's world intro is spoken on the first visit (until it has been heard to the end).
   useEffect(() => {
     const id = lineId(`world-${worldId}`);
-    if (kid.settings.voice !== 'off' && !kid.settings.muted && !kid.firsts.includes(id)) say(() => heardFirst(kid.id, id));
+    if (kid.settings.voice !== 'off' && !isQuiet(kid.id) && !kid.firsts.includes(id)) say(() => heardFirst(kid.id, id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [worldId]);
 

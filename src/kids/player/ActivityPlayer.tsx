@@ -9,6 +9,7 @@ import { NODE_BY_ID, WORLDS } from '../curriculum/worlds';
 import { stickerDef, TROPHY_BY_ID } from '../curriculum/stickers';
 import { ACTIVITIES, REGISTRY } from '../packs';
 import { awardTo, getKid, updateKid, updateKids, type KidProfile } from '../store/kidsStore';
+import { isQuiet } from '../store/quiet';
 import { acceptEase, acceptFastTrack, fastTrackOffer, addFamilyStars, bossOffers, bossPassed, bossPassMark, nextNode, nodeScore, recordRun, recordWarmup, skipNode, activeNodes, type RunOutcome } from '../store/progress';
 import { hashSeed, mulberry32 } from '../lib/rng';
 import { plural } from '../lib/plural';
@@ -171,7 +172,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
       const id = lineId(caption);
       const k = getKid(kid.id);
       // Quiet mode (the map's speaker button) stops automatic reading; a tap on the speaker still reads.
-      const speakIt = force || (!k?.settings.muted && (voice === 'auto' || (voice === 'first' && !k?.firsts.includes(id))));
+      const speakIt = force || (!isQuiet(kid.id) && (voice === 'auto' || (voice === 'first' && !k?.firsts.includes(id))));
       let token: number | undefined;
       if (speakIt) {
         const onEnd = voice === 'first' && !force ? () => heardFirst(kid.id, id) : undefined;
@@ -184,7 +185,7 @@ export function ActivityPlayer(props: ActivityPlayerProps) {
     [band, kid.id, kid.settings.voice, rate, tuning.pitch],
   );
   // Pip's demo and the piece parade are read aloud every time, except in Quiet mode or with "Speaker button only".
-  const sayDemo = (t: string, m?: PipMood) => say(t, m, kid.settings.voice !== 'off' && !getKid(kid.id)?.settings.muted);
+  const sayDemo = (t: string, m?: PipMood) => say(t, m, kid.settings.voice !== 'off' && !isQuiet(kid.id));
 
   // ---------- per-item state ----------
   const [hintLevel, setHintLevel] = useState<0 | 1 | 2 | 3 | 4>(0);

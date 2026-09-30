@@ -1,10 +1,13 @@
 // The learner's profile: settings, XP, streaks, ratings and spaced-repetition state.
-// Persisted to localStorage (per browser). All writes go through updateProfile().
+// Persisted to localStorage (per browser). All writes go through updateProfile(), which stamps each
+// setting it changes (settingsStamps, sync/clock.ts) so linked devices merge settings one by one.
 import { useSyncExternalStore } from 'react';
 import { dayKey, daysBetween } from '../lib/srs';
 import { RD_START } from '../lib/rating';
 import type { SrsCard } from '../lib/srs';
+import { MAX_AHEAD_MS, observeStamps } from '../sync/clock';
 import { deviceId } from '../sync/device';
+import { legacyStamps, readStamps, stampChanges, type Stamps } from '../sync/fields';
 import { readTally, tallyGrowth, type Counts, type Tally } from '../sync/tally';
 
 export type BoardTheme = 'slate' | 'walnut' | 'marble' | 'tourney' | 'ink' | 'rose';
@@ -116,8 +119,13 @@ export interface Profile {
   lastVisit: string;
   /** Last local change (ms). Used to merge with the cloud copy. */
   updatedAt: number;
-  /** Last change to settings (ms), so syncing keeps the most recent choices. */
+  /** Last change to settings: the highest of settingsStamps. Older app versions merge settings as
+   *  one object by this stamp, so it is still written. */
   settingsAt?: number;
+  /** When each setting last changed (a hybrid logical clock stamp, sync/clock.ts), so syncing keeps
+   *  the latest choice of every setting on its own. A setting not listed has never been changed on
+   *  a device that stamps (data from older versions has none: see stampsOfSettings). */
+  settingsStamps?: Stamps;
   /** Look version: 1 = the walnut board and 3D pieces became the defaults. */
   look?: number;
   /** What each device added to the counters (see counters()), so progress made on two devices
@@ -162,7 +170,7 @@ export function normalizeProfile(p: Partial<Profile>): Profile {
     if (settings.pieceSet === 'cburnett') settings.pieceSet = 'staunton3d';
     if (settings.boardTheme === 'slate') settings.boardTheme = 'walnut';
   }
-  return {
+  const out: Profile = {
     ...base,
     ...p,
     look: Math.max(p.look ?? 0, 1),
@@ -173,7 +181,15 @@ export function normalizeProfile(p: Partial<Profile>): Profile {
     // Profiles from before level tracking: do not announce levels reached long ago.
     levelSeen: p.levelSeen ?? levelFromXp(p.xp ?? 0).level,
   };
+  const stamps = readStamps(p.settingsStamps, Object.keys(settings));
+  if (stamps) out.settingsStamps = stamps;
+  else delete out.settingsStamps;
+  return out;
 }
+
+/** The stamp of every setting of a profile: its own, or for one from before stamps existed (no
+ *  settingsStamps) every setting counts as changed at settingsAt, as the old whole-object rule had it. */
+export const stampsOfSettings = (p: Pick<Profile, 'settings' | 'settingsAt' | 'settingsStamps'>): Stamps => p.settingsStamps ?? legacyStamps(Object.keys(p.settings), p.settingsAt);
 
 function load(): Profile {
   try {
@@ -185,6 +201,7 @@ function load(): Profile {
 }
 
 let state: Profile = load();
+observeStamps(state.settingsStamps, state.settingsAt);
 const listeners = new Set<() => void>();
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -211,7 +228,13 @@ export function updateProfile(fn: (draft: Profile) => void) {
   const next = structuredClone(state);
   fn(next);
   next.updatedAt = Date.now();
-  if (JSON.stringify(next.settings) !== JSON.stringify(state.settings)) next.settingsAt = next.updatedAt;
+  // Each setting that changed gets its own new stamp; settingsAt follows the highest, for older versions.
+  const stamped = stampChanges(state.settings as unknown as Record<string, unknown>, next.settings as unknown as Record<string, unknown>, stampsOfSettings(state));
+  if (stamped) {
+    next.settingsStamps = stamped.stamps;
+    next.settingsAt = stamped.at;
+    next.updatedAt = Math.max(next.updatedAt, Math.min(stamped.stamp, next.updatedAt + MAX_AHEAD_MS)); // (not into the far future with a stamp that had to go past one)
+  }
   const tally = tallyGrowth(next.tally, deviceId(), counters(state), counters(next));
   if (tally) next.tally = tally;
   state = next;
@@ -221,6 +244,7 @@ export function updateProfile(fn: (draft: Profile) => void) {
 
 export function replaceProfile(p: Profile, opts: { keepTimestamp?: boolean } = {}) {
   state = opts.keepTimestamp ? p : { ...p, updatedAt: Date.now() };
+  observeStamps(state.settingsStamps, state.settingsAt);
   persist();
   listeners.forEach((l) => l());
 }

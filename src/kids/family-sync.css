@@ -1,0 +1,22 @@
+/* Family sync in Kids mode: the badge for two players with one name, the wait for the first sync and
+   the Grown-ups offer to merge them. */
+.k-avatar-twin {
+  padding: 1px 8px;
+  border-radius: var(--k-r-pill);
+  border: 2px dashed var(--k-line);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--k-ink-soft);
+}
+.k-getting {
+  font-size: 22px;
+  text-align: center;
+}
+.k-gu-twins {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 2px solid var(--k-line);
+  border-radius: 14px;
+}

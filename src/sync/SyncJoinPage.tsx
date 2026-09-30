@@ -4,6 +4,7 @@ import { Button, PageHeader } from '../components/ui';
 import { formatSyncCode, normalizeSyncCode } from './code';
 import { syncAvailable, useSync } from './index';
 import { linkDevice } from './SyncCard';
+import { WhatSyncs } from './WhatSyncs';
 
 /** Opened from a sync link (#/sync/CODE): offers to link this device. */
 export function SyncJoinPage({ code: raw }: { code?: string }) {
@@ -33,6 +34,7 @@ export function SyncJoinPage({ code: raw }: { code?: string }) {
         <span className="stat-label">Sync code</span>
         <strong className="mono sync-code">{formatSyncCode(code)}</strong>
         {s.code && <p className="muted">This device currently syncs with another code; linking switches it to this one.</p>}
+        <WhatSyncs joining />
         <div className="btn-row">
           <Button
             variant="primary"

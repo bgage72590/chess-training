@@ -5,6 +5,7 @@ import { useSyncExternalStore } from 'react';
 import { BAND_TUNING } from '../curriculum/tuning';
 import { getKid, updateKid, type KidProfile } from '../store/kidsStore';
 import { rankVoices } from './voices';
+import { isQuiet } from '../store/quiet';
 import { clipKey, spokenText } from '../lib/clipKey';
 
 interface SpeakOpts {
@@ -496,7 +497,7 @@ export function sayAs(kid: KidProfile | null | undefined, lines: string[], opts:
   const voice = kid?.settings.voice ?? 'auto';
   let onEnd: (() => void) | undefined;
   if (!opts.force && kid) {
-    if (voice === 'off' || getKid(kid.id)?.settings.muted) return undefined;
+    if (voice === 'off' || isQuiet(kid.id)) return undefined;
     if (voice === 'first') {
       const id = lineId(clean.join(' '));
       if (getKid(kid.id)?.firsts.includes(id)) return undefined;
