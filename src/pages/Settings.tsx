@@ -8,6 +8,8 @@ import { toast } from '../lib/toast';
 import { REPLY_SPEED_LABELS, type ReplySpeed } from '../lib/replyPace';
 import { useSyncState } from '../store/cloud';
 import { InstallCard } from '../components/InstallCard';
+import { ShareCard } from '../components/ShareCard';
+import { useInstall } from '../pwa/install';
 import { SyncCard } from '../sync/SyncCard';
 import { useSync } from '../sync';
 import { sinceReset } from '../sync/merge';
@@ -21,6 +23,7 @@ export function SettingsPage() {
   const [confirmReset, setConfirmReset] = useState(false);
   const sync = useSyncState();
   const linked = !!useSync().code;
+  const { ios } = useInstall();
   const [importText, setImportText] = useState('');
   const set = (patch: Partial<typeof s>) => updateProfile((d) => Object.assign(d.settings, patch));
 
@@ -103,8 +106,11 @@ export function SettingsPage() {
           </div>
           <label className="switch">
             <input id="set-sound" type="checkbox" checked={s.sound} onChange={(e) => set({ sound: e.target.checked })} />
-            Sound effects <span className="faint">(press M anywhere to mute)</span>
+            <span>
+              Sound effects <span className="faint key-hint">(press M anywhere to mute)</span>
+            </span>
           </label>
+          {ios && <p className="faint sound-tip">No sound on iPhone or iPad? Check the silent switch on the side (or Control Center).</p>}
           <label className="volume-row">
             <span className="stat-label">Volume</span>
             <input
@@ -157,6 +163,7 @@ export function SettingsPage() {
         </section>
         <SyncCard />
         <InstallCard />
+        <ShareCard />
         <section className="card settings-section">
           <h2>Your data</h2>
           <p className="muted">
@@ -211,7 +218,12 @@ export function SettingsPage() {
         <section className="card settings-section">
           <h2>Credits</h2>
           <p className="muted">
-            Engine: Stockfish 19 (GPLv3) via stockfish.js. Pieces: “cburnett” by Colin M.L. Burnett. Rules: chess.js. Puzzles are generated from Stockfish self-play and verified for a unique solution.
+            Engine: <a href="https://github.com/official-stockfish/Stockfish" target="_blank" rel="noreferrer">Stockfish</a> 19 (GPLv3) via{' '}
+            <a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noreferrer">stockfish.js</a>. Pieces: “cburnett” by Colin M.L. Burnett. Rules: chess.js. Puzzles are generated from Stockfish self-play and verified for a unique solution.
+          </p>
+          <p className="muted">
+            Source code: <a href="https://github.com/bgage72590/chess-training" target="_blank" rel="noreferrer">github.com/bgage72590/chess-training</a>. The Stockfish licence text is included with the app:{' '}
+            <a href="./engine/COPYING-stockfish.txt" target="_blank" rel="noreferrer">engine/COPYING-stockfish.txt</a>.
           </p>
           <p className="faint num" style={{ fontSize: '0.8rem' }}>
             Version {__BUILD__}

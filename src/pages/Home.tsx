@@ -5,6 +5,7 @@ import { openings, endgameDrills, units } from '../content';
 import { THEMES } from '../data/puzzles';
 import { Button, Pill, ProgressBar, Ring, Sparkline } from '../components/ui';
 import { Icon } from '../components/Icon';
+import { hasFinishedFirst, InstallGuide } from '../components/InstallGuide';
 import { dayKey } from '../lib/srs';
 
 interface PlanItem {
@@ -198,6 +199,8 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      <InstallGuide ready={hasFinishedFirst(p)} />
 
       <div className="home-grid">
         <section className="section">

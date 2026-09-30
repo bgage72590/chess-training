@@ -1,20 +1,24 @@
 import { APP_URL, install, useInstall } from '../pwa/install';
 import { Button } from './ui';
 import { Icon } from './Icon';
+import { guideKind, InstallSteps } from './InstallGuide';
+import { StorageSplitNote } from './StorageSplitNote';
 
 const HOW: Record<string, string> = {
-  ios: 'In Safari, tap the Share button, then Add to Home Screen.',
-  'safari-mac': 'In Safari, choose File, then Add to Dock.',
   menu: 'Click the install icon at the right of the address bar, or open the browser menu and choose Install Tempo (on Android: Add to Home screen).',
   unsupported: 'This browser cannot install web apps. Open Tempo in Chrome, Edge or Safari to install it.',
+  'safari-old': 'This version of Safari cannot add web apps to the Dock. Update macOS (Add to Dock needs macOS 14 Sonoma or later) or open Tempo in Chrome or Edge to install it.',
+  'in-app': 'Open this page in Chrome first: the browser built into this app cannot install Tempo. Look for Open in browser in its menu.',
 };
 
 /** The app's address, shown as text to select or type (a link may open inside the same sandbox). */
-export const APP_ADDRESS = APP_URL.replace(/^https:\/\/|\/$/g, '');
+export const APP_ADDRESS = APP_URL.replace(/^https?:\/\/|\/$/g, '');
 
 /** Settings section: install Tempo as an app with its own icon. */
 export function InstallCard() {
   const s = useInstall();
+  // On an iPhone or iPad an in-app browser needs the Safari steps; anything else gets HOW.
+  const kind = guideKind({ ...s, installed: false });
   return (
     <section className="card settings-section">
       <h2>Install the app</h2>
@@ -40,6 +44,12 @@ export function InstallCard() {
                 Install Tempo
               </Button>
             </div>
+          ) : kind ? (
+            <>
+              {kind === 'in-app' && <p><strong>Open this page in Safari first.</strong></p>}
+              <InstallSteps kind={kind} />
+              {kind !== 'in-app' && <StorageSplitNote mode="install" />}
+            </>
           ) : (
             <p>{HOW[s.how]}</p>
           )}

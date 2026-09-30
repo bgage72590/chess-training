@@ -8,8 +8,31 @@ interface InstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-/** Where the installable app is hosted (for pages that cannot install themselves). */
-export const APP_URL = 'https://bgage72590.github.io/chess-training/';
+const DEFAULT_APP_URL = 'https://bgage72590.github.io/chess-training/';
+
+/** The address to hand out: `raw` (VITE_APP_URL) when it is a web address, else the default. It
+ *  always ends in a slash and drops any query or hash. */
+export function resolveAppUrl(raw: string | undefined): string {
+  const value = raw?.trim();
+  if (!value) return DEFAULT_APP_URL;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return DEFAULT_APP_URL;
+    return url.origin + (url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`);
+  } catch {
+    return DEFAULT_APP_URL;
+  }
+}
+
+/**
+ * Where the installable app is hosted: for pages that cannot install themselves, and for handing the
+ * app to someone else (QR code, share link). Never use location.href for that: the sync page's
+ * address holds a private sync code. Set VITE_APP_URL when building to publish somewhere else.
+ */
+export const APP_URL = resolveAppUrl(import.meta.env.VITE_APP_URL);
+
+/** How this browser installs Tempo when it has no install prompt. */
+export type InstallHow = 'ios' | 'safari-mac' | 'safari-old' | 'in-app' | 'menu' | 'unsupported' | 'elsewhere';
 
 export type InstallState = {
   /** Running as an installed app (its own window or home-screen icon). */
@@ -17,31 +40,51 @@ export type InstallState = {
   /** The browser offered an install prompt we can show from a button. */
   canPrompt: boolean;
   /** How to install when there is no prompt. */
-  how: 'ios' | 'safari-mac' | 'menu' | 'unsupported' | 'elsewhere';
+  how: InstallHow;
+  /** An iPhone, iPad or iPod, whatever browser is on it. */
+  ios: boolean;
 };
+
+/** An iPhone, iPad or iPod. An iPad in its desktop-class mode says it is a Mac but has a touch screen. */
+export function isIosDevice(ua: string, touchPoints: number): boolean {
+  return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && touchPoints > 1);
+}
+
+/** A page opened inside another app (a social, chat or search app's own browser): those cannot
+ *  install web apps, and keep their own storage. */
+const IN_APP = /FBAN|FBAV|Instagram|Line\/|Snapchat|Messenger|GSA\/|Twitter/;
+
+/** Safari's version from its user agent; Infinity when it does not say. */
+const safariMajor = (ua: string) => Number(/Version\/(\d+)/.exec(ua)?.[1] ?? Infinity);
+
+export function detectHow(ua: string, touchPoints: number, elsewhere: boolean): InstallHow {
+  if (elsewhere) return 'elsewhere';
+  if (IN_APP.test(ua)) return 'in-app';
+  if (isIosDevice(ua, touchPoints)) return 'ios';
+  // Add to Dock came with Safari 17 (macOS 14 Sonoma); the version cannot tell Sonoma from older macOS.
+  if (/Macintosh/.test(ua) && /Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua)) return safariMajor(ua) < 17 ? 'safari-old' : 'safari-mac';
+  if (/Firefox\//.test(ua)) return 'unsupported';
+  return 'menu';
+}
+
+function currentHow(): InstallHow {
+  if (typeof window === 'undefined') return 'unsupported';
+  // Inside another page (e.g. the claude.ai viewer) or the single-file build: install from the hosted app.
+  return detectHow(navigator.userAgent, navigator.maxTouchPoints, window.top !== window.self || import.meta.env.MODE === 'single');
+}
 
 let prompt: InstallPromptEvent | null = null;
 let state: InstallState = {
   installed: typeof window !== 'undefined' && (matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true),
   canPrompt: false,
-  how: detectHow(),
+  how: currentHow(),
+  ios: typeof window !== 'undefined' && isIosDevice(navigator.userAgent, navigator.maxTouchPoints),
 };
 const listeners = new Set<() => void>();
 const set = (s: Partial<InstallState>) => {
   state = { ...state, ...s };
   listeners.forEach((l) => l());
 };
-
-function detectHow(): InstallState['how'] {
-  if (typeof window === 'undefined') return 'unsupported';
-  // Inside another page (e.g. the claude.ai viewer) or the single-file build: install from the hosted app.
-  if (window.top !== window.self || import.meta.env.MODE === 'single') return 'elsewhere';
-  const ua = navigator.userAgent;
-  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'ios';
-  if (/Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua)) return 'safari-mac';
-  if (/Firefox\//.test(ua)) return 'unsupported';
-  return 'menu';
-}
 
 /** Call once at start-up, before the browser may fire its install prompt. */
 export function setupInstall() {
