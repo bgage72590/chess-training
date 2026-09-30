@@ -33,14 +33,36 @@ the side of the phone does not mute the app's sounds.
 ## Building the apps (GitHub Actions, no Mac needed)
 
 The workflow `.github/workflows/native.yml` runs on GitHub's macOS machines, which are free for a public
-repository. Run it from the repository's Actions tab: Native apps, Run workflow.
+repository. Run it from the repository's Actions tab: Native apps, Run workflow. A run takes about 12 to 15 minutes.
 
-- `mac`: builds the universal Mac app and uploads `Tempo-mac.zip` and `Tempo-mac.dmg` as a run artifact.
+- `mac`: builds the universal Mac app and uploads `Tempo-mac.zip` and `Tempo-mac.dmg` as a run artifact
+  (kept 14 days).
 - `ios`: builds the app for the iOS Simulator and runs it on an iPhone and an iPad simulator.
 - `smoke`: each app opens its diagnostics page and posts what works inside it (secure context, the engine's
-  wasm file, voices, Stockfish, whether the sync service can be reached from the app's origin, safe areas) to a
-  listener on the runner. The reports are printed in the job summary and saved with the screenshots.
+  wasm file, voices played in an audio element, Stockfish, whether the sync service can be reached from the
+  app's origin, safe areas) to a listener on the runner. The reports are printed in the job log and saved with
+  the screenshots.
 - `release` and a tag name: also attach the Mac app to a GitHub release, so a link can be handed out.
+
+## What the first runs showed
+
+Both apps built and ran on `macos-26` runners (real WKWebView, the same web engine as Safari).
+
+| | Mac app (`tauri://localhost`) | iPad simulator (`capacitor://localhost`) |
+| --- | --- | --- |
+| Build | universal (`x86_64 arm64`), ad-hoc signed (`Signature=adhoc`, no team), `Tempo.app` 157 MiB, `.dmg` 152 MiB, zip 152 MB | builds with `CODE_SIGNING_ALLOWED=NO` for the simulator |
+| Secure context, `crypto.subtle`, Cache API, `navigator.share`, clipboard | all present | all present |
+| Service worker | the API exists but the app registers none | absent, as expected |
+| Stockfish | starts as real Stockfish (not the backup engine), first search in 0.2 to 0.3 s | starts as real Stockfish; about 1 s on the shared CI simulator |
+| `stockfish.wasm` file type | `application/wasm` | `application/wasm` |
+| Pip's voice clips | fetched; a clip loads and plays in an `<audio>` element. The file server answers a byte-range request with the whole file (200) instead of 206, which did not matter | fetched with a 206 range answer (loading and playing a clip in an audio element is being checked in the second run) |
+| Sync service (Supabase) from the app's origin | reachable (HTTP 200) | reachable (HTTP 200, so cross-origin requests from `capacitor://` are allowed) |
+| Device (system) English voices | 25 | 25 |
+| Safe areas | 0 | top 32 px, bottom 20 px |
+
+Not checked, because they need a real device or a person: the silent switch on a real iPhone or iPad (the
+audio session is set natively, see above), haptics, how a person's Mac reacts to the unsigned app, and
+anything about signing, notarization and TestFlight.
 
 ## Opening the Mac app (unsigned)
 
