@@ -6,6 +6,7 @@ import { navigate } from '../../router';
 import { sync, syncAvailable, useSync } from '../../sync';
 import { MAX_KIDS, setActiveKid, useKids, type KidProfile } from '../store/kidsStore';
 import { currentWorld, totalStars } from '../store/progress';
+import { twinGroups } from '../store/syncKids';
 import { REGISTRY } from '../packs';
 import { WORLD_BY_ID } from '../curriculum/worlds';
 import { AvatarTile } from '../ui/AvatarTile';
@@ -76,6 +77,8 @@ export function ProfilePicker() {
     return () => clearTimeout(t);
   }, [s.kids]);
 
+  // The same two players Grown-ups offers to merge: same name and age group (a 5-year-old Mia and a 12-year-old Mia are two).
+  const twins = new Set(twinGroups(s.kids).flat().map((k) => k.id));
   const addKid = () => (s.kids.length ? requireGate('Add a new player.', () => go.newKid()) : go.newKid());
 
   // On a linked device that has not heard from the copy yet, the family's players may be a moment away:
@@ -195,7 +198,7 @@ export function ProfilePicker() {
       </header>
       <div className="k-avatar-grid">
         {s.kids.map((k) => (
-          <AvatarTile key={k.id} kid={k} rank={rankOf(k)} stars={totalStars(k)} resting={onBreak(k)} onPick={() => pickKid(k)} twin={s.kids.some((o) => o.id !== k.id && o.name.trim().toLowerCase() === k.name.trim().toLowerCase())} />
+          <AvatarTile key={k.id} kid={k} rank={rankOf(k)} stars={totalStars(k)} resting={onBreak(k)} onPick={() => pickKid(k)} twin={twins.has(k.id)} />
         ))}
         {s.kids.length < MAX_KIDS && (
           <button type="button" className="k-avatar-tile k-avatar-new" onClick={addKid}>

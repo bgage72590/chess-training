@@ -17,6 +17,7 @@ import { newSyncCode } from '../src/sync/code';
 import { getProfile, normalizeProfile, replaceProfile, stampsOfSettings, updateProfile } from '../src/store/profile';
 import {
   __setKidsStateForTests,
+  applySyncedKids,
   defaultKidsState,
   exportKids,
   getKids,
@@ -377,6 +378,15 @@ describe('kids sound and voice settings', () => {
     expect(B.act(() => isQuiet('k-mia'))).toBe(false);
     await A.sync();
     expect(A.act(() => isQuiet('k-mia'))).toBe(true); // synced kids never replace this device's own quiet mode
+  });
+
+  it("applying synced kids keeps this device's own block: PIN, device voice, quiet mode, recorded-voice choice", () => {
+    const own = { pinSalt: 's', pinHash: 'h', voiceURI: 'v', quiet: { 'k-mia': 5 }, useRecorded: true };
+    __setKidsStateForTests({ ...defaultKidsState(), kids: [mia()], activeKid: 'k-mia', device: own, updatedAt: 1 });
+    applySyncedKids({ kids: [{ ...mia(), name: 'Mia B' }, mia('k-leo', 'Leo')], family: { stars: 3, parties: 0 }, updatedAt: 9 });
+    expect(getKids().device).toEqual(own);
+    expect(getKids().kids.map((k) => k.name)).toEqual(['Mia B', 'Leo']);
+    expect(getKids().activeKid).toBe('k-mia');
   });
 
   it('quiet mode saved the old way (settings.muted) is kept on this device when it is loaded, and only there', () => {
@@ -746,6 +756,35 @@ describe('an older app version syncing the same copy', () => {
     await N.sync();
     expect(N.s.theme).toBe('dark');
     expect(N.s).toMatchObject({ sound: false, volume: O.s.volume, theme: O.s.theme });
+  });
+
+  it("a kid's stamps come from the mirror after an older device merged the kids and dropped them", async () => {
+    const backend = memoryBackend();
+    const N = new Dev(backend);
+    const N2 = new Dev(backend);
+    const O = new Dev(backend, 0, oldParts());
+    for (const d of [N, N2, O]) withKid(d);
+    const code = newSyncCode();
+    at(0);
+    await N.link(code);
+    await N2.link(code, { mustExist: true });
+    await O.link(code, { mustExist: true });
+    at(10);
+    N.act(() => updateKid('k-mia', (k) => void (k.settings.pipVoice = 'rocket')));
+    await N.sync();
+    at(20);
+    await O.sync(); // O has pulled the rocket voice
+    at(30);
+    N2.act(() => updateKid('k-mia', (k) => void (k.settings.pipVoice = 'honey'))); // offline: N2 has not heard of rocket
+    at(50);
+    O.act(() => updateKid('k-mia', (k) => void (k.settings.rate = 1.15)));
+    await O.sync(); // an older device's whole-object write: no stamps on the kid any more
+    at(60);
+    await N2.sync();
+    at(70);
+    await N.sync();
+    // rocket was picked at 10, honey at 30: honey stands, and O's later change to another setting did not give rocket a later stamp
+    for (const d of [N, N2]) expect(d.kid().settings).toMatchObject({ pipVoice: 'honey', rate: 1.15 });
   });
 
   it('a copy an older device wrote (no mirror) counts every setting as changed at settingsAt, as before', async () => {

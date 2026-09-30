@@ -51,6 +51,9 @@ function stable(v: unknown): string {
   );
 }
 
+/** The longest a sync waits for its `prepare` hook. */
+export const PREPARE_WAIT_MS = 8000;
+
 export class SyncEngine {
   private snap: SyncSnapshot = { status: 'off', code: null, lastSyncedAt: null, error: null, caughtUp: false };
   private listeners = new Set<() => void>();
@@ -155,12 +158,21 @@ export class SyncEngine {
     return this.running;
   }
 
+  /** Waits for `prepare`, but not for one that hangs (a chunk on a stalled connection): the parts already registered sync, and the late one joins the next sync. */
+  private async prepared() {
+    if (!this.prepare) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<void>((resolve) => void (timer = setTimeout(resolve, PREPARE_WAIT_MS)));
+    await Promise.race([this.prepare().catch(() => undefined), late]);
+    clearTimeout(timer);
+  }
+
   private async run() {
     const code = this.snap.code!;
     if (!this.online()) return this.set({ status: 'offline' });
     this.set({ status: 'syncing', error: null });
     try {
-      await this.prepare?.().catch(() => undefined);
+      await this.prepared();
       for (let attempt = 0; attempt < 5; attempt++) {
         const remote = await this.backend.get(code);
         if (this.snap.code !== code) return; // unlinked meanwhile
