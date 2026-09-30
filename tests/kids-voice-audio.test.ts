@@ -46,6 +46,8 @@ interface Options {
   /** play() answers a moment later, and a pause() or a new src before that aborts it, as a real element does. */
   asyncPlay?: boolean;
   voices?: FakeUtterance['voice'][];
+  /** Length of every clip in the manifest (default 900). */
+  ms?: number;
 }
 
 function world(o: Options = {}) {
@@ -120,7 +122,7 @@ function world(o: Options = {}) {
       this.abort();
     }
   }
-  const clips = Object.fromEntries((o.clips ?? [LINE, PREVIEW]).map((t) => [key(t), 900]));
+  const clips = Object.fromEntries((o.clips ?? [LINE, PREVIEW]).map((t) => [key(t), o.ms ?? 900]));
   const fetchStub = async (url: string) => {
     w.fetched.push(url);
     const done = async (body: unknown) => {
@@ -487,6 +489,26 @@ describe('a clip that is cut off', () => {
     await adv(900 + 2000 - 100);
     expect(m.speech.state.speaking).toBe(true);
     await adv(200);
+    expect(m.speech.state.speaking).toBe(false);
+    expect(onEnd).not.toHaveBeenCalled();
+  });
+
+  it('a slowed clip gets its longer playing time before the watchdog drops it', async () => {
+    const w = world({ ms: 8000 });
+    const m = await load(w);
+    await m.speech.loadPipVoices();
+    m.speech.enter();
+    w.gesture('touchend');
+    await adv(0);
+    const onEnd = vi.fn();
+    m.speech.speak([LINE], { clipRate: 0.7, onEnd });
+    await adv(50);
+    expect(w.el!.playbackRate).toBe(0.7);
+    await adv(8000 + 2000 + 100); // past length + 2 s, but the clip plays for 8000 / 0.7 = 11.4 s
+    expect(m.speech.state.speaking).toBe(true);
+    await adv(1600); // 11.4 s + 2 s not reached yet either
+    expect(m.speech.state.speaking).toBe(true);
+    await adv(2000);
     expect(m.speech.state.speaking).toBe(false);
     expect(onEnd).not.toHaveBeenCalled();
   });

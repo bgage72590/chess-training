@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const GESTURES = ['pointerup', 'touchend', 'click', 'keydown'];
 
-type Resume = 'run' | 'hang' | 'stay' | 'reject';
+type Resume = 'run' | 'hang' | 'until-running' | 'stay' | 'reject';
 
 interface Env {
   win: EventTarget & Record<string, unknown>;
@@ -42,6 +42,8 @@ class FakeContext extends EventTarget {
     this.resumes++;
     const how = this.env.cfg.resume;
     if (how === 'hang') return new Promise<void>(() => undefined);
+    // A real resume() settles when the interruption ends and the state changes to running.
+    if (how === 'until-running') return new Promise<void>((done) => this.addEventListener('statechange', () => this.state === 'running' && done(), { once: false }));
     if (how === 'reject') return Promise.reject(new Error('not allowed'));
     if (how === 'run') this.setState('running');
     return Promise.resolve();
@@ -321,7 +323,7 @@ describe('a context that stops', () => {
 
   it('drops a sound whose resume took longer than a moment', async () => {
     vi.useFakeTimers();
-    const env = setup({ initial: 'suspended', resume: 'hang' });
+    const env = setup({ initial: 'suspended', resume: 'until-running' });
     const audio = await load();
     const draw = vi.fn();
     audio.withRunningContext(draw);
@@ -329,6 +331,19 @@ describe('a context that stops', () => {
     env.contexts[0].setState('running'); // the interruption ended long after the sound was wanted
     await vi.advanceTimersByTimeAsync(0);
     expect(draw).not.toHaveBeenCalled();
+  });
+
+  it('plays a sound whose resume came within a moment', async () => {
+    vi.useFakeTimers();
+    const env = setup({ initial: 'suspended', resume: 'until-running' });
+    const audio = await load();
+    const draw = vi.fn();
+    audio.withRunningContext(draw);
+    await vi.advanceTimersByTimeAsync(audio.LATE_MS - 100);
+    expect(draw).not.toHaveBeenCalled();
+    env.contexts[0].setState('running');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(draw).toHaveBeenCalledTimes(1);
   });
 
   it("makes a new context when the old one is closed, on the next sound", async () => {

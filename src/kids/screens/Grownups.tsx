@@ -263,6 +263,7 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
   // The picked voice may be another kid's: leaving gives Pip the active kid's voice back.
   useEffect(
     () => () => {
+      lastPick.current = ''; // a preview still waiting for a voice list is not said on the next screen
       const all = getKids();
       speech.setPipVoice(all.kids.find((k) => k.id === all.activeKid)?.settings.pipVoice);
     },
