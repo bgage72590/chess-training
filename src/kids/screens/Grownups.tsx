@@ -318,13 +318,21 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
   const noRecorded = listLoaded && !pipVoices.length;
   const pipVoice = noRecorded ? DEVICE_VOICE : st.pipVoice || speech.defaultPipVoice();
   const preview = () => speech.speak([VOICE_PREVIEW], { rate: st.rate ?? BAND_TUNING[kid.band].speechRate, clipRate: st.rate ?? undefined });
+  // A voice not used yet loads its clip list first: the preview waits for it, or the device voice would read it instead.
+  const lastPick = useRef('');
   const pickVoice = (id: string) => {
     set('pipVoice', id);
-    speech.setPipVoice(id);
-    preview();
+    lastPick.current = id;
+    void speech.setPipVoice(id).then(() => lastPick.current === id && preview());
   };
   // The picked voice may be another kid's: leaving gives Pip the active kid's voice back.
-  useEffect(() => () => speech.setPipVoice(pipVoiceFor(getKids())), []);
+  useEffect(
+    () => () => {
+      lastPick.current = ''; // a preview still waiting for a voice list is not said on the next screen
+      void speech.setPipVoice(pipVoiceFor(getKids()));
+    },
+    [],
+  );
   // A new age group then offers that age's settings, asked here: a browser dialog is blocked
   // inside the claude.ai viewer.
   const [offerReset, setOfferReset] = useState<{ kid: string; band: AgeBand } | null>(null);

@@ -94,9 +94,15 @@ export function KidsApp({ route }: { route: string }) {
   useEffect(() => speech.setVoice(s.device.voiceURI), [s.device.voiceURI]);
   // The active kid's voice, or the family's while nobody is picked (the picker, the New player wizard).
   const pipVoice = pipVoiceFor(s);
-  useEffect(() => speech.setPipVoice(pipVoice), [pipVoice]);
+  useEffect(() => void speech.setPipVoice(pipVoice), [pipVoice]);
   // Opening Kids mode looks for news from the other devices (a voice or a player set there) right away.
   useEffect(() => void sync.syncNow(), []);
+  // Sound is Pip's voice: while Kids mode is open the audio session is 'playback', and the first gesture of any
+  // kind (a tap, a key press, VoiceOver or Switch Control) unlocks the sounds and the voice (lib/audio.ts).
+  useEffect(() => {
+    const stops = [kidsSound.enter(), speech.enter()];
+    return () => stops.forEach((stop) => stop());
+  }, []);
   useEffect(() => {
     const prev = document.title;
     document.title = "Pip's Chess Quest";
@@ -187,10 +193,6 @@ export function KidsApp({ route }: { route: string }) {
         data-screen={r.screen}
         data-veil={veil ? '1' : undefined}
         style={{ ['--k-btn-h' as string]: `${tuning.buttonPx}px` }}
-        onPointerDownCapture={() => {
-          speech.unlock();
-          kidsSound.unlock();
-        }}
       >
         <div className="k-sky-deco" aria-hidden="true">
           <span className="k-cloud c1" />

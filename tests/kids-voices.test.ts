@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rankVoices, voiceNote } from '../src/kids/player/voices';
+import { rankVoices, voiceNote, voiceScore } from '../src/kids/player/voices';
 
 const v = (name: string, lang = 'en-US', localService = true) => ({ name, lang, voiceURI: name, localService });
 
@@ -20,6 +20,21 @@ describe('read-aloud voice choice', () => {
     const edge = [v('Microsoft David - English (United States)'), v('Microsoft Zira - English (United States)'), v('Microsoft Ana Online (Natural) - English (United States)', 'en-US', false), v('Microsoft Ava Online (Natural) - English (United States)', 'en-US', false)];
     expect(rankVoices(edge)[0].name).toMatch(/^Microsoft Ava Online/);
     expect(rankVoices([v('Google US English', 'en-US', false), v('Fred')])[0].name).toBe('Google US English');
+  });
+
+  it('finds Premium and Enhanced voices by their voiceURI when the name does not say so', () => {
+    const apple = (name: string, tier: string, lang = 'en-US') => ({ name, lang, voiceURI: `com.apple.voice.${tier}.${lang}.${name}`, localService: true });
+    // iOS and macOS list a downloaded voice as plain "Zoe", and only the voiceURI carries the tier.
+    expect(voiceScore(apple('Zoe', 'premium'))).toBe(voiceScore(v('Zoe (Premium)')));
+    expect(voiceScore(apple('Nicky', 'enhanced'))).toBe(voiceScore(v('Nicky (Enhanced)')));
+    expect(voiceScore(apple('Nicky', 'compact'))).toBeLessThan(voiceScore(apple('Nicky', 'enhanced')));
+    const compact = apple('Samantha', 'compact');
+    expect(rankVoices([compact, apple('Evan', 'enhanced'), apple('Zoe', 'premium')]).map((x) => x.name)).toEqual(['Zoe', 'Evan', 'Samantha']);
+    // The name is still enough, and a voice with neither is ordinary.
+    expect(voiceScore(v('Zoe (Premium)'))).toBe(voiceScore(apple('Zoe', 'premium')));
+    expect(voiceScore({ name: 'Moira', lang: 'en-IE', voiceURI: 'premiumish-voice', localService: true })).toBeLessThan(80);
+    // A premium tier in the URI does not rescue a joke voice.
+    expect(voiceScore(apple('Zarvox', 'premium'))).toBe(-Infinity);
   });
 
   it('uses on-device voices when offline', () => {

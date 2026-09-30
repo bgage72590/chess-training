@@ -539,7 +539,7 @@ The look is a bright "toy box on a sunny day". It is clearly different from the 
 ### 7.7 Sound (`src/kids/lib/kidsSound.ts`)
 Sounds are synthesized with WebAudio in the style of `src/chess/sound.ts`, about 30% quieter, with no harsh square waves. **Kids code never imports `src/chess/sound.ts`**. That fact is enforced by a test, and it means the kid's mute also silences all move sounds. Board itself plays no sounds.
 
-All sounds check `kid.settings.sound`. `kidsSound.unlock()` resumes the AudioContext on the first tap on the profile picker (iOS).
+All sounds check `kid.settings.sound`. The AudioContext is the app's shared one (`src/lib/audio.ts`, also used by `src/chess/sound.ts`). Kids mode asks for the `playback` audio session (`navigator.audioSession`, Safari 16.4 and later), so Pip's sounds play with the ringer switch on silent; the grown-up app keeps the default session, and Kids mode puts it back when it closes. The first tap, key press or VoiceOver / Switch Control activation anywhere (listened for as `pointerup`, `touchend`, `click` and `keydown`, in the capture phase) creates and resumes the context, unless the kid's sound is off or muted, and it tries again on every gesture until the context reports `running`. A context that iOS leaves `interrupted` (a call, Siri, the lock screen) or `suspended` is resumed on the next sound and the next gesture, and a closed one is replaced. A sound asked for while the context is not running is not scheduled (it would queue against a stopped clock and play in one burst); if the resume comes within 300 ms it plays, otherwise it is skipped.
 
 | name | use | synthesis |
 |---|---|---|
@@ -613,7 +613,7 @@ All routes live under `#/kids/...` and are rendered by KidsApp full-screen, with
    - The Family Star Jar is at the top center, showing its fill level plus the count.
    - A grid of AvatarTiles plus a dashed "+ New player" tile. Adding a player needs the gate once one profile exists.
    - Bottom corners: "Grown-ups" (lock icon) and "Exit" (door icon), both small and low-contrast, both behind the gate.
-   - The first tap anywhere calls `speech.unlock()` and `kidsSound.unlock()`.
+   - The first gesture anywhere (tap, key press, VoiceOver activation) unlocks Pip's voice and the sounds (`speech.enter()` and `kidsSound.enter()` in KidsApp, section 7.7 and 10.1).
    - With exactly one profile, a "Hi Mia!" splash shows with a tap to continue.
    - Up to 8 profiles.
 2. **New player** (`kids/new`)
@@ -695,7 +695,12 @@ All routes live under `#/kids/...` and are rendered by KidsApp full-screen, with
 - **Voice loading.** Listen for `voiceschanged` and re-pick the voice then.
   - Preference order: the grown-up's chosen `voiceURI`; then the first voice with `localService === true` and `lang` starting with `en-US`, `en-GB`, then `en`; then any `en` voice.
   - Prefer on-device voices so no text goes to cloud voice services.
-- **First-gesture unlock (iOS).** `speech.unlock()` is called from the first pointerdown on the picker. It speaks an empty utterance at volume 0. `speak()` queues lines until `unlocked` is true.
+- **First-gesture unlock (iOS).** While Kids mode is open, `src/lib/audio.ts` listens for `pointerup`, `touchend`, `click` and `keydown` (capture phase) and runs `speech`'s unlock inside each one until it works: it speaks an empty utterance at volume 0 and plays a silent 80 ms WAV on the `<audio>` element that plays the clips. It counts as unlocked only when that `play()` resolves, and the listeners go away only then. `speak()` queues lines until `unlocked` is true, and the queued lines are said when the unlock works.
+- **A line the device refused is not a line said.** `onEnd` (and so a "first" line being recorded as heard) runs only when every line of the call began: a clip started playing or an utterance fired `onstart`. When autoplay is refused (`NotAllowedError`) or the engine answers `not-allowed`, the lines not yet said go back to the queue, the unlock is armed again and the next gesture says them. No speech engine, or an engine error, ends the line as not heard.
+- **Interruptions.** A clip the OS pauses (call, Siri, lock, app switch) sends no `ended`: `pause` while not ended, `visibilitychange` to hidden and `pagehide` cancel the speech (the child left), and a watchdog of the clip's length plus 2 s does the same. A clip still loading after 8 s goes to the device voice.
+- **Device voice.** The voice is picked at speak time if none was yet. After a cancel that had speech in flight, the next utterance waits 80 ms (Safari drops a `speak()` that follows a `cancel()` at once), and an utterance whose `onstart` has not fired in 1.5 s is cancelled and tried once more, then given up. Apple voices are ranked Premium or Enhanced by name or by `voiceURI` (`com.apple.voice.premium.*`).
+- **Recorded voice still loading.** `setPipVoice()` returns a promise for the clip list (at most 6 s); the Grown-ups preview waits for it. A line that fell back to the device voice because the list was late, and has not begun when the list arrives, is said by the recording instead.
+- **Manual checks on a real iPhone, iPad and Mac (WebKit is not in the test rig).** (a) Ringer switch on silent: Pip's voice and the sounds still play in Kids mode, and the grown-up app's move sounds stay muted. (b) Fresh load, then only a keyboard Enter, or VoiceOver's double tap, on the first button: Pip speaks. (c) Lock the phone or take a call while Pip is mid-line, come back: no stuck caption highlight, and a tap plays sounds and voice again. (d) A first move sound is not clipped. (e) Preview a voice not used before, on a slow connection: the recorded voice speaks, not the device voice. (f) The device voice "Automatic" picks a Premium or Enhanced voice when one is downloaded.
 - **Queue.** `speak(lines, {onWord, onEnd})` cancels the previous speech, then queues the lines. `speech.cancel()` runs on every route change (a KidsApp effect on `route`) and on player unmount.
 - **Karaoke.** `onboundary` word events underline the current word. **Graceful fallback**: if no boundary event arrives within 700 ms of `onstart`, switch to timed highlighting at `2.4 * rate` words per second. If `onstart` never fires, highlight nothing (the whole bubble stays readable).
 - **Pronunciation map** (`pronounce(text, band)`), applied only to the spoken string, never to the caption:
@@ -1976,7 +1981,7 @@ The UI team, the board team and the pieces team are editing some of the same fil
 2. From a fresh browser: create a Sprout, and the first screen after the wizard shows Pip, then the rook and a star. A move happens within 30 s. Play through w1 to w4 (stars nodes), w5 pawn steps and promo, w6 free lunch, lava and boss, w7 check and mate1. Earn stickers. Other nodes show "Coming soon". Worlds pass under the missing-pack rule.
 3. Placement: an "I play real games" Champion who passes cp3 to cp5 starts at w6 with paper planes on w1-w5.
 4. Gate: exit, Grown-ups and the session extension all require it. The PIN works. Lock mode opens `#/kids` on reload.
-5. Speech works after the first tap on iOS Safari (manual check). Muting kid sound silences everything, including moves.
+5. Speech works after the first tap, key press or VoiceOver activation on iOS Safari (manual check, see the checklist in section 10.1). Muting kid sound silences everything, including moves.
 6. Screenshot check (section 15) passes.
 
 ### Step 1: PACKS (run in parallel after step 0 merges)
