@@ -53,9 +53,9 @@ Both apps built and ran on `macos-26` runners (real WKWebView, the same web engi
 | Build | universal (`x86_64 arm64`), ad-hoc signed (`Signature=adhoc`, no team), `Tempo.app` 157 MiB, `.dmg` 152 MiB, zip 152 MB | builds with `CODE_SIGNING_ALLOWED=NO` for the simulator |
 | Secure context, `crypto.subtle`, Cache API, `navigator.share`, clipboard | all present | all present |
 | Service worker | the API exists but the app registers none | absent, as expected |
-| Stockfish | starts as real Stockfish (not the backup engine), first search in 0.2 to 0.3 s | starts as real Stockfish; about 1 s on the shared CI simulator |
+| Stockfish | starts as real Stockfish (not the backup engine), first search in 0.2 to 0.3 s | starts as real Stockfish; first search 0.4 to 1 s on the shared CI simulator |
 | `stockfish.wasm` file type | `application/wasm` | `application/wasm` |
-| Pip's voice clips | fetched; a clip loads and plays in an `<audio>` element. The file server answers a byte-range request with the whole file (200) instead of 206, which did not matter | fetched with a 206 range answer (loading and playing a clip in an audio element is being checked in the second run) |
+| Pip's voice clips | fetched; a clip loads and plays in an `<audio>` element. The file server answers a byte-range request with the whole file (200) instead of 206, which did not matter | fetched with a 206 range answer; a clip loads and plays in an `<audio>` element |
 | Sync service (Supabase) from the app's origin | reachable (HTTP 200) | reachable (HTTP 200, so cross-origin requests from `capacitor://` are allowed) |
 | Device (system) English voices | 25 | 25 |
 | Safe areas | 0 | top 32 px, bottom 20 px |
