@@ -58,6 +58,8 @@ def main():
                 clips[os.path.basename(path)[:-4]] = ms
             m['clips'] = dict(sorted(clips.items()))
             m['version'] = version + TRIM
+            if 'bytes' in m:  # the size the app shows before a download follows the new files
+                m['bytes'] = sum(os.path.getsize(os.path.join(folder, k + '.mp3')) for k in clips)
             with open(mpath, 'w') as f:
                 json.dump(m, f, separators=(',', ':'))
             print(f'{vid}: {len(clips)} clips, {before / 1000:.0f} s -> {after / 1000:.0f} s, version {m["version"]}', flush=True)

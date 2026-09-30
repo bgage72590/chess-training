@@ -1,7 +1,7 @@
 // Grown-ups: keeping one of Pip's recorded voices on the device, so it plays without the internet.
 // Without this a voice streams as it is used and only the lines already heard are kept. Grown-up
 // copy: read, never spoken (scripts/voice/collect.ts leaves this file out).
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PipVoice } from '../player/speech';
 import { formatSize, isIos, megabytes, mustAskFirst, packView, useVoicePack, voicePacks, type PackRun } from '../player/voicePack';
 import './VoicePackRow.css';
@@ -22,6 +22,20 @@ export function VoicePackRow({ voices, selected }: { voices: PipVoice[]; selecte
 function PackRow({ voice }: { voice: PipVoice }) {
   const { run, status, supported, busyWith } = useVoicePack(voice.id);
   const [asking, setAsking] = useState(false);
+  // The button that opens the question is replaced by it: keep keyboard and screen-reader focus with
+  // the person, on the question and back on the button after 'Not now'.
+  const actionRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const moved = useRef(false);
+  useEffect(() => {
+    if (asking) {
+      moved.current = true;
+      confirmRef.current?.focus();
+    } else if (moved.current) {
+      moved.current = false;
+      actionRef.current?.focus();
+    }
+  }, [asking]);
   const view = packView(run, status);
   const otherBusy = !!busyWith && busyWith !== voice.id;
   const connection = (navigator as Navigator & { connection?: { type?: string; saveData?: boolean } }).connection;
@@ -72,7 +86,7 @@ function PackRow({ voice }: { voice: PipVoice }) {
         <small>{text}</small>
       </span>
       {action && !asking && (
-        <button type="button" className="k-gu-btn" onClick={action.onClick} disabled={otherBusy && view.kind !== 'downloading'}>
+        <button ref={actionRef} type="button" className="k-gu-btn" onClick={action.onClick} disabled={otherBusy && view.kind !== 'downloading'}>
           {action.label}
         </button>
       )}
@@ -82,7 +96,7 @@ function PackRow({ voice }: { voice: PipVoice }) {
             {ios ? 'This is a large download, and the screen must stay open until it finishes. It may use mobile data.' : 'This is a large download and may use mobile data.'} Save {voice.name} ({formatSize(view.kind === 'streams' || view.kind === 'update' ? view.size : 0)}) now?
           </span>
           <div className="k-gu-inline">
-            <button type="button" className="k-gu-btn" onClick={begin}>
+            <button ref={confirmRef} type="button" className="k-gu-btn" onClick={begin}>
               Download now
             </button>
             <button type="button" className="k-gu-btn" onClick={() => setAsking(false)}>
