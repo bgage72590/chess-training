@@ -1,14 +1,20 @@
-// Syncs the kids (and the family star jar) across linked devices. Registered when Kids mode loads;
-// until then the synced copy keeps the kids part untouched. Like the grown-up merge, it keeps
-// progress made on either device: nodes, stickers, days and games combine item by item, minutes
-// and stars add up what each device did (sync/tally.ts), and names, avatars and settings follow
-// the device where a grown-up (or the kid) changed them last. Deleted kids stay deleted, a
-// reset wins over progress made before it, and so does a grown-up's "Starting rank".
+// Syncs the kids (and the family star jar) across linked devices. Registered (sync/index.ts,
+// loadKidsPart) whenever a device is linked, whether or not Kids mode was opened; until then the
+// synced copy keeps the kids part untouched. Like the grown-up merge, it keeps progress made on
+// either device: nodes, stickers, days and games combine item by item, minutes and stars add up what
+// each device did (sync/tally.ts), and a kid's name, avatar, age group and every setting follow the
+// device where they were changed last, field by field (sync/fields.ts: a grown-up's voice pick is
+// not undone by a change to another setting on a device that had not heard of it yet). Deleted kids
+// stay deleted, a reset wins over progress made before it, and so does a grown-up's "Starting rank".
+// The same kid made on two devices before they were linked is merged, or offered for merging
+// (twins). Quiet mode, the PIN and the device voice are not here: they stay on the device.
 import { dayKey } from '../../lib/srs';
-import { addSyncPart, sync, syncAvailable, tallyPart } from '../../sync';
+import { addSyncPart, mirrorPart, sync, syncAvailable, tallyPart } from '../../sync';
+import type { SyncPart } from '../../sync/engine';
+import { mergeFields, mirrorOf, readMirror, reconcile, stableJson, type StampMirror } from '../../sync/fields';
 import { filterTally, maxTally, mergeTallied, readTally, type Tally } from '../../sync/tally';
-import { placementRating, unplaceFrom } from './progress';
-import { applySyncedKids, getKids, kidCounters, normalizeKids, subscribeKids, KIDS_KEEP_MAX, SEEN_MAX, FIRSTS_MAX, type DayRecord, type KidProfile, type KidsState, type NodeProgress } from './kidsStore';
+import { placementRating, totalStars, unplaceFrom } from './progress';
+import { applySyncedKids, choiceFields, defaultSettings, getKids, kidCounters, normalizeKids, stampsOfKid, subscribeKids, updateKids, withChoiceFields, KIDS_KEEP_MAX, SEEN_MAX, FIRSTS_MAX, type DayRecord, type KidProfile, type KidsState, type NodeProgress } from './kidsStore';
 
 export type SyncedKids = Pick<KidsState, 'kids' | 'family' | 'removed' | 'updatedAt'>;
 
@@ -114,8 +120,9 @@ export function mergeKid(a: KidProfile, b: KidProfile): KidProfile {
   const startAt = (a.startAt?.t ?? 0) > (b.startAt?.t ?? 0) ? a.startAt : b.startAt;
   if (startAt && (a.startAt?.t ?? 0) < startAt.t) a = kidSinceStart(a, startAt);
   if (startAt && (b.startAt?.t ?? 0) < startAt.t) b = kidSinceStart(b, startAt);
-  // Name, avatar, age group and settings: from the copy where they changed last (ties: b).
-  const chosen = (a.settingsAt ?? 0) > (b.settingsAt ?? 0) ? a : b;
+  // Name, avatar, age group and each setting: the later stamp wins, field by field.
+  const choices = mergeFields({ values: choiceFields(a), stamps: stampsOfKid(a) }, { values: choiceFields(b), stamps: stampsOfKid(b) });
+  const chosen = withChoiceFields(b, choices.values);
   const pz = b.puzzle.attempts > a.puzzle.attempts ? b.puzzle : a.puzzle;
   const { counts, tally } = mergeTallied(kidCounters(a), a.tally, kidCounters(b), b.tally);
   const days = mergeRecord(a.days, b.days, mergeDay);
@@ -151,8 +158,14 @@ export function mergeKid(a: KidProfile, b: KidProfile): KidProfile {
   // The play-time limit follows the most recent session, so switching devices does not reset it.
   const session = [a.session, b.session].filter((s) => !!s).sort((x, y) => y!.last - x!.last)[0];
   if (session) out.session = session;
-  const settingsAt = Math.max(a.settingsAt ?? 0, b.settingsAt ?? 0);
-  if (settingsAt) out.settingsAt = settingsAt;
+  const stamped = Object.keys(choices.stamps);
+  if (stamped.length) {
+    out.stamps = choices.stamps;
+    out.settingsAt = Math.max(...Object.values(choices.stamps));
+  } else {
+    delete out.stamps;
+    delete out.settingsAt;
+  }
   if (resetAt) out.resetAt = resetAt;
   if (tally) out.tally = tally;
   else delete out.tally;
@@ -217,6 +230,7 @@ const pick = (s: KidsState): SyncedKids => {
 };
 
 const KIDS_TALLY = 'kids-tally';
+const KIDS_STAMPS = 'kids-stamps';
 
 /** The tallies of the kids and the star jar, synced again on their own (see tallyPart). The jar's
  *  tally goes with its delete-all time: one from before a delete-all is not folded back in. */
@@ -239,22 +253,116 @@ export function withTallies(s: SyncedKids, mirror: unknown): SyncedKids {
   };
 }
 
+/** The stamps of every kid's choices with the values they were written for, synced in a part of its
+ *  own (see mirrorPart): older app versions rebuild kids without the fields they do not know, so
+ *  they would drop `stamps` from the kids themselves but pass this part on untouched. */
+function stampMirrors(s: Pick<KidsState, 'kids'>): Record<string, StampMirror> {
+  return Object.fromEntries(s.kids.map((k) => [k.id, mirrorOf({ values: choiceFields(k), stamps: stampsOfKid(k) })]));
+}
+
+/** Gives each synced kid the stamps of the mirror (see reconcile): the copy's own `stamps` are not
+ *  trusted, an older version may have merged the kids since. */
+export function withStamps(s: SyncedKids, mirror: unknown): SyncedKids {
+  const m = (mirror ?? {}) as Record<string, unknown>;
+  return {
+    ...s,
+    kids: s.kids.map((k) => {
+      const stamps = reconcile(choiceFields(k), k.settingsAt, readMirror(m[k.id]));
+      const out: KidProfile = { ...k };
+      if (Object.keys(stamps).length) out.stamps = stamps;
+      else delete out.stamps;
+      return out;
+    }),
+  };
+}
+
+// ---------- The same player made twice ----------
+// A kid made on two devices before they were linked has two ids, so the merge keeps both. Two kids
+// with the same name (in any letter case) and age group are probably one.
+
+const empty = (o: object) => Object.keys(o).length === 0;
+
+/** Has this kid played, earned or been given anything? */
+export function hasProgress(k: KidProfile): boolean {
+  return !empty(k.nodes) || !empty(k.stickers) || !empty(k.trophies) || !empty(k.bots) || !empty(k.bests) || !empty(k.days) || k.wardrobe.length > 0 || k.firsts.length > 0 || k.puzzle.attempts > 0 || k.garden > 0 || !!k.graduated || !!k.testedOut || !!k.startAt || !!k.tally || !!k.scene?.length;
+}
+
+/** A kid with nothing of their own: no progress, and the settings a new player starts with. */
+export const isIdle = (k: KidProfile) => !hasProgress(k) && stableJson(k.settings) === stableJson(defaultSettings(k.band));
+
+const twinKey = (k: KidProfile) => `${k.name.trim().toLowerCase()}\n${k.band}`;
+
+/** Groups of kids that look like one player (same name and age group, different ids). */
+export function twinGroups(kids: readonly KidProfile[]): KidProfile[][] {
+  const groups = new Map<string, KidProfile[]>();
+  for (const k of kids) if (k.name.trim()) groups.set(twinKey(k), [...(groups.get(twinKey(k)) ?? []), k]);
+  return [...groups.values()].filter((g) => g.length > 1);
+}
+
+/** A player made this recently is not dropped as a twin yet: a grown-up may have made it on purpose a moment ago. */
+export const TWIN_GRACE_MS = 10 * 60_000;
+
+/**
+ * After a merge: a twin with nothing of its own is dropped (its id goes to `removed`, so every
+ * device drops it), in favour of the twin that has something, or of the oldest when none has. One
+ * that has played or was set up is left alone: Grown-ups offers to merge those (mergeTwins). A twin
+ * made in the last few minutes (TWIN_GRACE_MS) waits: by the next sync it has been played, or was a
+ * mistake, and a child never has a player deleted from under them at the start of play.
+ */
+export function dropIdleTwins(s: SyncedKids, now = Date.now()): SyncedKids {
+  const drop = new Set<string>();
+  for (const g of twinGroups(s.kids)) {
+    const idle = g.filter(isIdle).sort((x, y) => x.created - y.created || (x.id < y.id ? -1 : 1));
+    for (const k of idle.slice(idle.length === g.length ? 1 : 0)) if (now - k.created >= TWIN_GRACE_MS) drop.add(k.id);
+  }
+  if (!drop.size) return s;
+  const removed = { ...s.removed };
+  for (const id of drop) removed[id] = Math.max(1, s.updatedAt);
+  return { ...s, kids: s.kids.filter((k) => !drop.has(k.id)), removed };
+}
+
+/** Merges two kids that are the same player into the one with more stars (the older on a tie): their
+ *  progress is combined, the kept kid's own name, look and settings stand, and the other id is
+ *  deleted on every device. */
+export function mergeTwins(idA: string, idB: string) {
+  updateKids((s) => {
+    const a = s.kids.find((k) => k.id === idA);
+    const b = s.kids.find((k) => k.id === idB);
+    if (!a || !b || a.id === b.id) return;
+    const [keep, drop] = totalStars(a) > totalStars(b) || (totalStars(a) === totalStars(b) && (a.created < b.created || (a.created === b.created && a.id < b.id))) ? [a, b] : [b, a];
+    const merged: KidProfile = { ...withChoiceFields(mergeKid(drop, keep), choiceFields(keep)), id: keep.id };
+    if (keep.stamps) merged.stamps = keep.stamps;
+    else delete merged.stamps;
+    if (keep.settingsAt) merged.settingsAt = keep.settingsAt;
+    else delete merged.settingsAt;
+    s.kids = s.kids.filter((k) => k.id !== drop.id).map((k) => (k.id === keep.id ? merged : k));
+    s.removed = { ...s.removed, [drop.id]: Date.now() };
+    if (s.activeKid === drop.id) s.activeKid = keep.id;
+  });
+}
+
 let registered = false;
+
+/** The parts that sync the kids: the kids themselves and the mirrors of their tallies and settings stamps. */
+export const kidsSyncParts = (): SyncPart[] => [
+  {
+    key: 'kids',
+    read: () => pick(getKids()),
+    write: (v) => applySyncedKids(v as SyncedKids),
+    merge: (a, b, joining) => dropIdleTwins(mergeSyncedKids(joining ? joiningCopy(a as SyncedKids, b as SyncedKids) : (a as SyncedKids), b as SyncedKids)),
+    normalize: (v, parts) => withStamps(withTallies(pick(normalizeKids({ ...(v as object), v: 1 }, KIDS_KEEP_MAX)), parts[KIDS_TALLY]), parts[KIDS_STAMPS]),
+  },
+  tallyPart(KIDS_TALLY, () => tallies(getKids())),
+  mirrorPart(KIDS_STAMPS, () => stampMirrors(getKids())),
+];
 
 /** Adds the kids to cross-device sync (once) and pulls what other devices have. */
 export function registerKidsSync() {
   if (registered || !syncAvailable) return;
   registered = true;
-  addSyncPart({
-    key: 'kids',
-    read: () => pick(getKids()),
-    write: (v) => applySyncedKids(v as SyncedKids),
-    merge: (a, b, joining) => mergeSyncedKids(joining ? joiningCopy(a as SyncedKids, b as SyncedKids) : (a as SyncedKids), b as SyncedKids),
-    normalize: (v, parts) => withTallies(pick(normalizeKids({ ...(v as object), v: 1 }, KIDS_KEEP_MAX)), parts[KIDS_TALLY]),
-  });
-  addSyncPart(tallyPart(KIDS_TALLY, () => tallies(getKids())));
+  for (const part of kidsSyncParts()) addSyncPart(part);
   subscribeKids(() => {
     if (!sync.isApplying) sync.schedule();
   });
-  void sync.syncNow();
+  void sync.syncNow(); // no-op until a device is linked
 }

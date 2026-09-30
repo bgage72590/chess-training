@@ -1,7 +1,10 @@
 // The map: an island of 8 ranks (Rank 1 at the bottom). The Pawn Buddy stands on the current
 // node; a big sticky PLAY runs the warm-up (if due) and then the next node.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { updateKid, type KidProfile } from '../store/kidsStore';
+import { type KidProfile } from '../store/kidsStore';
+import { isQuiet, setQuiet } from '../store/quiet';
+import { quietNotice } from '../../lib/quietNotice';
+import { toast } from '../../lib/toast';
 import { speech } from '../player/speech';
 import { REGISTRY } from '../packs';
 import { WORLDS, nodesOf, type NodeDef, type WorldDef } from '../curriculum/worlds';
@@ -85,6 +88,7 @@ export function MapScreen({ kid }: { kid: KidProfile }) {
 }
 
 export function MapBar({ kid, stars, playgroundOpen, back }: { kid: KidProfile; stars: number; playgroundOpen?: boolean; back?: () => void }) {
+  const quiet = isQuiet(kid.id);
   return (
     <header className="k-mapbar">
       {back ? (
@@ -103,17 +107,18 @@ export function MapBar({ kid, stars, playgroundOpen, back }: { kid: KidProfile; 
       <span className="k-mapbar-gap" />
       <button
         type="button"
-        className={`k-round k-round-plain k-mute${kid.settings.muted ? ' on' : ''}`}
+        className={`k-round k-round-plain k-mute${quiet ? ' on' : ''}`}
         aria-label="Sound"
-        aria-pressed={!kid.settings.muted}
-        title={kid.settings.muted ? 'Sound is off' : 'Sound is on'}
+        aria-pressed={!quiet}
+        title={quiet ? 'Sound is off' : 'Sound is on'}
         onClick={() => {
-          const muted = !kid.settings.muted;
-          if (muted) speech.cancel();
-          updateKid(kid.id, (d) => void (d.settings.muted = muted));
+          if (!quiet) speech.cancel();
+          setQuiet(kid.id, !quiet);
+          // A notice to read, not a line Pip says: it works with the sound off and on a touch screen.
+          toast({ title: quietNotice(!quiet) }, 4000);
         }}
       >
-        <KidsIcon name={kid.settings.muted ? 'mute' : 'speaker'} size={28} />
+        <KidsIcon name={quiet ? 'mute' : 'speaker'} size={28} />
       </button>
       <button type="button" className="k-pillbtn sea" aria-label="Sticker book" onClick={() => go.stickers()}>
         <KidsIcon name="book" size={26} />

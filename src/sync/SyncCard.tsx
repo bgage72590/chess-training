@@ -7,6 +7,7 @@ import { APP_ADDRESS } from '../components/InstallCard';
 import { useSyncState } from '../store/cloud';
 import { formatSyncCode, newSyncCode, normalizeSyncCode, syncLink } from './code';
 import { embedded, sync, syncAvailable, useSync } from './index';
+import { WhatSyncs } from './WhatSyncs';
 
 function ago(t: number | null): string {
   if (!t) return 'not yet';
@@ -192,6 +193,7 @@ export function SyncCard() {
         </div>
       </div>
       <p className="faint">{STATUS[s.status] ?? `Last synced ${ago(s.lastSyncedAt)}.`}</p>
+      <WhatSyncs />
       <Feedback tone="warn" icon="lock" title="Keep this code private" body="Anyone with it can see and change this progress, like a password." />
       <div className="btn-row">
         <Button icon="refresh" onClick={() => void sync.syncNow()} disabled={s.status === 'syncing'}>

@@ -1,6 +1,7 @@
 // Grown-ups (behind the parent gate): a report per kid, per-kid settings, actions and device
 // settings. Plain, calm and readable. Nothing here is ever spoken.
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import '../family-sync.css';
 import { navigate } from '../../router';
 import type { AgeBand } from '../activities/types';
 import { BAND_LABEL, BAND_TUNING, BANDS } from '../curriculum/tuning';
@@ -8,10 +9,12 @@ import { SKILLS } from '../curriculum/skills';
 import { NODE_BY_ID, WORLDS, WORLD_BY_ID } from '../curriculum/worlds';
 import { BUDDIES, type BuddyId } from '../curriculum/buddies';
 import { REGISTRY } from '../packs';
-import { cleanName, clipName, defaultKidsState, defaultSettings, exportKids, getKids, importedKids, IMPORT_MAX_BYTES, kidsRecovered, parseKidsImport, replaceKids, updateKid, updateKids, useKids, useSaveFailed, type KidProfile, type KidSettings, type KidsImport, type KidsState } from '../store/kidsStore';
+import { cleanName, clipName, defaultKidsState, defaultSettings, exportKids, getKids, importedKids, IMPORT_MAX_BYTES, kidsRecovered, parseKidsImport, replaceKids, setUseRecordedVoice, updateKid, updateKids, useKids, useSaveFailed, type KidProfile, type KidSettings, type KidsImport, type KidsState } from '../store/kidsStore';
 import { canDo, canGraduate, currentWorld, minutesLast7, neededHelp, startAtRank, totalStars } from '../store/progress';
-import { kidSinceReset } from '../store/syncKids';
-import { embedded, syncAvailable, useSync } from '../../sync';
+import { pipVoiceFor } from '../store/familyVoice';
+import { isQuiet, setQuiet } from '../store/quiet';
+import { kidSinceReset, mergeTwins, twinGroups } from '../store/syncKids';
+import { embedded, sync, syncAvailable, useSync } from '../../sync';
 import { APP_ADDRESS } from '../../components/InstallCard';
 import { isKidsLocked, setKidsLocked } from '../lock';
 import { hashPin, newSalt, pinSupported, clearGatePass, keepGatePass } from '../ui/ParentGate';
@@ -29,6 +32,8 @@ export function Grownups({ kidId }: { kidId?: string }) {
   const saveFailed = useSaveFailed();
   const kid = s.kids.find((k) => k.id === kidId) ?? s.kids.find((k) => k.id === s.activeKid) ?? s.kids[0];
   useEffect(() => speech.cancel(), []);
+  // What another device changed (a voice, a name, a new player) is here to see and edit, not one sync behind.
+  useEffect(() => void sync.syncNow(), []);
   // A grown-up's time here is not the kid's play time.
   useEffect(() => pauseSession(), []);
   // Taps here keep the gate pass fresh (see keepGatePass), so it does not run out in the middle of an edit.
@@ -54,6 +59,7 @@ export function Grownups({ kidId }: { kidId?: string }) {
       </header>
       {saveFailed && <p className="k-gu-warn">Progress won&rsquo;t be saved on this device (its storage is full or blocked).</p>}
       {kidsRecovered() && <p className="k-gu-warn">Saved Kids data could not be read, so Kids mode started fresh. A copy of the old data was kept on this device (tempo.kids.v1.bak).</p>}
+      <TwinBanner kids={s.kids} />
       {s.kids.length > 0 && (
         <nav className="k-gu-kids" aria-label="Choose a kid">
           {s.kids.map((k) => (
@@ -74,6 +80,59 @@ export function Grownups({ kidId }: { kidId?: string }) {
         <p className="k-gu-note">No players yet. Add one from the kids&rsquo; screen.</p>
       )}
       <Device />
+    </div>
+  );
+}
+
+const TWINS_KEY = 'tempo.kids.twins.v1';
+const twinId = (a: KidProfile, b: KidProfile) => [a.id, b.id].sort().join('+');
+
+/** Two players with the same name and age group are probably one player made on two devices: offers to merge them. */
+function TwinBanner({ kids }: { kids: KidProfile[] }) {
+  // "Keep both" is remembered on this device, so twins who really are two players are not asked again.
+  const [kept, setKept] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(TWINS_KEY) ?? '[]') as string[];
+    } catch {
+      return [];
+    }
+  });
+  const pairs = twinGroups(kids).flatMap((g) => g.slice(1).map((k) => [g[0], k] as const)).filter(([a, b]) => !kept.includes(twinId(a, b)));
+  if (!pairs.length) return null;
+  const [a, b] = pairs[0];
+  return (
+    <div className="k-gu-note k-gu-twins" role="group" aria-label="Players that look the same">
+      <p className="k-gu-label">
+        {a.name} and {b.name} look like the same player: merge them?
+        <small>They have the same name and age group. Merging keeps the progress of both and the settings of the one with more stars, and removes the other on every linked device.</small>
+      </p>
+      <div className="k-gu-inline">
+        <button
+          type="button"
+          className="k-gu-btn"
+          onClick={() => {
+            mergeTwins(a.id, b.id);
+            toast({ title: `${a.name} is one player now.` }, 3000);
+          }}
+        >
+          Merge them
+        </button>
+        <button
+          type="button"
+          className="k-gu-btn"
+          onClick={() => {
+            const next = [...kept, twinId(a, b)];
+            setKept(next);
+            try {
+              localStorage.setItem(TWINS_KEY, JSON.stringify(next));
+            } catch {
+              /* remembered until this page closes */
+            }
+          }}
+        >
+          They are two players
+        </button>
+      </div>
     </div>
   );
 }
@@ -233,11 +292,17 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
   const st = kid.settings;
   const set = <K extends keyof KidSettings>(k: K, v: KidSettings[K]) => updateKid(kid.id, (d) => void (d.settings[k] = v));
   const [voices, setVoices] = useState(speech.voices());
+  // Voices load late in some browsers: an empty list counts as "no good voice" only once they had time to.
+  const [voicesWaited, setVoicesWaited] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setVoices(speech.voices()), 600);
+    const t = setTimeout(() => {
+      setVoices(speech.voices());
+      setVoicesWaited(true);
+    }, 600);
     return () => clearTimeout(t);
   }, []);
   const device = useKids().device;
+  const quiet = isQuiet(kid.id);
   const [pipVoices, setPipVoices] = useState(speech.pipVoices());
   const [listLoaded, setListLoaded] = useState(false);
   useEffect(() => {
@@ -259,13 +324,7 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
     preview();
   };
   // The picked voice may be another kid's: leaving gives Pip the active kid's voice back.
-  useEffect(
-    () => () => {
-      const all = getKids();
-      speech.setPipVoice(all.kids.find((k) => k.id === all.activeKid)?.settings.pipVoice);
-    },
-    [],
-  );
+  useEffect(() => () => speech.setPipVoice(pipVoiceFor(getKids())), []);
   // A new age group then offers that age's settings, asked here: a browser dialog is blocked
   // inside the claude.ai viewer.
   const [offerReset, setOfferReset] = useState<{ kid: string; band: AgeBand } | null>(null);
@@ -365,6 +424,23 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
           Windows, open Tempo in Microsoft Edge (its Natural voices are built in). On Android, install Google Speech Services voices.
         </p>
       )}
+      {speech.supported() && !noRecorded && pipVoice === DEVICE_VOICE && (device.useRecorded || ((voices.length > 0 || voicesWaited) && !voices.some((v) => voiceScore(v) >= 80))) && (
+        <div className="k-gu-row">
+          <span className="k-gu-label">
+            Recorded voice on this device
+            <small>
+              {device.useRecorded
+                ? "Pip speaks with a recorded voice here, whatever the choice is. The choice \"This device\" is unchanged on your other devices."
+                : 'The choice "This device" is shared with your other devices, where it may sound better. This changes this device only.'}
+            </small>
+          </span>
+          <div className="k-gu-inline">
+            <button type="button" className="k-gu-btn" onClick={() => setUseRecordedVoice(!device.useRecorded)}>
+              {device.useRecorded ? 'Use the device voice again' : 'Use a recorded voice on this device'}
+            </button>
+          </div>
+        </div>
+      )}
       <div className="k-gu-row">
         <span className="k-gu-label">
           Speech speed
@@ -379,17 +455,12 @@ function KidSettingsPanel({ kid }: { kid: KidProfile }) {
           )}
         </div>
       </div>
+      <Toggle label="Sounds" value={st.sound} onChange={(v) => set('sound', v)} note="Piece and game sounds. Shared with your linked devices." />
       <Toggle
-        label="Sounds"
-        value={st.sound && !st.muted}
-        onChange={(v) =>
-          updateKid(kid.id, (d) => {
-            d.settings.sound = v;
-            // Turning sounds on also ends the map's quiet mode, so the switch does what it says.
-            if (v) d.settings.muted = false;
-          })
-        }
-        note={st.muted ? 'Quiet mode is on (the speaker button on the map)' : 'Also mutes piece sounds'}
+        label="Quiet mode on this device"
+        value={quiet}
+        onChange={(v) => setQuiet(kid.id, v)}
+        note="The speaker button on the map. Pip and the sounds stay quiet on this device only, and it ends by itself when the next play session starts."
       />
       <Seg label="Bedtime colors" value={st.bedtime} options={[['off', 'Off'], ['on', 'On'], ['system', 'Follow device']]} onChange={(v) => set('bedtime', v)} />
       <Seg label="Reduced motion" value={st.reducedMotion} options={[['system', 'Follow device'], ['on', 'On']]} onChange={(v) => set('reducedMotion', v)} />
@@ -701,7 +772,7 @@ function Device() {
       )}
       <p className="k-gu-fine">
         {linked
-          ? "Kids' names, settings and progress are shared with your linked devices through your sync code. The PIN and the Kids-mode lock stay on this device."
+          ? "Kids' names, settings and progress are shared with your linked devices through your sync code. The PIN, the Kids-mode lock, quiet mode, the device voice and downloaded voices stay on this device."
           : syncAvailable
             ? "Kids data stays on this device unless you turn on sync in Tempo's Settings; then kids' names, settings and progress are shared with your linked devices."
             : 'Kids data stays on this device. It is never synced or sent anywhere.'}{' '}

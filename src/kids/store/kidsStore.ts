@@ -1,5 +1,7 @@
 // Kids data: every kid profile, the family star jar and device settings. Kids and the star jar are
-// synced across linked devices (syncKids.ts); the active kid and device settings stay on the device.
+// synced across linked devices (syncKids.ts); the active kid and device settings (PIN, device voice,
+// quiet mode) stay on the device. A kid's name, avatar, age group and every setting carry their own
+// stamp (KidProfile.stamps) and sync field by field.
 // Key 'tempo.kids.v1' (separate from the grown-up profile). Every storage access is guarded, with
 // an in-memory fallback for private mode or sandboxed frames. Spec section 11.4.
 import { useSyncExternalStore } from 'react';
@@ -9,7 +11,9 @@ import type { AgeBand } from '../activities/types';
 import { BAND_TUNING, BANDS } from '../curriculum/tuning';
 import { AVATAR_COLORS, FACES, HATS, type AvatarColor, type FaceId, type HatId } from '../curriculum/wardrobe';
 import type { BuddyId } from '../curriculum/buddies';
+import { MAX_AHEAD_MS, observeStamps } from '../../sync/clock';
 import { deviceId } from '../../sync/device';
+import { legacyStamps, readStamps, stampChanges, type Stamps } from '../../sync/fields';
 import { filterTally, readTally, tallyGrowth, type Counts, type Tally } from '../../sync/tally';
 
 export const KIDS_KEY = 'tempo.kids.v1';
@@ -29,7 +33,11 @@ export interface KidsState {
    *  devices at once add up. `resetAt`: when a grown-up last deleted all kids data (ms), so a
    *  device that missed it does not refill the jar. */
   family: { stars: number; parties: number; tally?: Tally; resetAt?: number };
-  device: { pinSalt?: string; pinHash?: string; voiceURI?: string };
+  /** What belongs to this device only: never synced, exported or taken from another device.
+   *  `quiet`: kids whose quiet mode (the map's speaker button) is on here, each with the start of the
+   *  play session it was switched on in (see quiet.ts). `useRecorded`: a recorded voice stands in for
+   *  the device voice a kid's synced choice asks for (this device has no good one). */
+  device: { pinSalt?: string; pinHash?: string; voiceURI?: string; quiet?: Record<string, number>; useRecorded?: boolean };
   updatedAt: number;
   /** Deleted kids (id -> when), so syncing another device does not bring them back. */
   removed?: Record<string, number>;
@@ -61,8 +69,14 @@ export interface KidProfile {
   testedOut?: number;
   /** The play session (spec 10.5): persisted so a re-pick or a reload never resets the limit. */
   session?: KidSession;
-  /** Last change to the name, avatar, age group or settings (ms): syncing keeps the latest ones. */
+  /** Last change to the name, avatar, age group or settings: the highest of `stamps`. Older app
+   *  versions merge these as one object by this stamp, so it is still written. */
   settingsAt?: number;
+  /** When each of the name, avatar, age group and settings last changed (a hybrid logical clock
+   *  stamp, sync/clock.ts), keyed as choiceFields() names them: syncing keeps the latest value of
+   *  each on its own. A field not listed has not been changed since it was made. Data from older
+   *  versions has none: every field counts as changed at settingsAt (stampsOfKid). */
+  stamps?: Stamps;
   /** Last progress reset by a grown-up (ms). Syncing drops older progress from copies that missed it. */
   resetAt?: number;
   /** Last "Starting rank" a grown-up set (when, and the world rank). Syncing takes back the
@@ -120,12 +134,13 @@ export interface NodeProgress {
   leaf?: boolean;
 }
 
+/** Settings a grown-up chooses, synced. (Quiet mode, the map's speaker button, is not one: it belongs
+ *  to a device, see KidsState.device.quiet.) Settings this app version does not know stay in the
+ *  object as they came, so a newer version's fields survive a sync through this one. */
 export interface KidSettings {
   voice: 'auto' | 'first' | 'off';
   rate: number | null;
   sound: boolean;
-  /** Quiet mode from the map's speaker button: no sounds and no automatic reading aloud. */
-  muted: boolean;
   /** Pip's voice: a recorded voice id from public/voice/voices.json, 'device', or '' for the default. */
   pipVoice: string;
   bedtime: 'off' | 'on' | 'system';
@@ -152,7 +167,6 @@ export function defaultSettings(band: AgeBand): KidSettings {
     voice: t.voice,
     rate: null,
     sound: true,
-    muted: false,
     pipVoice: '',
     bedtime: 'system',
     reducedMotion: 'system',
@@ -185,7 +199,7 @@ export function newKidId(): string {
   return `k${Date.now().toString(36)}${idCounter.toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
 }
 
-export function newKid(o: { name: string; band: AgeBand; start: KidProfile['start']; avatar?: Partial<KidProfile['avatar']>; id?: string; now?: number }): KidProfile {
+export function newKid(o: { name: string; band: AgeBand; start: KidProfile['start']; avatar?: Partial<KidProfile['avatar']>; id?: string; now?: number; settings?: Partial<KidSettings> }): KidProfile {
   return {
     id: o.id ?? newKidId(),
     name: cleanName(o.name),
@@ -203,7 +217,7 @@ export function newKid(o: { name: string; band: AgeBand; start: KidProfile['star
     days: {},
     garden: 0,
     firsts: [],
-    settings: defaultSettings(o.band),
+    settings: { ...defaultSettings(o.band), ...o.settings },
     placed: o.start === 'new',
   };
 }
@@ -260,6 +274,47 @@ function normalizeNode(x: unknown): NodeProgress | null {
   return out;
 }
 
+/** The longest Pip voice id kept. */
+const PIP_VOICE_MAX = 40;
+
+/**
+ * Settings this version does not know (a newer version's), kept as they came so that a sync through
+ * this one does not drop them: plain data under a plain name, and not many. (`muted`, quiet mode
+ * before it became a device setting, is one that is dropped: it must not travel between devices.)
+ */
+function unknownSettings(s: Record<string, unknown>, known: object): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(s)) {
+    if (k in known || k === 'muted' || Object.keys(out).length >= 24 || !/^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(k)) continue;
+    try {
+      const json = JSON.stringify(v);
+      if (json !== undefined && json.length <= 500) out[k] = JSON.parse(json);
+    } catch {
+      /* not plain data */
+    }
+  }
+  return out;
+}
+
+/** The fields of a kid that a grown-up chooses and that sync field by field: name, avatar, age group
+ *  and each setting (as 'settings.<key>'). */
+export function choiceFields(k: Pick<KidProfile, 'name' | 'avatar' | 'band' | 'settings'>): Record<string, unknown> {
+  const out: Record<string, unknown> = { name: k.name, avatar: k.avatar, band: k.band };
+  for (const [key, v] of Object.entries(k.settings)) out[`settings.${key}`] = v;
+  return out;
+}
+
+/** A kid with the choices `values` give (choiceFields the other way round). */
+export function withChoiceFields(k: KidProfile, values: Record<string, unknown>): KidProfile {
+  const settings: Record<string, unknown> = {};
+  for (const [key, v] of Object.entries(values)) if (key.startsWith('settings.')) settings[key.slice(9)] = v;
+  return { ...k, name: values.name as string, avatar: values.avatar as KidProfile['avatar'], band: values.band as AgeBand, settings: settings as unknown as KidSettings };
+}
+
+/** The stamp of each choice of a kid: its own, or for one from before stamps existed (no `stamps`)
+ *  every choice counts as changed at settingsAt, as the old whole-object rule had it. */
+export const stampsOfKid = (k: Pick<KidProfile, 'name' | 'avatar' | 'band' | 'settings' | 'settingsAt' | 'stamps'>): Stamps => k.stamps ?? legacyStamps(Object.keys(choiceFields(k)), k.settingsAt);
+
 function normalizeKid(x: unknown): KidProfile | null {
   if (!isObj(x) || typeof x.id !== 'string' || !x.id) return null;
   const band = oneOf(x.band, BANDS, 'explorer');
@@ -288,11 +343,12 @@ function normalizeKid(x: unknown): KidProfile | null {
   const s = isObj(x.settings) ? x.settings : {};
   const ds = base.settings;
   const settings: KidSettings = {
+    ...unknownSettings(s, ds),
     voice: oneOf(s.voice, ['auto', 'first', 'off'] as const, ds.voice),
     rate: typeof s.rate === 'number' ? num(s.rate, 1, 0.7, 1.2) : null,
     sound: typeof s.sound === 'boolean' ? s.sound : ds.sound,
-    muted: s.muted === true,
-    pipVoice: typeof s.pipVoice === 'string' && /^[a-z0-9-]{0,24}$/.test(s.pipVoice) ? s.pipVoice : '',
+    // Any id up to a length: a voice id from a newer voice list must not be reset here (speech.ts plays the default for one it does not know).
+    pipVoice: typeof s.pipVoice === 'string' && s.pipVoice.length <= PIP_VOICE_MAX ? s.pipVoice : '',
     bedtime: oneOf(s.bedtime, ['off', 'on', 'system'] as const, ds.bedtime),
     reducedMotion: oneOf(s.reducedMotion, ['system', 'on'] as const, ds.reducedMotion),
     sessionMin: oneOf(s.sessionMin, [0, 10, 15, 20, 30, 45] as const, ds.sessionMin),
@@ -344,6 +400,8 @@ function normalizeKid(x: unknown): KidProfile | null {
   }
   if (isObj(x.graduated)) kid.graduated = { t: num(x.graduated.t, Date.now()), form: oneOf(x.graduated.form, ['queen', 'king'] as const, 'queen') };
   if (typeof x.settingsAt === 'number') kid.settingsAt = num(x.settingsAt, 0, 0);
+  const stamps = readStamps(x.stamps, Object.keys(choiceFields(kid)));
+  if (stamps) kid.stamps = stamps;
   if (typeof x.resetAt === 'number') kid.resetAt = num(x.resetAt, 0, 0);
   if (isObj(x.startAt)) kid.startAt = { t: num(x.startAt.t, 0, 0), rank: Math.round(num(x.startAt.rank, 1, 1, 8)) };
   const tally = readTally(x.tally);
@@ -378,6 +436,10 @@ export function normalizeKids(raw: unknown, max = MAX_KIDS): KidsState {
     device.pinHash = dev.pinHash;
   }
   if (typeof dev.voiceURI === 'string') device.voiceURI = dev.voiceURI;
+  const quiet = numMap(dev.quiet);
+  for (const id of Object.keys(quiet)) if (!kids.some((k) => k.id === id)) delete quiet[id];
+  if (Object.keys(quiet).length) device.quiet = quiet;
+  if (dev.useRecorded === true) device.useRecorded = true;
   const activeKid = typeof raw.activeKid === 'string' && kids.some((k) => k.id === raw.activeKid) ? raw.activeKid : null;
   const out: KidsState = { v: 1, activeKid, kids, family: { stars: num(fam.stars, 0, 0), parties: num(fam.parties, 0, 0) }, device, updatedAt: num(raw.updatedAt, 0, 0) };
   const famTally = readTally(fam.tally);
@@ -489,6 +551,20 @@ function keepBackup(st: StorageLike | null, raw: string) {
   }
 }
 
+/**
+ * Quiet mode used to be a setting of the kid (settings.muted) that synced. A device that has it on
+ * in its own saved data keeps it, as its own quiet mode for the play session it was saved in; data
+ * arriving through sync or import loses it (normalizeKids), or one child's tap would silence every
+ * linked device.
+ */
+function keepQuietMode(rawKids: unknown[], out: KidsState) {
+  for (const r of rawKids) {
+    if (!isObj(r) || typeof r.id !== 'string' || !isObj(r.settings) || r.settings.muted !== true) continue;
+    const kid = out.kids.find((k) => k.id === r.id);
+    if (kid?.session && out.device.quiet?.[kid.id] === undefined) out.device.quiet = { ...out.device.quiet, [kid.id]: kid.session.start };
+  }
+}
+
 /** Reads kids data from a storage (null storage or a throwing one gives the default). */
 export function readKids(st: StorageLike | null = storage()): KidsState {
   let raw: string | null | undefined;
@@ -506,6 +582,7 @@ export function readKids(st: StorageLike | null = storage()): KidsState {
     return defaultKidsState();
   }
   const out = normalizeKids(parsed, KIDS_KEEP_MAX);
+  if (isObj(parsed) && Array.isArray(parsed.kids)) keepQuietMode(parsed.kids, out);
   const hadKids = isObj(parsed) && Array.isArray(parsed.kids) && parsed.kids.length > 0;
   if (!isObj(parsed) || parsed.v !== 1 || (hadKids && !out.kids.length)) keepBackup(st, raw);
   return out;
@@ -526,6 +603,7 @@ export function writeKids(s: KidsState, st: StorageLike | null = storage()): boo
 }
 
 let state: KidsState = readKids();
+observeKidStamps(state.kids);
 let saveFailed = false;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
@@ -540,6 +618,7 @@ if (typeof window !== 'undefined') {
       // child who is mid-game here (and if their profile was deleted over there, nobody is playing here).
       next.activeKid = next.kids.some((k) => k.id === state.activeKid) ? state.activeKid : null;
       state = next;
+      observeKidStamps(state.kids);
       emit();
     });
   } catch {
@@ -547,14 +626,25 @@ if (typeof window !== 'undefined') {
   }
 }
 
-/** A kid's grown-up choices, which sync by settingsAt rather than by the latest play. */
-const choices = (k: KidProfile) => JSON.stringify([k.name, k.avatar, k.band, k.settings]);
+/** Lets the clock (sync/clock.ts) know the stamps in stored or synced kids, so this device never stamps behind them. */
+function observeKidStamps(kids: KidProfile[]) {
+  for (const k of kids) observeStamps(k.stamps, k.settingsAt);
+}
 
 function commit(next: KidsState) {
-  next.updatedAt = Date.now();
+  const now = Date.now();
+  next.updatedAt = now;
+  // A grown-up's choices (name, avatar, age group, settings) sync by their own stamps rather than by
+  // the latest play: each one that changed is stamped, and settingsAt follows the highest.
   for (const k of next.kids) {
     const prev = getKid(k.id);
-    if (prev && choices(prev) !== choices(k)) k.settingsAt = next.updatedAt;
+    // (most commits are play: a look at the whole of the choices spares telling the fields apart)
+    if (!prev || JSON.stringify([prev.name, prev.avatar, prev.band, prev.settings]) === JSON.stringify([k.name, k.avatar, k.band, k.settings])) continue;
+    const stamped = stampChanges(choiceFields(prev), choiceFields(k), stampsOfKid(prev));
+    if (!stamped) continue;
+    k.stamps = stamped.stamps;
+    k.settingsAt = stamped.at;
+    next.updatedAt = Math.max(next.updatedAt, Math.min(stamped.stamp, now + MAX_AHEAD_MS)); // (not into the far future with a stamp that had to go past one)
   }
   state = pruneForSave(next);
   saveFailed = !writeKids(state);
@@ -578,6 +668,7 @@ export function applySyncedKids(synced: Pick<KidsState, 'kids' | 'family' | 'rem
   const next: KidsState = { ...structuredClone(state), ...structuredClone(synced) };
   if (!next.removed) delete next.removed;
   if (next.activeKid && !next.kids.some((k) => k.id === next.activeKid)) next.activeKid = null;
+  observeKidStamps(next.kids);
   state = pruneForSave(next);
   saveFailed = !writeKids(state);
   emit();
@@ -631,6 +722,36 @@ export function awardTo(kidId: string, id: string): boolean {
     }
   });
   return true;
+}
+
+/** Device-only settings (quiet mode, the recorded voice stand-in) never sync, so changing one is not a synced change either. */
+function setDevice(fn: (device: KidsState['device']) => void) {
+  const device = structuredClone(state.device);
+  fn(device);
+  state = { ...state, device };
+  saveFailed = !writeKids(state);
+  emit();
+}
+
+/** Switches quiet mode for a kid on this device: `sessionStart` is the play session it belongs to (undefined: off). */
+export function setDeviceQuiet(kidId: string, sessionStart: number | undefined) {
+  if (state.device.quiet?.[kidId] === sessionStart) return;
+  setDevice((d) => {
+    const quiet = { ...d.quiet };
+    if (sessionStart === undefined) delete quiet[kidId];
+    else quiet[kidId] = sessionStart;
+    if (Object.keys(quiet).length) d.quiet = quiet;
+    else delete d.quiet;
+  });
+}
+
+/** This device speaks with a recorded voice where a kid's synced choice is the device's own voice. */
+export function setUseRecordedVoice(on: boolean) {
+  if (!!state.device.useRecorded === on) return;
+  setDevice((d) => {
+    if (on) d.useRecorded = true;
+    else delete d.useRecorded;
+  });
 }
 
 /** The active kid is this device's choice and never syncs, so picking one is not a synced change. */

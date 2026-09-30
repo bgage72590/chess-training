@@ -1,9 +1,12 @@
 // "Who's playing?": the family star jar, one tile per kid, and "+ New player". Grown-ups and Exit
 // sit small in the corners, behind the parent gate.
 import { useEffect, useState } from 'react';
+import '../family-sync.css';
 import { navigate } from '../../router';
+import { sync, syncAvailable, useSync } from '../../sync';
 import { MAX_KIDS, setActiveKid, useKids, type KidProfile } from '../store/kidsStore';
 import { currentWorld, totalStars } from '../store/progress';
+import { twinGroups } from '../store/syncKids';
 import { REGISTRY } from '../packs';
 import { WORLD_BY_ID } from '../curriculum/worlds';
 import { AvatarTile } from '../ui/AvatarTile';
@@ -26,6 +29,8 @@ export const rankOf = (kid: KidProfile) => WORLD_BY_ID.get(currentWorld(kid, REG
 export function pickKid(kid: KidProfile) {
   setActiveKid(kid.id);
   noteInput();
+  // Whatever another device changed for this kid (a voice, a setting) is here before they start.
+  void sync.syncNow();
   // The picker the map opened ("Switch player") steps back to that map, or gives its place to the new
   // screen, so the history never piles up map, players, map.
   const fromMap = cameFromScreen('map');
@@ -41,6 +46,9 @@ export function pickKid(kid: KidProfile) {
   else if (!Object.keys(kid.nodes).length) go.play('w1-hello', fromMap);
   else toMap();
 }
+
+/** The longest the picker waits for a linked device's first sync before it offers "New player" anyway. */
+export const FIRST_SYNC_WAIT_MS = 6000;
 
 export function ProfilePicker() {
   const s = useKids();
@@ -69,7 +77,35 @@ export function ProfilePicker() {
     return () => clearTimeout(t);
   }, [s.kids]);
 
+  // The same two players Grown-ups offers to merge: same name and age group (a 5-year-old Mia and a 12-year-old Mia are two).
+  const twins = new Set(twinGroups(s.kids).flat().map((k) => k.id));
   const addKid = () => (s.kids.length ? requireGate('Add a new player.', () => go.newKid()) : go.newKid());
+
+  // On a linked device that has not heard from the copy yet, the family's players may be a moment away:
+  // "New player" now could make a second copy of one of them. It waits for the first sync, but not
+  // for one that failed or takes long.
+  const linked = useSync();
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    void sync.syncNow();
+    const t = setTimeout(() => setWaited(true), FIRST_SYNC_WAIT_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const gettingPlayers = !s.kids.length && !waited && syncAvailable && !!linked.code && !linked.caughtUp && linked.status !== 'error' && linked.status !== 'offline';
+
+  if (gettingPlayers) {
+    return (
+      <div className="k-screen k-picker k-welcome">
+        <div className="k-welcome-card k-card">
+          <Pip mood="think" size={160} />
+          <p className="k-body k-getting" role="status">
+            Getting your players...
+          </p>
+        </div>
+        <PickerCorners />
+      </div>
+    );
+  }
 
   if (!s.kids.length) {
     return (
@@ -162,7 +198,7 @@ export function ProfilePicker() {
       </header>
       <div className="k-avatar-grid">
         {s.kids.map((k) => (
-          <AvatarTile key={k.id} kid={k} rank={rankOf(k)} stars={totalStars(k)} resting={onBreak(k)} onPick={() => pickKid(k)} />
+          <AvatarTile key={k.id} kid={k} rank={rankOf(k)} stars={totalStars(k)} resting={onBreak(k)} onPick={() => pickKid(k)} twin={twins.has(k.id)} />
         ))}
         {s.kids.length < MAX_KIDS && (
           <button type="button" className="k-avatar-tile k-avatar-new" onClick={addKid}>

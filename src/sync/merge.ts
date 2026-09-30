@@ -1,11 +1,13 @@
 // Merging two copies of a learner's profile (e.g. this device and the synced copy).
 // The merge keeps progress made on either side: lessons, opening cards, drills, puzzles, games
 // and achievements are combined item by item, and the counters (XP, day logs, puzzle counts)
-// add up what each device did (tally.ts). Settings follow the copy that changed them last. A
+// add up what each device did (tally.ts). Every setting follows the device that changed it last,
+// setting by setting (fields.ts), so an unrelated change on another device never undoes it. A
 // reset wins over progress made before it, on any copy.
-// It is pure, idempotent (merge(x, x) equals x) and symmetric apart from ties on timestamps.
+// It is pure, idempotent (merge(x, x) equals x) and symmetric.
 import { dayKey, daysBetween } from '../lib/srs';
-import { counters, defaultProfile, emptyDay, levelFromXp, type DayLog, type GameRecord, type Profile, type PuzzleProgress } from '../store/profile';
+import { counters, defaultProfile, emptyDay, levelFromXp, stampsOfSettings, type DayLog, type GameRecord, type Profile, type PuzzleProgress, type Settings } from '../store/profile';
+import { legacyStamps, maxStamp, mergeFields, stableJson, type Values } from './fields';
 import { filterTally, mergeTallied, type Counts } from './tally';
 
 type Rec<T> = Record<string, T>;
@@ -130,21 +132,34 @@ export function sinceReset(p: Profile, at: number): Profile {
     resetAt: at,
   };
   if (p.settingsAt) out.settingsAt = p.settingsAt;
+  if (p.settingsStamps) out.settingsStamps = p.settingsStamps;
   const tally = filterTally(p.tally, (k) => dayOf(k) > day);
   if (tally) out.tally = tally;
   return out;
 }
 
 /** A device joining a copy keeps its progress and the copy keeps its own: a reset made on either
- *  side before they were linked applies to neither. */
-export const joiningCopy = (local: Profile, remote: Profile): Profile => ({ ...local, resetAt: remote.resetAt });
+ *  side before they were linked applies to neither. Settings it never changed do not compete with the
+ *  copy's: with stamps that is every setting without one; a device from before stamps existed has
+ *  every setting stamped, so those still at their default count as never changed. */
+export function joiningCopy(local: Profile, remote: Profile): Profile {
+  const out: Profile = { ...local, resetAt: remote.resetAt };
+  if (!local.settingsStamps && local.settingsAt) {
+    const base = defaultProfile().settings as unknown as Values;
+    const stamps = legacyStamps(Object.keys(local.settings).filter((k) => stableJson(local.settings[k as keyof Settings]) !== stableJson(base[k])), local.settingsAt);
+    out.settingsStamps = stamps;
+    out.settingsAt = maxStamp(stamps) || undefined;
+  }
+  return out;
+}
 
 export function mergeProfiles(a: Profile, b: Profile): Profile {
   const resetAt = Math.max(a.resetAt ?? 0, b.resetAt ?? 0);
   if ((a.resetAt ?? 0) < resetAt) a = sinceReset(a, resetAt);
   if ((b.resetAt ?? 0) < resetAt) b = sinceReset(b, resetAt);
   const newer = b.updatedAt > a.updatedAt ? b : a;
-  const settingsFrom = (b.settingsAt ?? 0) > (a.settingsAt ?? 0) ? b : a;
+  const settings = mergeFields({ values: a.settings as unknown as Values, stamps: stampsOfSettings(a) }, { values: b.settings as unknown as Values, stamps: stampsOfSettings(b) });
+  const settingsAt = maxStamp(settings.stamps);
   const { counts, tally } = mergeTallied(counters(a), a.tally, counters(b), b.tally);
   const days = daysFrom(counts);
   const sumXp = Object.values(days).reduce((s, d) => s + d.xp, 0);
@@ -161,8 +176,9 @@ export function mergeProfiles(a: Profile, b: Profile): Profile {
     xp: Math.max(sumXp, a.xp, b.xp),
     days,
     streak,
-    settings: settingsFrom.settings,
-    settingsAt: Math.max(a.settingsAt ?? 0, b.settingsAt ?? 0) || undefined,
+    settings: settings.values as unknown as Settings,
+    settingsAt: settingsAt || undefined,
+    settingsStamps: Object.keys(settings.stamps).length ? settings.stamps : undefined,
     puzzles: { ...mergePuzzles(a.puzzles, b.puzzles, newer === b), attempts: counts.attempts, solved: counts.solved },
     lessons: mergeRecord(a.lessons, b.lessons, (x, y) => ({ done: x.done || y.done, t: Math.max(x.t, y.t), score: Math.max(x.score, y.score) })),
     lines: mergeRecord(a.lines, b.lines, (x, y) => (y.t > x.t ? y : x)),

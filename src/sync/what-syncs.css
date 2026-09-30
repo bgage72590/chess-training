@@ -1,0 +1,10 @@
+/* "What syncs" list on the sync card and the join page. */
+.what-syncs h3 {
+  margin: 12px 0 4px;
+}
+.what-syncs ul {
+  margin: 0;
+  padding-left: 1.2em;
+  display: grid;
+  gap: 2px;
+}

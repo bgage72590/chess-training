@@ -5,6 +5,7 @@ import type { AgeBand } from '../activities/types';
 import { bandOfAge } from '../curriculum/tuning';
 import { AVATAR_COLORS, FACES, FUN_NAMES, HATS, type AvatarColor, type FaceId } from '../curriculum/wardrobe';
 import { MAX_KIDS, cleanName, clipName, getKids, newKid, updateKids, type KidProfile } from '../store/kidsStore';
+import { inheritedSettings } from '../store/familyVoice';
 import { Pip } from '../ui/Pip';
 import { PawnBuddy } from '../ui/PawnBuddy';
 import { SpeechBubble } from '../ui/SpeechBubble';
@@ -71,7 +72,8 @@ export function NewKid() {
     if (done.current) return;
     done.current = true;
     if (getKids().kids.length >= MAX_KIDS) return go.upToPicker();
-    const kid = newKid({ name: cleanName(name) || funName(), band, start: start ?? 'new', avatar: { color, face, hat: null } });
+    // Pip's voice, speech speed and Sounds are the family's, not the age group's defaults: a new player of a family that chose Rocket hears Rocket.
+    const kid = newKid({ name: cleanName(name) || funName(), band, start: start ?? 'new', avatar: { color, face, hat: null }, settings: inheritedSettings(getKids().kids) });
     updateKids((s) => {
       s.kids.push(kid);
       s.activeKid = kid.id;

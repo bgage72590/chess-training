@@ -12,6 +12,7 @@ import { useKidCtx } from './context';
 import { promotionFor } from '../curriculum/tuning';
 import { KidsPromoPicker } from './KidsPromoPicker';
 import { kidSound } from '../lib/kidsSound';
+import { isQuiet } from '../store/quiet';
 import { playableDests } from '../lib/chessDests';
 import { useBoardFx } from '../activities/useBoardFx';
 import '../motion-board.css';
@@ -301,7 +302,7 @@ export function KidsBoard(props: KidsBoardProps) {
       {promo && (
         <KidsPromoPicker
           color={turn}
-          speak={band !== 'champion' && kid?.settings.voice !== 'off' && !kid?.settings.muted}
+          speak={band !== 'champion' && kid?.settings.voice !== 'off' && !isQuiet(kid?.id)}
           onCancel={() => setPromo(null)}
           onPick={(p) => {
             const pr = promo;

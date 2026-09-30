@@ -8,6 +8,9 @@ import './motion-nav.css';
 import { useToasts } from '../lib/toast';
 import { setActiveKid, useKids } from './store/kidsStore';
 import { registerKidsSync } from './store/syncKids';
+import { pipVoiceFor } from './store/familyVoice';
+import { isQuiet } from './store/quiet';
+import { sync } from '../sync';
 import { BAND_TUNING } from './curriculum/tuning';
 import { KidContext } from './player/context';
 import { speech } from './player/speech';
@@ -87,9 +90,13 @@ export function KidsApp({ route }: { route: string }) {
   useEffect(() => {
     if (kid && BOUNDARY_SCREENS.includes(r.screen) && sessionOver(kid)) markBreak(kid.id);
   }, [kid, r.screen]);
-  useEffect(() => kidsSound.setEnabled(kid ? kid.settings.sound && !kid.settings.muted : true), [kid]);
+  useEffect(() => kidsSound.setEnabled(kid ? kid.settings.sound && !isQuiet(kid.id) : true), [kid, s.device.quiet]);
   useEffect(() => speech.setVoice(s.device.voiceURI), [s.device.voiceURI]);
-  useEffect(() => speech.setPipVoice(kid?.settings.pipVoice), [kid?.settings.pipVoice]);
+  // The active kid's voice, or the family's while nobody is picked (the picker, the New player wizard).
+  const pipVoice = pipVoiceFor(s);
+  useEffect(() => speech.setPipVoice(pipVoice), [pipVoice]);
+  // Opening Kids mode looks for news from the other devices (a voice or a player set there) right away.
+  useEffect(() => void sync.syncNow(), []);
   useEffect(() => {
     const prev = document.title;
     document.title = "Pip's Chess Quest";

@@ -1,9 +1,9 @@
 // Keeps this device's progress and the synced copy in step. A sync pulls the copy, merges
 // it with local data part by part, applies any change locally, and pushes the merged
 // result with a version check; if another device wrote in between, it pulls and merges
-// again. Merges only ever add progress (or apply a reset), so syncing from several devices is
-// safe. A copy that disappears after syncing was deleted on another device: this device then
-// stops syncing rather than upload it again.
+// again. Merges only ever add progress (or apply a reset), and settings merge field by field
+// (fields.ts), so syncing from several devices is safe. A copy that disappears after syncing was
+// deleted on another device: this device then stops syncing rather than upload it again.
 import type { SyncBackend } from './backend';
 
 /** One piece of synced data (the grown-up profile, the kids' profiles...). */
@@ -28,6 +28,9 @@ export interface SyncSnapshot {
   code: string | null;
   lastSyncedAt: number | null;
   error: string | null;
+  /** A sync has finished on this device since the app started (or since it was linked): what it
+   *  shows is at least as new as the copy was then. */
+  caughtUp: boolean;
 }
 
 interface Stored {
@@ -48,8 +51,11 @@ function stable(v: unknown): string {
   );
 }
 
+/** The longest a sync waits for its `prepare` hook. */
+export const PREPARE_WAIT_MS = 8000;
+
 export class SyncEngine {
-  private snap: SyncSnapshot = { status: 'off', code: null, lastSyncedAt: null, error: null };
+  private snap: SyncSnapshot = { status: 'off', code: null, lastSyncedAt: null, error: null, caughtUp: false };
   private listeners = new Set<() => void>();
   private running: Promise<void> | null = null;
   private again = false;
@@ -62,9 +68,12 @@ export class SyncEngine {
     private parts: SyncPart[],
     private storage: { load(): Stored | null; save(s: Stored | null): void },
     private online: () => boolean = () => true,
+    /** Runs before every sync (it must be quick once done): parts that load on demand (Kids) are in the
+     *  first sync of a device that is linked, whoever starts it. */
+    private prepare?: () => Promise<void>,
   ) {
     const stored = storage.load();
-    if (stored) this.snap = { status: 'synced', code: stored.code, lastSyncedAt: stored.lastSyncedAt ?? null, error: null };
+    if (stored) this.snap = { status: 'synced', code: stored.code, lastSyncedAt: stored.lastSyncedAt ?? null, error: null, caughtUp: false };
   }
 
   get snapshot() {
@@ -98,7 +107,7 @@ export class SyncEngine {
    */
   async link(code: string, { mustExist = false } = {}): Promise<boolean> {
     if (mustExist && !(await this.backend.get(code))) return false;
-    this.set({ code, status: 'syncing', error: null, lastSyncedAt: null });
+    this.set({ code, status: 'syncing', error: null, lastSyncedAt: null, caughtUp: false });
     await this.running; // a sync for the previous code stops early
     await this.syncNow();
     return true;
@@ -108,7 +117,7 @@ export class SyncEngine {
   unlink(error: string | null = null) {
     if (this.timer) clearTimeout(this.timer);
     this.storage.save(null);
-    this.snap = { status: 'off', code: null, lastSyncedAt: null, error };
+    this.snap = { status: 'off', code: null, lastSyncedAt: null, error, caughtUp: false };
     this.listeners.forEach((l) => l());
   }
 
@@ -149,11 +158,21 @@ export class SyncEngine {
     return this.running;
   }
 
+  /** Waits for `prepare`, but not for one that hangs (a chunk on a stalled connection): the parts already registered sync, and the late one joins the next sync. */
+  private async prepared() {
+    if (!this.prepare) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<void>((resolve) => void (timer = setTimeout(resolve, PREPARE_WAIT_MS)));
+    await Promise.race([this.prepare().catch(() => undefined), late]);
+    clearTimeout(timer);
+  }
+
   private async run() {
     const code = this.snap.code!;
     if (!this.online()) return this.set({ status: 'offline' });
     this.set({ status: 'syncing', error: null });
     try {
+      await this.prepared();
       for (let attempt = 0; attempt < 5; attempt++) {
         const remote = await this.backend.get(code);
         if (this.snap.code !== code) return; // unlinked meanwhile
@@ -186,7 +205,7 @@ export class SyncEngine {
         if (res.ok) break;
         if (attempt === 4) throw new Error('the synced copy kept changing; try again');
       }
-      this.set({ status: 'synced', lastSyncedAt: Date.now() });
+      this.set({ status: 'synced', lastSyncedAt: Date.now(), caughtUp: true });
     } catch (e) {
       this.set({ status: this.online() ? 'error' : 'offline', error: (e as Error).message });
     }
