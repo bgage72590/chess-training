@@ -9,12 +9,15 @@ import './styles/pages.css';
 import { App } from './App';
 import { startCloudSync } from './store/cloud';
 import { setupInstall } from './pwa/install';
+import { persistAfterProgress } from './lib/storage';
+import { getProfile, subscribeProfile } from './store/profile';
 import { startSync } from './sync';
 import { armAudioUnlock } from './lib/audio';
 
 setupInstall();
 // The first tap, key press or VoiceOver activation starts the sound (Safari only allows it inside one).
 armAudioUnlock();
+persistAfterProgress(subscribeProfile, () => getProfile().xp > 0);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

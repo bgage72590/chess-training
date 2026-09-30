@@ -84,6 +84,8 @@ def main():
             m['clips'][l['key']] = best_ms
             fixed += 1
             print(f"  fixed {ms} -> {best_ms} ms  {l['text'][:60]}", flush=True)
+    if 'bytes' in m:  # the size the app shows before a download follows the new files
+        m['bytes'] = sum(os.path.getsize(os.path.join(a.dir, k + '.mp3')) for k in m['clips'])
     json.dump(m, open(mpath, 'w'), separators=(',', ':'))
     shutil.rmtree(tmp)
     print(f'{a.id}: {fixed} of {len(bad)} recorded again; {len(find(lines, m["clips"]))} still look wrong')

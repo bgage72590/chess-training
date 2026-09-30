@@ -6,7 +6,8 @@ import './fonts';
 import './kids.css';
 import './motion-nav.css';
 import { useToasts } from '../lib/toast';
-import { setActiveKid, useKids } from './store/kidsStore';
+import { persistAfterProgress } from '../lib/storage';
+import { getKids, setActiveKid, subscribeKids, useKids } from './store/kidsStore';
 import { registerKidsSync } from './store/syncKids';
 import { pipVoiceFor } from './store/familyVoice';
 import { isQuiet } from './store/quiet';
@@ -37,6 +38,8 @@ import { Certificate, Graduation } from './screens/Graduation';
 import { BreakTime } from './screens/BreakTime';
 
 registerKidsSync();
+// The first finished lesson or game is when the browser is asked to keep the data.
+persistAfterProgress(subscribeKids, () => getKids().kids.some((k) => Object.values(k.nodes).some((n) => n.plays > 0)));
 
 /** Screens that belong to grown-ups: a gate pass lives only while one of these is open. */
 const GROWNUP_SCREENS = ['grownups', 'certificate'];

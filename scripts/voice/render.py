@@ -58,6 +58,12 @@ def version():
     return f'{ENGINE}:{VOICE}@{SPEED}@{BITRATE}k{TRIM}'
 
 
+def pack_bytes(clips):
+    """Size of the clips on disk. Written to the manifest so the app can say how big a voice is
+    before anyone downloads it (scripts/voice/sizes.py does the same for older manifests)."""
+    return sum(os.path.getsize(p) for p in (os.path.join(OUT, k + '.mp3') for k in clips) if os.path.exists(p))
+
+
 def init_kokoro(model_dir):
     global _k
     import onnxruntime as ort
@@ -233,7 +239,7 @@ def main():
         """Saves the clips so far: a recording that stops (a quota, a network error) carries on from here."""
         tmp = mpath + '.tmp'
         with open(tmp, 'w') as f:
-            json.dump({**record, 'clips': dict(sorted(clips.items()))}, f, separators=(',', ':'))
+            json.dump({**record, 'bytes': pack_bytes(clips), 'clips': dict(sorted(clips.items()))}, f, separators=(',', ':'))
         os.replace(tmp, mpath)
 
     pool = Pool(jobs, initializer=init_kokoro, initargs=(a.model,)) if ENGINE == 'kokoro' else ThreadPool(jobs)
@@ -257,8 +263,8 @@ def main():
         if f.endswith('.mp3') and f[:-4] not in clips:
             os.remove(os.path.join(OUT, f))
     with open(mpath, 'w') as f:
-        json.dump({**record, 'clips': dict(sorted(clips.items()))}, f, separators=(',', ':'))
-    print(f'manifest: {len(clips)} clips', flush=True)
+        json.dump({**record, 'bytes': pack_bytes(clips), 'clips': dict(sorted(clips.items()))}, f, separators=(',', ':'))
+    print(f'manifest: {len(clips)} clips, {pack_bytes(clips) / 1e6:.1f} MB', flush=True)
     if a.id:
         publish(len(lines))
 
