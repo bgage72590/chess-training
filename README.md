@@ -52,7 +52,8 @@ itself the next time it is opened online.
 
 On iPhone, iPad and Mac Safari, **the Safari tab and the installed Home Screen (or Dock) app keep
 separate data**, so the installed app starts empty. Before you install, turn on sync (**Settings →
-Sync across devices → Turn on sync**) or export your progress. Then open the installed app and
+Sync across devices → Turn on sync**) or export your progress (Settings → Your data; Kids mode has a
+separate **Export kids data** in its Grown-ups area). Then open the installed app and
 choose **I have a sync code** (Settings → Sync across devices) and type the code. A sync link or QR
 code opens in Safari, not in the installed app, so linking by link would link the browser copy
 only. Chrome and Edge share their data between the browser and the installed app.

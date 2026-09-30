@@ -52,7 +52,7 @@ export function isIosDevice(ua: string, touchPoints: number): boolean {
 
 /** A page opened inside another app (a social, chat or search app's own browser): those cannot
  *  install web apps, and keep their own storage. */
-const IN_APP = /FBAN|FBAV|Instagram|Line\/|Snapchat|Messenger|GSA\/|Twitter/;
+const IN_APP = /FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|Messenger|GSA\/|Twitter|TikTok|musical_ly|Bytedance|LinkedInApp|Pinterest|MicroMessenger/;
 
 /** Safari's version from its user agent; Infinity when it does not say. */
 const safariMajor = (ua: string) => Number(/Version\/(\d+)/.exec(ua)?.[1] ?? Infinity);

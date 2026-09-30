@@ -2,17 +2,23 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsPage } from '../src/pages/Settings';
+import { APP_URL } from '../src/pwa/install';
 
-const h = vi.hoisted(() => ({ ios: false }));
+const h = vi.hoisted(() => ({ ios: false, embedded: false }));
 vi.mock('../src/pwa/install', async (original) => ({
   ...(await original<typeof import('../src/pwa/install')>()),
   useInstall: () => ({ installed: false, canPrompt: false, how: h.ios ? 'ios' : 'menu', ios: h.ios }),
 }));
 vi.mock('../src/components/QrCode', () => ({ QrCode: () => null }));
+vi.mock('../src/sync', async (original) => {
+  const real = await original<typeof import('../src/sync')>();
+  return new Proxy(real, { get: (target, key) => (key === 'embedded' ? h.embedded : Reflect.get(target, key)) });
+});
 
 describe('Settings', () => {
   beforeEach(() => {
     h.ios = false;
+    h.embedded = false;
   });
   const page = () => renderToStaticMarkup(createElement(SettingsPage));
 
@@ -37,6 +43,12 @@ describe('Settings', () => {
       'https://github.com/bgage72590/chess-training',
       './engine/COPYING-stockfish.txt',
     ]) expect(html).toContain(`href="${href}"`);
+  });
+  it('points the licence text at the hosted app in the single-file copy, which ships without the engine folder', () => {
+    h.embedded = true;
+    const html = page();
+    expect(html).toContain(`href="${APP_URL}engine/COPYING-stockfish.txt"`);
+    expect(html).not.toContain('href="./engine/COPYING-stockfish.txt"');
   });
   it('says nothing about a licence for Tempo itself', () => {
     const credits = page().split('<h2>Credits</h2>')[1];

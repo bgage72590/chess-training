@@ -9,9 +9,9 @@ import { REPLY_SPEED_LABELS, type ReplySpeed } from '../lib/replyPace';
 import { useSyncState } from '../store/cloud';
 import { InstallCard } from '../components/InstallCard';
 import { ShareCard } from '../components/ShareCard';
-import { useInstall } from '../pwa/install';
+import { APP_URL, useInstall } from '../pwa/install';
 import { SyncCard } from '../sync/SyncCard';
-import { useSync } from '../sync';
+import { embedded, useSync } from '../sync';
 import { sinceReset } from '../sync/merge';
 import { navigate } from '../router';
 
@@ -222,8 +222,9 @@ export function SettingsPage() {
             <a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noreferrer">stockfish.js</a>. Pieces: “cburnett” by Colin M.L. Burnett. Rules: chess.js. Puzzles are generated from Stockfish self-play and verified for a unique solution.
           </p>
           <p className="muted">
+            {/* The single-file copy ships without the engine folder, so it points at the hosted app's copy. */}
             Source code: <a href="https://github.com/bgage72590/chess-training" target="_blank" rel="noreferrer">github.com/bgage72590/chess-training</a>. The Stockfish licence text is included with the app:{' '}
-            <a href="./engine/COPYING-stockfish.txt" target="_blank" rel="noreferrer">engine/COPYING-stockfish.txt</a>.
+            <a href={embedded ? `${APP_URL}engine/COPYING-stockfish.txt` : './engine/COPYING-stockfish.txt'} target="_blank" rel="noreferrer">engine/COPYING-stockfish.txt</a>.
           </p>
           <p className="faint num" style={{ fontSize: '0.8rem' }}>
             Version {__BUILD__}

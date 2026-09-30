@@ -115,7 +115,7 @@ export function InstallSteps({ kind }: { kind: GuideKind }) {
   const { steps, after } = stepsFor(kind);
   return (
     <>
-      <ol className="ig-steps">
+      <ol className="ig-steps" role="list">
         {steps.map((s, i) => (
           <li key={i}>
             <span className="ig-pic" aria-hidden="true">

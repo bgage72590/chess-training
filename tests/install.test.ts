@@ -51,6 +51,11 @@ const UA = {
   snapchat: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Snapchat/12.3.0.35 (like Safari/604.1)',
   google: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) GSA/312.0.6 Mobile/15E148 Safari/604.1',
   twitter: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Twitter for iPhone/9.45',
+  tiktok: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 musical_ly_34.1.0 JsSdk/2.0 NetType/WIFI Channel/App Store ByteLocale/en Region/US',
+  linkedin: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [LinkedInApp]/9.30.1',
+  pinterest: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [Pinterest/iOS]',
+  wechat: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.47(0x18002f2c) NetType/WIFI Language/en',
+  facebookAndroid: 'Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/UP1A) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/126.0.0.0 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/450.0.0.38.108;]',
 };
 
 describe('detectHow', () => {
@@ -82,6 +87,10 @@ describe('detectHow', () => {
     for (const ua of [UA.facebook, UA.messenger, UA.instagram, UA.instagramAndroid, UA.line, UA.snapchat, UA.google, UA.twitter]) expect(detectHow(ua, 5, false)).toBe('in-app');
   });
 
+  it('recognises more apps with a built-in browser', () => {
+    for (const ua of [UA.tiktok, UA.linkedin, UA.pinterest, UA.wechat, UA.facebookAndroid]) expect(detectHow(ua, 5, false)).toBe('in-app');
+  });
+
   it('leaves Chrome and Edge to their own install button', () => {
     expect(detectHow(UA.chromeMac, 0, false)).toBe('menu');
     expect(detectHow(UA.chromeWin, 0, false)).toBe('menu');
@@ -111,6 +120,60 @@ describe('isIosDevice', () => {
     expect(isIosDevice(UA.macSafari, 0)).toBe(false);
     expect(isIosDevice(UA.androidChrome, 5)).toBe(false);
     expect(isIosDevice(UA.chromeWin, 0)).toBe(false);
+  });
+});
+
+/** A small seeded generator, so a failing run can be replayed. */
+function rng(seed: number) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+describe('detectHow on random user agents', () => {
+  const OS = ['(iPhone; CPU iPhone OS 17_5 like Mac OS X)', '(iPad; CPU OS 16_6 like Mac OS X)', '(Macintosh; Intel Mac OS X 10_15_7)', '(Windows NT 10.0; Win64; x64)', '(Linux; Android 14; Pixel 8)', '(X11; Linux x86_64)'];
+  const BROWSER = ['', 'Version/17.5 Safari/605.1.15', 'Version/16.6 Safari/605.1.15', 'Chrome/126.0.0.0 Safari/537.36', 'Chrome/126.0.0.0 Safari/537.36 Edg/126.0.1', 'Firefox/127.0', 'CriOS/126.0 Mobile/15E148 Safari/604.1', 'FxiOS/127.0 Mobile/15E148 Safari/605.1.15'];
+  const APPS = ['', '', '', '[FBAN/FBIOS;FBAV/450.0]', 'Instagram 330.0.0.9.90', 'Line/14.9.0', 'Snapchat/12.3.0.35', 'GSA/312.0.6', 'Twitter for iPhone/9.45', 'TikTok', 'Pinterest', 'MicroMessenger/8.0'];
+  const pick = <T,>(r: () => number, xs: T[]) => xs[Math.floor(r() * xs.length)];
+  const VALID = ['ios', 'safari-mac', 'safari-old', 'in-app', 'menu', 'unsupported', 'elsewhere'];
+
+  it('always gives one known answer, and follows the rules that do not depend on the browser mix', () => {
+    const r = rng(20260930);
+    for (let i = 0; i < 4000; i++) {
+      const os = pick(r, OS);
+      const app = pick(r, APPS);
+      const ua = `Mozilla/5.0 ${os} AppleWebKit/605.1.15 (KHTML, like Gecko) ${pick(r, BROWSER)} ${app}`;
+      const touch = Math.floor(r() * 6);
+      const elsewhere = r() < 0.15;
+      const how = detectHow(ua, touch, elsewhere);
+      const why = `${how} for ${ua} / ${touch} / ${elsewhere}`;
+      expect(VALID, why).toContain(how);
+      if (elsewhere) expect(how, why).toBe('elsewhere');
+      else if (app) expect(how, why).toBe('in-app');
+      else if (/iPhone|iPad/.test(os)) expect(how, why).toBe('ios');
+      else if (/Macintosh/.test(os) && touch > 1) expect(how, why).toBe('ios');
+      if (how === 'safari-mac' || how === 'safari-old') expect(ua, why).toMatch(/Macintosh[^)]*\).*Safari\//);
+      if (/Chrome|Edg\//.test(ua) && !isIosDevice(ua, touch)) expect(how, why).not.toMatch(/safari/);
+      expect(isIosDevice(ua, touch) && !elsewhere && !app, why).toBe(how === 'ios');
+    }
+  });
+});
+
+describe('resolveAppUrl on random input', () => {
+  it('never throws, and always gives a web address that ends in a slash with no query or hash', () => {
+    const r = rng(7);
+    const PARTS = ['https://', 'http://', 'ftp://', 'javascript:', 'data:', '//', 'tempo.example.com', 'a.b', 'localhost:5173', '/app', '/x/y/', '?q=1', '#/sync/ABCD', '#', ' ', '\t', '..', '%zz', 'user:pw@', 'é', '[::1]', ''];
+    for (let i = 0; i < 3000; i++) {
+      let raw = '';
+      for (let n = Math.floor(r() * 6); n >= 0; n--) raw += PARTS[Math.floor(r() * PARTS.length)];
+      const url = resolveAppUrl(raw);
+      expect(url, JSON.stringify(raw)).toMatch(/^https?:\/\/[^?#\s]*\/$/);
+      expect(new URL(url).username + new URL(url).password, JSON.stringify(raw)).toBe('');
+      expect(resolveAppUrl(url), JSON.stringify(raw)).toBe(url);
+    }
   });
 });
 
@@ -216,6 +279,9 @@ describe('the install banner', () => {
     expect(html).toContain('open Tempo from the new icon');
     expect(html).toContain('Hide this');
   });
+  it('keeps the numbered steps a list for screen readers (the numbers are drawn, not typed)', () => {
+    expect(show({})).toContain('<ol class="ig-steps" role="list">');
+  });
   it('says the installed app has its own data, and how to bring progress across', () => {
     const html = show({});
     expect(html).toContain('keeps its own data, separate from this Safari tab');
@@ -281,6 +347,11 @@ describe('the storage split note', () => {
   it('points to export and import when sync is not available', () => {
     expect(storageSplitText({ ...facts, sync: false })).toContain('export your progress');
     expect(storageSplitText({ ...facts, sync: false })).not.toContain('sync code');
+  });
+  it('tells the grown-up app that Kids mode has its own export, and Kids grown-ups only about theirs', () => {
+    expect(storageSplitText({ ...facts, sync: false })).toContain('Kids mode has a separate export under Grown-ups: Export kids data');
+    expect(storageSplitText({ ...facts, mode: 'installed', installed: true, sync: false })).toContain('Export kids data');
+    expect(storageSplitText({ ...facts, sync: false, kids: true })).not.toContain('Kids mode has a separate export');
   });
   it('sends Kids grown-ups to the right places', () => {
     expect(storageSplitText({ ...facts, kids: true })).toContain("Tempo's Settings");

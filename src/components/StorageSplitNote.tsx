@@ -28,9 +28,11 @@ export function storageSplitText({ mode, how, installed, linked, sync, kids }: F
   if ((mode === 'installed') !== installed) return null;
   const app = how === 'ios' ? 'Home Screen app' : 'Dock app';
   const opens = 'A sync link opens in Safari, not in the installed app';
+  // Settings > Export covers the grown-up profile only; Kids mode keeps its own export.
+  const kidsExport = 'Kids mode has a separate export under Grown-ups: Export kids data';
   switch (mode) {
     case 'install':
-      if (!sync) return `The ${app} keeps its own data, separate from this Safari tab, so your progress does not carry over by itself. Before you install, export your progress${kids ? ' (Export kids data, below)' : ' (Settings, Your data)'}. Then open the installed app and paste it into Import.`;
+      if (!sync) return `The ${app} keeps its own data, separate from this Safari tab, so your progress does not carry over by itself. Before you install, export your progress${kids ? ' (Export kids data, below)' : ` (Settings, Your data; ${kidsExport})`}. Then open the installed app and paste it into Import.`;
       if (linked) return `The ${app} keeps its own data, separate from this Safari tab. Sync is on, so your progress is safe: after you install, open the installed app, go to Settings, choose “I have a sync code” and type your code. ${opens}, so type the code in.`;
       return `The ${app} keeps its own data, separate from this Safari tab, so your progress does not carry over by itself. Before you install, turn on sync ${kids ? "in Tempo's Settings" : 'in Settings'} (or export your progress${kids ? ': Export kids data, below' : ''}). Then open the installed app and choose “I have a sync code”. ${opens}, so type the code in.`;
     case 'join':
@@ -40,7 +42,7 @@ export function storageSplitText({ mode, how, installed, linked, sync, kids }: F
     case 'installed':
       return sync
         ? `This installed app keeps its own data, separate from Safari. To bring your progress here, turn on sync where it is now, then choose “I have a sync code” here and type the code. ${opens}.`
-        : 'This installed app keeps its own data, separate from Safari. To bring your progress here, export it where it is now and paste it into Import (Settings, Your data).';
+        : `This installed app keeps its own data, separate from Safari. To bring your progress here, export it where it is now and paste it into Import (Settings, Your data; ${kidsExport}).`;
   }
 }
 

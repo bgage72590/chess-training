@@ -41,6 +41,7 @@ If you need a board-side change (for example the promotion picker skin), write i
 - `.board-with-eval`: `14px minmax(0,1fr)`, gap 8px.
 - `.page`: `max-width:1200px; padding:28px 32px 64px` (≤900px: `18px 16px 40px`). This must stay in sync with `.lesson-nav` margins `0 -32px -64px` (≤900px: `0 -16px -40px`). If you change one, change the other. (Recommendation: change neither.)
 - `.panel`: `position: sticky; top: 20px`, static at ≤900px.
+- **Safe areas**: `app.css` defines `--safe-t/r/b/l` (the `env(safe-area-inset-*)` values, 0 where a screen has none) and every fixed edge uses them: topbar, tabbar, `.page` and `.lesson-nav` (left and right; the `.page` and `.lesson-nav` insets stay in sync like their 32px and 16px padding), the sidebar (top, left, bottom, and its column grows by the left inset), the desktop `.page` (top, right), `.panel` sticky top, and the toasts. With all four at 0 nothing moves.
 - `.lesson-nav`: `position: sticky; bottom: 0`. BoardColumn's `stickyBottom()` reads it.
 - **No transforms on `.page`, `.step-wrap`, `.trainer` or any ancestor of a sticky or fixed element or of `.trainer-board`.** Page and step transitions are **opacity-only** (section 12). This also fixes an existing bug: `.step-wrap` currently runs `pop` (translateY) around the lesson board.
 - `.move-input` stays hidden under `(pointer: coarse)`. The toast position stays bottom-right, and above the tabbar on mobile (`bottom: calc(76px + env(safe-area-inset-bottom))`).
