@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { askWorker, offlineState, offlineSupported, type OfflineState } from '../pwa/offline';
+import { askWorker, offlineState, offlineSupported, workerBlocked, type OfflineState } from '../pwa/offline';
 import { useInstall } from '../pwa/install';
 import { formatSize, loadVoiceNames, voicePacks } from '../kids/player/voicePack';
 import { storageStatus, type StorageStatus } from '../lib/storage';
@@ -25,13 +25,24 @@ export function OfflineCard() {
   useEffect(() => {
     if (!supported) return;
     let live = true;
-    const check = () => {
+    const check = (retry = true) => {
       const sw = navigator.serviceWorker;
-      void askWorker(sw).then((status) => live && setApp(offlineState(!!sw.controller, status)));
+      void askWorker(sw).then(async (status) => {
+        if (!live) return;
+        const state = offlineState(!!sw.controller, status);
+        if (state === 'ready') return setApp(state);
+        // A first visit registers its worker a moment after loading: look again once before saying it is blocked.
+        const registered = !!(await sw.getRegistration().catch(() => undefined));
+        if (!live) return;
+        if (!workerBlocked(!!sw.controller, registered)) return setApp(state);
+        if (retry) return void setTimeout(() => live && check(false), 5000);
+        setApp('unavailable');
+      });
     };
     check();
     // The worker takes control of a first visit's page once it has installed: ask again then.
-    navigator.serviceWorker.addEventListener('controllerchange', check);
+    const again = () => check();
+    navigator.serviceWorker.addEventListener('controllerchange', again);
     void storageStatus().then((s) => live && setStorage(s));
     void (async () => {
       const names = await loadVoiceNames();
@@ -44,7 +55,7 @@ export function OfflineCard() {
     })();
     return () => {
       live = false;
-      navigator.serviceWorker.removeEventListener('controllerchange', check);
+      navigator.serviceWorker.removeEventListener('controllerchange', again);
     };
   }, [supported]);
 
@@ -60,6 +71,11 @@ export function OfflineCard() {
         <p>
           <strong>Ready offline</strong>
           <span className="muted"> Every part of Tempo, Stockfish included, is saved on this device.</span>
+        </p>
+      ) : app === 'unavailable' ? (
+        <p>
+          <strong>Saving for offline use is not available in this window</strong>
+          <span className="muted"> Private windows and some browsers do not allow it. Open Tempo in a normal window to use it without the internet.</span>
         </p>
       ) : (
         <>

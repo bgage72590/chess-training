@@ -90,7 +90,7 @@ const set = (s: Partial<InstallState>) => {
 export function setupInstall() {
   if (import.meta.env.PROD && import.meta.env.MODE !== 'single') recoverFromMissingFiles();
   if (import.meta.env.PROD && import.meta.env.MODE !== 'single' && 'serviceWorker' in navigator) {
-    window.addEventListener('load', () => void navigator.serviceWorker.register('./sw.js').then((reg) => watchForUpdates(reg)).catch(() => undefined));
+    window.addEventListener('load', () => void navigator.serviceWorker.register('./sw.js').then((reg) => reg && watchForUpdates(reg)).catch(() => undefined));
   }
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();

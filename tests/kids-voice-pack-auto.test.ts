@@ -71,7 +71,51 @@ describe("saving the kid's voice on its own", () => {
     await settle();
     expect(m.autoDownload).not.toHaveBeenCalled();
 
-    m.updateKid(kid.id, (d) => void (d.settings.pipVoice = 'rocket'));
+    vi.useFakeTimers();
+    try {
+      m.updateKid(kid.id, (d) => void (d.settings.pipVoice = 'rocket'));
+      await vi.advanceTimersByTimeAsync(m.AUTO_SAVE_SETTLE_MS - 1);
+      expect(m.autoDownload).not.toHaveBeenCalled(); // a voice must stay a while first
+      await vi.advanceTimersByTimeAsync(1);
+      await vi.advanceTimersByTimeAsync(10);
+      expect(m.autoDownload).toHaveBeenCalledWith('rocket');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not save the voices a grown-up only auditions', async () => {
+    const m = await load();
+    const kid = m.newKid({ name: 'Maya', band: 'explorer', start: 'moves' });
+    kid.settings.pipVoice = 'sunny';
+    m.replaceKids({ ...m.defaultKidsState(), kids: [kid], activeKid: kid.id });
+    await settle();
+    m.autoDownload.mockClear();
+
+    vi.useFakeTimers();
+    try {
+      for (const id of ['rocket', 'sunny', 'rocket', 'sunny']) {
+        m.updateKid(kid.id, (d) => void (d.settings.pipVoice = id));
+        await vi.advanceTimersByTimeAsync(5000); // a tap every few seconds
+      }
+      m.updateKid(kid.id, (d) => void (d.settings.pipVoice = 'rocket'));
+      await vi.advanceTimersByTimeAsync(m.AUTO_SAVE_SETTLE_MS + 10);
+      expect(m.autoDownload).toHaveBeenCalledTimes(1);
+      expect(m.autoDownload).toHaveBeenCalledWith('rocket'); // the one that stayed
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('starts at once for a kid who is picked, whatever voice they had', async () => {
+    const m = await load();
+    const a = m.newKid({ name: 'Ann', band: 'explorer', start: 'moves' });
+    const b = m.newKid({ name: 'Bo', band: 'explorer', start: 'moves' });
+    b.settings.pipVoice = 'rocket';
+    m.replaceKids({ ...m.defaultKidsState(), kids: [a, b], activeKid: a.id });
+    await settle();
+    m.autoDownload.mockClear();
+    m.setActiveKid(b.id);
     await settle();
     expect(m.autoDownload).toHaveBeenCalledWith('rocket');
   });

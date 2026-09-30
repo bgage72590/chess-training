@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { detectHow, isIosDevice, resolveAppUrl, APP_URL } from '../src/pwa/install';
-import { guideKind, hasFinishedFirst, InstallGuide, readGuideDismissed, shouldShowGuide, writeGuideDismissed } from '../src/components/InstallGuide';
+import { __resetGuideDismissedForTests, guideKind, hasFinishedFirst, InstallGuide, readGuideDismissed, shouldShowGuide, writeGuideDismissed } from '../src/components/InstallGuide';
 import { storageSplitText } from '../src/components/StorageSplitNote';
 import { InstallCard } from '../src/components/InstallCard';
 import { copyAppLink, SHARE, ShareCard, shareApp } from '../src/components/ShareCard';
@@ -234,6 +234,7 @@ describe('when the install banner shows', () => {
 });
 
 describe('remembering that the banner was hidden', () => {
+  beforeEach(() => __resetGuideDismissedForTests());
   afterEach(() => vi.unstubAllGlobals());
   const store = () => {
     const data = new Map<string, string>();
@@ -248,17 +249,20 @@ describe('remembering that the banner was hidden', () => {
     expect([...data.values()]).toEqual(['1']);
     expect(readGuideDismissed()).toBe(true);
   });
-  it('works without storage: it shows again rather than failing', () => {
+  it('works without storage: it stays away for this visit and comes back the next', () => {
     const blocked = () => {
       throw new Error('blocked');
     };
     vi.stubGlobal('localStorage', { getItem: blocked, setItem: blocked });
     expect(() => writeGuideDismissed()).not.toThrow();
+    expect(readGuideDismissed()).toBe(true); // opening Today or Grown-ups again does not bring it back
+    __resetGuideDismissedForTests(); // a new visit
     expect(readGuideDismissed()).toBe(false);
   });
 });
 
 describe('the install banner', () => {
+  beforeEach(() => __resetGuideDismissedForTests());
   const show = (state: Partial<typeof h.install>, props: { ready?: boolean; variant?: 'app' | 'kids' } = {}) => {
     h.install = { installed: false, canPrompt: false, how: 'ios', ios: true, ...state };
     return renderToStaticMarkup(createElement(InstallGuide, { ready: true, ...props }));

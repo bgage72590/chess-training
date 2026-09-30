@@ -21,6 +21,9 @@ export function offlineState(controlled: boolean, status: WorkerStatus | null): 
   return status.missing === 0 && status.files > 0 ? 'ready' : 'reload';
 }
 
+/** True when the browser has no worker for Tempo at all (a private window, blocked site data): reloading would not help. */
+export const workerBlocked = (controlled: boolean, registered: boolean) => !controlled && !registered;
+
 /** Asks the worker in control of this page for its status; null when there is none or it does not answer in time. */
 export function askWorker(container: Pick<ServiceWorkerContainer, 'controller'>, timeoutMs = 4000): Promise<WorkerStatus | null> {
   const worker = container.controller;

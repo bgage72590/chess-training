@@ -211,6 +211,9 @@ const clipUrl = (id: string, m: VoiceManifest, key: string) => voiceUrl(`${id}/$
  * connection is known to be unmetered and data saving is off: Safari cannot tell, so on an iPhone or
  * Mac the grown-ups' screen has a Download button instead. Never before a kid is picked.
  */
+/** How long a changed voice must stay before it is saved on its own. */
+export const AUTO_SAVE_SETTLE_MS = 30_000;
+
 function autoSavePack() {
   const kid = getActiveKid();
   if (!kid || !voiceList) return;
@@ -227,15 +230,20 @@ if (typeof window !== 'undefined' && RECORDED) {
   } catch {
     /* no connection information (Safari) */
   }
-  // A kid picked (or a new voice for the kid in use) starts the check.
+  // A kid picked starts the check at once. A new voice for the kid in use waits until it has stayed a
+  // while: a grown-up auditioning voices changes it with every tap, and each one would start a 45 MB download.
   let saving = '';
+  let settle: ReturnType<typeof setTimeout> | undefined;
   subscribeKids(() => {
     const kid = getActiveKid();
     const now = kid ? `${kid.id}:${kid.settings.pipVoice ?? ''}` : '';
-    if (now !== saving) {
-      saving = now;
-      if (kid) warm();
-    }
+    if (now === saving) return;
+    const sameKid = !!kid && saving.startsWith(`${kid.id}:`);
+    saving = now;
+    clearTimeout(settle);
+    if (!kid) return;
+    if (sameKid) settle = setTimeout(warm, AUTO_SAVE_SETTLE_MS);
+    else warm();
   });
 }
 

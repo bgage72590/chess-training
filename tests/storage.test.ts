@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { persistAfterProgress, rememberedPersistence, requestPersistence, storageStatus } from '../src/lib/storage';
-import { askWorker, offlineState } from '../src/pwa/offline';
+import { askWorker, offlineState, workerBlocked } from '../src/pwa/offline';
 
 // navigator.storage and localStorage are stubbed: none of this needs a browser.
 function fakeLocalStorage() {
@@ -142,6 +142,9 @@ describe('is the app saved for offline use', () => {
     expect(offlineState(true, { version: 'a', files: 39, missing: 2 })).toBe('reload');
     expect(offlineState(false, { version: 'a', files: 39, missing: 0 })).toBe('reload'); // first visit: reload once
     expect(offlineState(true, null)).toBe('reload');
+    expect(workerBlocked(false, false)).toBe(true); // nothing registered: reloading will not help
+    expect(workerBlocked(false, true)).toBe(false); // registered, taking control on the next load
+    expect(workerBlocked(true, false)).toBe(false);
     expect(offlineState(true, { version: 'a', files: 0, missing: 0 })).toBe('reload');
   });
 

@@ -112,3 +112,9 @@
 .ig-share-side > span {
   overflow-wrap: anywhere;
 }
+
+/* Focus moved here after the install banner is hidden: no ring around the whole page. */
+main[tabindex="-1"]:focus,
+.kids-app[tabindex="-1"]:focus {
+  outline: none;
+}

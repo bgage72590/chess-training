@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import './install.css';
 import { navigate } from '../router';
 import { useInstall, type InstallState } from '../pwa/install';
@@ -8,7 +8,11 @@ import { StorageSplitNote } from './StorageSplitNote';
 
 const DISMISS_KEY = 'tempo.installGuide.dismissed';
 
+/** Where the dismissal is kept when storage is blocked: the banner stays away for this visit at least. */
+let dismissedThisVisit = false;
+
 export function readGuideDismissed(): boolean {
+  if (dismissedThisVisit) return true;
   try {
     return localStorage.getItem(DISMISS_KEY) === '1';
   } catch {
@@ -17,11 +21,17 @@ export function readGuideDismissed(): boolean {
 }
 
 export function writeGuideDismissed() {
+  dismissedThisVisit = true;
   try {
     localStorage.setItem(DISMISS_KEY, '1');
   } catch {
     /* storage is blocked: the banner comes back next visit, which is better than an error */
   }
+}
+
+/** For tests. */
+export function __resetGuideDismissedForTests() {
+  dismissedThisVisit = false;
 }
 
 /** Which guide fits this browser: the Home Screen steps, the Dock steps, or "open it in Safari". */
@@ -147,15 +157,22 @@ const TITLE: Record<GuideKind, string> = {
 export function InstallGuide({ ready, variant = 'app' }: { ready: boolean; variant?: 'app' | 'kids' }) {
   const state = useInstall();
   const [dismissed, setDismissed] = useState(readGuideDismissed);
+  const ref = useRef<HTMLElement>(null);
   const kind = guideKind(state);
   if (!kind || !shouldShowGuide(kind, ready, dismissed)) return null;
   const kids = variant === 'kids';
   const hide = () => {
+    // The button leaves the page with the banner: keep keyboard and VoiceOver focus in the page, not on the body.
+    const host = ref.current?.closest<HTMLElement>('main, .kids-app');
     writeGuideDismissed();
     setDismissed(true);
+    if (host) {
+      host.tabIndex = -1;
+      host.focus({ preventScroll: true });
+    }
   };
   return (
-    <section className={kids ? 'k-gu-card ig ig-kids' : 'card ig'} aria-label="Install Tempo">
+    <section ref={ref} className={kids ? 'k-gu-card ig ig-kids' : 'card ig'} aria-label="Install Tempo">
       <h2>{TITLE[kind]}</h2>
       {kind !== 'in-app' && <p className={kids ? 'k-gu-note' : 'muted'}>Tempo gets its own icon, opens full screen and works offline, Stockfish included.</p>}
       <InstallSteps kind={kind} />
