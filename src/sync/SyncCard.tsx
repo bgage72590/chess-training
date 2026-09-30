@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import './sync.css';
 import { Button, Feedback } from '../components/ui';
+import { QrCode } from '../components/QrCode';
+import { StorageSplitNote } from '../components/StorageSplitNote';
 import { toast } from '../lib/toast';
 import { APP_URL } from '../pwa/install';
 import { APP_ADDRESS } from '../components/InstallCard';
@@ -15,33 +17,6 @@ function ago(t: number | null): string {
   if (s < 60) return 'just now';
   if (s < 3600) return `${Math.round(s / 60)} min ago`;
   return new Date(t).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-}
-
-/** A QR code (rendered as one SVG path) so a phone can scan the sync link. */
-function QrCode({ text }: { text: string }) {
-  const [shape, setShape] = useState<{ n: number; d: string } | null>(null);
-  useEffect(() => {
-    let alive = true;
-    void import('qrcode-generator').then(({ default: qrcode }) => {
-      const qr = qrcode(0, 'M');
-      qr.addData(text);
-      qr.make();
-      const n = qr.getModuleCount();
-      let d = '';
-      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
-      if (alive) setShape({ n, d });
-    });
-    return () => {
-      alive = false;
-    };
-  }, [text]);
-  if (!shape) return <div className="sync-qr" aria-hidden="true" />;
-  return (
-    <svg className="sync-qr" viewBox={`-2 -2 ${shape.n + 4} ${shape.n + 4}`} role="img" aria-label="QR code for the sync link">
-      <rect x="-2" y="-2" width={shape.n + 4} height={shape.n + 4} fill="#fff" />
-      <path d={shape.d} fill="#000" />
-    </svg>
-  );
 }
 
 const STATUS: Record<string, string> = {
@@ -127,6 +102,7 @@ export function SyncCard() {
           Keep your progress, and your kids&rsquo; progress, on every phone, tablet and computer. No account or email needed: Tempo gives you a private sync code.
         </p>
         {s.error && <Feedback tone="warn" icon="x" title="Sync stopped" body={s.error} />}
+        <StorageSplitNote mode="installed" />
         {!joining ? (
           <div className="btn-row">
             <Button variant="primary" icon="repeat" onClick={() => void linkDevice(newSyncCode(), false)}>
@@ -173,7 +149,7 @@ export function SyncCard() {
         On another device, scan the code, open the link, or enter the sync code in Settings. Progress from all linked devices is combined.
       </p>
       <div className="sync-link">
-        <QrCode text={url} />
+        <QrCode text={url} label="QR code for the sync link" />
         <div className="sync-code-box">
           <span className="stat-label">Your sync code</span>
           <strong className="mono sync-code">{formatSyncCode(s.code)}</strong>
@@ -192,6 +168,7 @@ export function SyncCard() {
           </div>
         </div>
       </div>
+      <StorageSplitNote mode="synced" />
       <p className="faint">{STATUS[s.status] ?? `Last synced ${ago(s.lastSyncedAt)}.`}</p>
       <WhatSyncs />
       <Feedback tone="warn" icon="lock" title="Keep this code private" body="Anyone with it can see and change this progress, like a password." />

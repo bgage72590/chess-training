@@ -508,8 +508,9 @@
   position: sticky;
   bottom: 0;
   z-index: 20;
-  margin: 0 -32px -64px;
-  padding: 12px 32px;
+  /* The page pads its right edge by the safe area (app.css), and this bar spans it. */
+  margin: 0 calc(-32px - var(--safe-r)) -64px -32px;
+  padding: 12px calc(32px + var(--safe-r)) calc(12px + var(--safe-b)) 32px;
   background: color-mix(in oklab, var(--bg) 86%, transparent);
   -webkit-backdrop-filter: blur(10px) saturate(1.1);
   backdrop-filter: blur(10px) saturate(1.1);
@@ -517,13 +518,14 @@
 }
 @media (max-width: 900px) {
   .lesson-nav {
-    margin: 0 -16px -40px;
-    padding: 10px 16px;
+    /* Under the tab bar, which owns the bottom inset. */
+    margin: 0 calc(-16px - var(--safe-r)) -40px calc(-16px - var(--safe-l));
+    padding: 10px calc(16px + var(--safe-r)) 10px calc(16px + var(--safe-l));
   }
 }
 /* A result scrolled into view (useReveal) stops clear of the sticky nav. */
 .main:has(.lesson-nav) {
-  scroll-padding-bottom: 88px;
+  scroll-padding-bottom: calc(88px + var(--safe-b));
 }
 /* Opacity only: .step-wrap wraps the board column. */
 .step-wrap {

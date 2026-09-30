@@ -5,16 +5,6 @@
   align-items: center;
   flex-wrap: wrap;
 }
-.sync-qr {
-  width: 136px;
-  height: 136px;
-  flex: none;
-  border-radius: var(--radius-s);
-  box-shadow: 0 0 0 1px var(--line);
-  background: #fff;
-  image-rendering: pixelated;
-  shape-rendering: crispEdges;
-}
 .sync-code-box {
   display: flex;
   flex-direction: column;

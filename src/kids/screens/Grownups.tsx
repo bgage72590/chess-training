@@ -16,6 +16,9 @@ import { isQuiet, setQuiet } from '../store/quiet';
 import { kidSinceReset, mergeTwins, twinGroups } from '../store/syncKids';
 import { embedded, sync, syncAvailable, useSync } from '../../sync';
 import { APP_ADDRESS } from '../../components/InstallCard';
+import { InstallGuide } from '../../components/InstallGuide';
+import { ShareCard } from '../../components/ShareCard';
+import { kidsFinishedFirst } from '../lib/installReady';
 import { isKidsLocked, setKidsLocked } from '../lock';
 import { hashPin, newSalt, pinSupported, clearGatePass, keepGatePass } from '../ui/ParentGate';
 import { BREAK_MS, pauseSession, setSessionLimit } from '../player/useSession';
@@ -80,6 +83,8 @@ export function Grownups({ kidId }: { kidId?: string }) {
       ) : (
         <p className="k-gu-note">No players yet. Add one from the kids&rsquo; screen.</p>
       )}
+      <InstallGuide variant="kids" ready={kidsFinishedFirst(s.kids)} />
+      <ShareCard variant="kids" />
       <Device />
     </div>
   );

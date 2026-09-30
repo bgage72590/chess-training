@@ -34,18 +34,55 @@ and works offline, full-strength Stockfish included. Open
 | Device | How |
 |---|---|
 | Chrome or Edge (Windows, Mac, Linux, ChromeOS) | Click **Install Tempo** in Settings, or the install icon at the right of the address bar. Tempo appears in the Start menu / Applications folder / dock. |
-| Safari on Mac | **File → Add to Dock** |
-| iPhone / iPad | Safari's **Share** button → **Add to Home Screen** |
+| Safari on Mac | **File → Add to Dock**. This needs Safari 17 on **macOS 14 Sonoma or later**; on an older Mac use Chrome or Edge. |
+| iPhone | In Safari, **Share** (on newer iOS it may sit under the **…** menu) → **Add to Home Screen** → **Add**, then open Tempo from the new icon. |
+| iPad | The same steps as iPhone. |
+| Chrome or Edge on iPhone / iPad | From iOS 16.4 they can add to the Home Screen too (their Share menu → **Add to Home Screen**). |
+| A page opened inside another app (Instagram, Facebook, Messenger, Snapchat, Line, Google, X) | Open the page in Safari first (**Open in Safari** in that app's menu): those built-in browsers cannot install web apps. Tempo says so when it detects one. |
 | Android | Chrome menu → **Install app** / **Add to Home screen** |
+
+On iPhone, iPad and Mac Safari Tempo shows these steps itself: a banner on the Today page and in
+Kids mode's grown-ups area after the first finished lesson or puzzle (**Hide this** keeps it away),
+and always under **Settings → Install the app**. Chrome and Edge keep their own **Install** button.
 
 Right-click (or long-press) the icon for shortcuts to Puzzles, Play and Learn. The app updates
 itself the next time it is opened online.
+
+### Moving your progress
+
+On iPhone, iPad and Mac Safari, **the Safari tab and the installed Home Screen (or Dock) app keep
+separate data**, so the installed app starts empty. Before you install, turn on sync (**Settings →
+Sync across devices → Turn on sync**) or export your progress (Settings → Your data; Kids mode has a
+separate **Export kids data** in its Grown-ups area). Then open the installed app and
+choose **I have a sync code** (Settings → Sync across devices) and type the code. A sync link or QR
+code opens in Safari, not in the installed app, so linking by link would link the browser copy
+only. Chrome and Edge share their data between the browser and the installed app.
+
+### Handing Tempo to someone else
+
+**Settings → Share Tempo** (and the grown-ups area in Kids mode) shows a QR code for the app's
+address, a **Copy link** button and the device's share sheet. It always shares the app's own
+address, never the page you are on: the address of a sync page holds your private sync code.
+
+### Choosing the address
+
+The address behind the QR code, the Copy link button and the install pages is `APP_URL`
+(`src/pwa/install.ts`). It defaults to the GitHub Pages address above; build with
+`VITE_APP_URL=https://your.address/ npm run build` to publish somewhere else (for the GitHub Pages
+deploy, put `env: VITE_APP_URL: https://your.address/` on the build step in
+`.github/workflows/pages.yml`). **Choose the
+permanent address before you share Tempo widely.** An installed copy is identified by its address
+(the manifest `id` is the address), so moving the site orphans every installed copy, and a GitHub
+Pages address that changes returns a 404 page to them. A custom domain (a `CNAME` for GitHub Pages)
+is the durable choice, and it does not carry your username. If the address ever has to change, leave a
+redirect page at the old one.
 
 ## Sync across devices
 
 No account needed. In **Settings → Sync across devices**, tap **Turn on sync** to get a private
 sync code (with a QR code and a link). On your other phones, tablets and computers, scan the QR
-code, open the link, or type the code under **I have a sync code**. Progress from every linked
+code, open the link, or type the code under **I have a sync code** (for an installed iPhone, iPad
+or Mac Safari app, always type it: see [Moving your progress](#moving-your-progress)). Progress from every linked
 device is combined, never overwritten: lessons, puzzles, openings, games, streaks and XP made on
 any of them add up, and every setting (sound and volume, Pip's voice, reading mode, speech speed
 ...) follows the device where that setting was changed last, one setting at a time. Players in Kids
@@ -149,7 +186,7 @@ tests/          Vitest suites
 
 ## Credits and licences
 
-- Engine: [Stockfish](https://stockfishchess.org) 19 via [stockfish.js](https://github.com/nmrugg/stockfish.js), GPLv3. The engine files are copied from the `stockfish` npm package at install time; its licence ships alongside as `engine/COPYING-stockfish.txt`.
+- Engine: [Stockfish](https://stockfishchess.org) 19 via [stockfish.js](https://github.com/nmrugg/stockfish.js), GPLv3. The engine files are copied from the `stockfish` npm package at install time; its licence ships alongside as `engine/COPYING-stockfish.txt`. Sources: [official-stockfish/Stockfish](https://github.com/official-stockfish/Stockfish), [nmrugg/stockfish.js](https://github.com/nmrugg/stockfish.js) and this app, [bgage72590/chess-training](https://github.com/bgage72590/chess-training). Settings → Credits links all of them.
 - Rules and move generation: [chess.js](https://github.com/jhlywa/chess.js) (BSD-2-Clause).
 - Pieces: "cburnett" set by Colin M.L. Burnett (GPLv2+ / GFDL / BSD), as distributed with lichess chessground. The app icon uses its knight. The 3D Staunton set and the walnut and marble boards are rendered for this app by `scripts/pieces` and `scripts/boards`.
 - Fonts (self-hosted via Fontsource, OFL): Newsreader, Source Sans 3 and IBM Plex Mono; Fredoka and Andika in Kids mode.

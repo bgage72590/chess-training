@@ -1,0 +1,114 @@
+/* Install steps, the install banner and the share card. The pictures draw in currentColor and the
+   shared tokens, so they suit the app and Kids' grown-ups screen alike, in light and dark. */
+.ig {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card.ig h2 {
+  font-size: 1.3rem;
+}
+.ig-kids {
+  margin-top: 16px;
+}
+.ig-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+  counter-reset: ig-step;
+}
+.ig-steps li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  counter-increment: ig-step;
+}
+.ig-steps li > span:last-child {
+  min-width: 0;
+}
+.ig-pic {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  /* One width for every picture, so the words line up. */
+  width: 104px;
+  height: 48px;
+  padding: 0 8px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  background: color-mix(in srgb, currentColor 7%, transparent);
+}
+.ig-pic::before {
+  content: counter(ig-step);
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font: 700 0.72rem/1 var(--font-body, system-ui, sans-serif);
+  background: var(--accent, #8c5e1c);
+  color: var(--on-accent, #fffaf0);
+}
+.ig-glyph {
+  flex: none;
+}
+.ig-or {
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+.ig-pill {
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-weight: 650;
+  font-size: 0.92rem;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.ig-after {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+.ig-appicon {
+  flex: none;
+  border-radius: 9px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent);
+}
+.ig-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-s, 8px);
+  border-left: 3px solid var(--accent, #8c5e1c);
+  background: color-mix(in srgb, var(--accent, #8c5e1c) 9%, transparent);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.ig-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.ig-share-body {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+.ig-share-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.ig-share-side > span {
+  overflow-wrap: anywhere;
+}

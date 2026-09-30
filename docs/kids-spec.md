@@ -682,6 +682,7 @@ All routes live under `#/kids/...` and are rendered by KidsApp full-screen, with
       - left-handed
     - **Actions**: set starting rank, unlock all ranks, reset progress, delete profile (hold to confirm), print certificate.
     - **Device**: set or clear the 4-digit PIN, "Lock Kids mode on this device" (P3 graft; the app opens `#/kids` when launched), export or import kids data (a JSON file), "Delete all kids data", "Exit to Tempo".
+    - **Install and share** (above Device; components shared with the grown-up app, never spoken): on an iPhone, iPad or Mac Safari, while Tempo is not installed, an install banner shows the Home Screen (or Dock) steps and says the installed app keeps its own data, so sync or export first. It appears after the first star or solved puzzle until "Hide this" is tapped. A "Share Tempo" card (QR code, Copy link, the share sheet) always hands on the app's own address, never the page being viewed.
 14. **Parent gate** (modal): see 10.4.
 
 **Entry from the grown-up app**: a "Kids mode" nav item in the sidebar's Play group, a Home card ("Teaching a kid? Open Kids mode"), and a Settings row. They all call `navigate('kids')`. The mobile tab bar is unchanged; on phones the entry is through the Home card and the Settings row.

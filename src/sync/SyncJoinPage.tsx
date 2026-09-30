@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { navigate } from '../router';
 import { Button, PageHeader } from '../components/ui';
+import { StorageSplitNote } from '../components/StorageSplitNote';
 import { formatSyncCode, normalizeSyncCode } from './code';
 import { syncAvailable, useSync } from './index';
 import { linkDevice } from './SyncCard';
@@ -35,6 +36,7 @@ export function SyncJoinPage({ code: raw }: { code?: string }) {
         <strong className="mono sync-code">{formatSyncCode(code)}</strong>
         {s.code && <p className="muted">This device currently syncs with another code; linking switches it to this one.</p>}
         <WhatSyncs joining />
+        <StorageSplitNote mode="join" />
         <div className="btn-row">
           <Button
             variant="primary"

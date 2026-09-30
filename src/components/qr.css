@@ -1,0 +1,11 @@
+/* A QR code: always black on white with its quiet zone, in both themes, so phones can scan it. */
+.qr {
+  width: 136px;
+  height: 136px;
+  flex: none;
+  border-radius: var(--radius-s, 8px);
+  box-shadow: 0 0 0 1px var(--line, #e0d5c3);
+  background: #fff;
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
+}
