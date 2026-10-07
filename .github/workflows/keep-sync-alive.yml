@@ -1,0 +1,35 @@
+name: Keep the sync service awake
+
+# Supabase's free plan pauses a project that has seen little traffic for a week, and the sync service
+# (docs/sync.sql) is one: devices only call it when a linked device syncs, so a quiet week could pause it and
+# stop sync on every device (each device keeps its own data). Twice a week this asks it one harmless question:
+# sync_get for a code that cannot exist, which reads nothing and writes nothing. If the project is paused or
+# unreachable the run fails, and GitHub emails the repository owner. Remove this file if the project moves to a
+# paid plan. (GitHub turns scheduled workflows off after 60 days without any repository activity.)
+on:
+  schedule:
+    - cron: '17 6 * * 1,4' # Mondays and Thursdays, 06:17 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: src/sync/config.ts
+          sparse-checkout-cone-mode: false
+      - name: Ask the sync service a read-only question
+        run: |
+          # The address and the public key are the app's own (src/sync/config.ts): one place to change.
+          URL=$(grep -oE "https://[a-z0-9]+\.supabase\.co" src/sync/config.ts | head -1)
+          KEY=$(grep -oE "sb_publishable_[A-Za-z0-9_-]+" src/sync/config.ts | head -1)
+          test -n "$URL" && test -n "$KEY"
+          status=$(curl -sS -o body.txt -w '%{http_code}' --retry 3 --retry-all-errors --max-time 20 \
+            -X POST "$URL/rest/v1/rpc/sync_get" -H "apikey: $KEY" -H 'Content-Type: application/json' \
+            -d '{"code":"KEEPAWAKE0000000000A"}')
+          echo "$URL answered HTTP $status: $(head -c 200 body.txt)"
+          test "$status" = 200
