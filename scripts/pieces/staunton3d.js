@@ -874,15 +874,12 @@ function makeCamera() {
   return cam;
 }
 
-/**
- * Rescales the projection so the king fills `fill` of the frame height with its foot `bottom`
- * above the lower edge (clear of the file letters drawn in the square's corner).
- */
-function frameCamera(cam, king, fill = 0.935, bottom = 0.052) {
+/** The piece's vertical extent in clip space (y up, -1 at the bottom of the sprite, 1 at the top). */
+function extent(cam, piece) {
   let ymin = Infinity, ymax = -Infinity;
   const v = new THREE.Vector3();
-  king.updateMatrixWorld(true);
-  king.traverse((o) => {
+  piece.updateMatrixWorld(true);
+  piece.traverse((o) => {
     if (!o.isMesh) return;
     const p = o.geometry.attributes.position;
     for (let i = 0; i < p.count; i++) {
@@ -891,9 +888,32 @@ function frameCamera(cam, king, fill = 0.935, bottom = 0.052) {
       ymax = Math.max(ymax, v.y);
     }
   });
+  return [ymin, ymax];
+}
+
+/**
+ * Rescales the projection so the king fills `fill` of the frame height. Every piece shares this
+ * scale, so the set keeps its height hierarchy; centerCamera then places each piece in the frame.
+ */
+function frameCamera(cam, king, fill = 0.88) {
+  const [ymin, ymax] = extent(cam, king);
   const s = (2 * fill) / (ymax - ymin);
-  const t = -1 + 2 * bottom - s * ymin;
-  const m = new THREE.Matrix4().makeTranslation(0, t, 0).multiply(new THREE.Matrix4().makeScale(s, s, 1)).multiply(cam.projectionMatrix);
+  const m = new THREE.Matrix4().makeScale(s, s, 1).multiply(cam.projectionMatrix);
+  cam.projectionMatrix.copy(m);
+  cam.projectionMatrixInverse.copy(m).invert();
+  return m.clone();
+}
+
+/**
+ * Moves the framed projection up or down so this piece's middle sits `drop` (a fraction of the
+ * sprite) below the sprite's centre: every piece stands in the middle of its square, a pawn as
+ * much as a king. The small drop leaves room above for the contact shadow's weight below the foot.
+ */
+function centerCamera(cam, framed, piece, drop = 0.012) {
+  cam.projectionMatrix.copy(framed);
+  const [ymin, ymax] = extent(cam, piece);
+  const t = -(ymin + ymax) / 2 - 2 * drop;
+  const m = new THREE.Matrix4().makeTranslation(0, t, 0).multiply(framed);
   cam.projectionMatrix.copy(m);
   cam.projectionMatrixInverse.copy(m).invert();
 }
@@ -1028,7 +1048,7 @@ export async function renderAll({ size = 1024, out = 256, only = null, debug = f
   const blob = blobTexture();
 
   const cam = makeCamera();
-  frameCamera(cam, buildPiece('K', 'w'));
+  const framed = frameCamera(cam, buildPiece('K', 'w'));
 
   const sprites = {};
   const full = {};
@@ -1037,7 +1057,9 @@ export async function renderAll({ size = 1024, out = 256, only = null, debug = f
   for (const name of names) {
     const color = name[0], type = name[1];
     const scene = makeScene(env, blob, RADIUS[type]);
-    scene.add(buildPiece(type, color));
+    const piece = buildPiece(type, color);
+    scene.add(piece);
+    centerCamera(cam, framed, piece);
     // First the piece alone (no contact shadow) for its outline mask, then the full render.
     const shadows = scene.children.filter((o) => o.userData.contactShadow);
     shadows.forEach((o) => (o.visible = false));

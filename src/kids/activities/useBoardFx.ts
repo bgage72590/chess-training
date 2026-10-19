@@ -57,9 +57,12 @@ function pieceAt(board: HTMLElement, sq: Sq, orientation: 'white' | 'black'): HT
   return [...board.querySelectorAll<HTMLElement>('.piece')].find((p) => p.style.transform.replace(/\s/g, '') === want) ?? null;
 }
 
-/** Scaling (squash, gulp) is done about the foot of the piece's own cell: the piece's transform already holds its position. */
+/**
+ * Scaling (squash, gulp) is done about the foot of the piece's own cell: the piece's transform already holds its position.
+ * Pieces stand centred in their squares, so feet sit from 77% (a pawn) to 95% (a king) down the cell.
+ */
 function anchor(el: HTMLElement, [c, r]: Cell) {
-  el.style.transformOrigin = `${c * 100 + 50}% ${r * 100 + 92}%`;
+  el.style.transformOrigin = `${c * 100 + 50}% ${r * 100 + 86}%`;
 }
 
 /** The origin only belongs to the running squash or gulp: a drag scales the piece about its own centre. */
