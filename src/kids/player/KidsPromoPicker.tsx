@@ -1,5 +1,7 @@
-// A big promotion picker over the board: Queen (first, highlighted), Rook, Bishop, Knight.
+// A big promotion picker over the board: Queen (first, highlighted), Rook, Bishop, Knight, drawn in
+// the board's piece set.
 import { useEffect, useRef } from 'react';
+import type { PieceSet } from '../../store/profile';
 import { speech } from './speech';
 
 const CHOICES = [
@@ -9,7 +11,7 @@ const CHOICES = [
   { p: 'n', name: 'Knight', say: 'Knight!' },
 ] as const;
 
-export function KidsPromoPicker({ color, onPick, onCancel, speak }: { color: 'w' | 'b'; onPick(p: 'q' | 'r' | 'b' | 'n'): void; onCancel(): void; speak: boolean }) {
+export function KidsPromoPicker({ color, pieceSet, onPick, onCancel, speak }: { color: 'w' | 'b'; pieceSet: PieceSet; onPick(p: 'q' | 'r' | 'b' | 'n'): void; onCancel(): void; speak: boolean }) {
   const first = useRef<HTMLButtonElement>(null);
   useEffect(() => first.current?.focus(), []);
   // Escape is the same as "Not yet", whichever element has the focus.
@@ -25,7 +27,7 @@ export function KidsPromoPicker({ color, onPick, onCancel, speak }: { color: 'w'
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   return (
-    <div className="k-promo" role="dialog" aria-modal="true" aria-label="Pick a piece for your pawn">
+    <div className={`k-promo pieces-${pieceSet}`} role="dialog" aria-modal="true" aria-label="Pick a piece for your pawn">
       <div className="k-promo-card">
         <p className="k-promo-title">Your pawn becomes...</p>
         <div className="k-promo-grid">

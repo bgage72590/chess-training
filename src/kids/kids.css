@@ -1274,6 +1274,27 @@
   font-weight: 700;
   font-size: clamp(10px, 2.6cqw, 14px);
 }
+/* Bigger 3D pieces for young eyes. At its true scale the 3D pawn is only half a square tall, so the
+   small pieces grow most (pawn 66%, rook 75%, knight 78%, bishop 83%, queen 86%, king 95% of the
+   square): still smallest to biggest, and every piece stays inside its square, clear of the
+   coordinates in the corners. The sprites are centred, so they grow about the middle. The classic
+   pieces already fill most of the square and would cover the file letters if they grew. */
+.kids-board .board.pieces-staunton3d .piece {
+  background-size: var(--k-piece, 108%) var(--k-piece, 108%);
+  background-position: center;
+}
+.kids-board .board.pieces-staunton3d .piece:is(.pc-wP, .pc-bP) {
+  --k-piece: 128%;
+}
+.kids-board .board.pieces-staunton3d .piece:is(.pc-wR, .pc-bR) {
+  --k-piece: 122%;
+}
+.kids-board .board.pieces-staunton3d .piece:is(.pc-wN, .pc-bN) {
+  --k-piece: 116%;
+}
+.kids-board .board.pieces-staunton3d .piece:is(.pc-wB, .pc-bB, .pc-wQ, .pc-bQ) {
+  --k-piece: 110%;
+}
 .kids-board .sq.tone-good::before {
   background: var(--k-good-glow);
 }
@@ -1512,6 +1533,11 @@
   height: 64px;
   background-size: contain;
   background-repeat: no-repeat;
+}
+/* The slimmer 3D pieces fill the same space as the classic ones (they are centred in their sprites). */
+.pieces-staunton3d .k-promo-piece {
+  background-size: 120%;
+  background-position: center;
 }
 
 /* ================= Results ================= */

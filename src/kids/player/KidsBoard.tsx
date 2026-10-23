@@ -302,6 +302,7 @@ export function KidsBoard(props: KidsBoardProps) {
       {promo && (
         <KidsPromoPicker
           color={turn}
+          pieceSet={pieceSet}
           speak={band !== 'champion' && kid?.settings.voice !== 'off' && !isQuiet(kid?.id)}
           onCancel={() => setPromo(null)}
           onPick={(p) => {
