@@ -14,16 +14,28 @@ export function SyncJoinPage({ code: raw }: { code?: string }) {
   const code = normalizeSyncCode(raw ?? '');
   if (!syncAvailable || !code) {
     return (
-      <div className="empty">
-        {syncAvailable ? 'This sync link is not valid.' : 'Sync is not available here.'} <Button onClick={() => navigate('settings')}>Settings</Button>
-      </div>
+      <>
+        <PageHeader eyebrow="Sync" title="Sync link" />
+        <div className="empty">
+          <h3>{syncAvailable ? 'This sync link is not valid.' : 'Sync is not available here.'}</h3>
+          <div className="btn-row" style={{ justifyContent: 'center', marginTop: 12 }}>
+            <Button onClick={() => navigate('settings')}>Settings</Button>
+          </div>
+        </div>
+      </>
     );
   }
   if (s.code === code) {
     return (
-      <div className="empty">
-        This device is already synced with this code. <Button onClick={() => navigate('home')}>Go to Today</Button>
-      </div>
+      <>
+        <PageHeader eyebrow="Sync" title="Sync link" />
+        <div className="empty">
+          <h3>This device is already synced with this code.</h3>
+          <div className="btn-row" style={{ justifyContent: 'center', marginTop: 12 }}>
+            <Button onClick={() => navigate('home')}>Go to Today</Button>
+          </div>
+        </div>
+      </>
     );
   }
   return (

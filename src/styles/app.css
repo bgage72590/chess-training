@@ -288,7 +288,31 @@ button {
     padding-bottom: calc(12px + var(--safe-b));
   }
   .nav-group-label {
-    padding-top: 6px;
+    padding-top: 4px;
+    padding-bottom: 2px;
+  }
+  /* Sound and the streak/rating share a line, so the level bar stays on screen at 1280 x 700
+     (.sidebar outranks the base .sidebar-foot and .mini-stats rules further down). */
+  .sidebar .sidebar-foot {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 0 0;
+  }
+  .sidebar .mini-stats {
+    gap: 10px;
+  }
+  .sidebar-foot .sound-toggle-row {
+    width: auto;
+    flex: none;
+  }
+  .sidebar-foot .sound-toggle-row kbd {
+    display: none;
+  }
+  .sidebar-foot > div:last-child {
+    flex-basis: 100%;
   }
 }
 .nav-item:hover {
@@ -337,6 +361,10 @@ button {
   padding: 14px 10px 0;
   border-top: 1px solid var(--line);
   color: var(--ink-2);
+}
+/* An empty (0 XP) level track still shows on the leather. */
+.sidebar .bar {
+  box-shadow: var(--sunk), inset 0 0 0 1px var(--leather-line-strong);
 }
 .mini-stats {
   display: flex;
@@ -424,6 +452,16 @@ button {
     border-color: var(--line);
     color: var(--ink-2);
   }
+  /* The buttons sit closer together than the two stats (.mini-stats gap). */
+  .mini-stats .topbar-actions {
+    gap: 6px;
+  }
+  /* Settings has no tab: the gear carries the "you are here". */
+  .topbar .icon-btn[aria-current='page'] {
+    color: var(--leather-accent);
+    background: rgb(226 190 130 / 0.12);
+    border-color: color-mix(in oklab, var(--leather-accent) 55%, transparent);
+  }
   .tabbar {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -462,6 +500,18 @@ button {
     border-radius: 0 0 3px 3px;
     background: linear-gradient(90deg, var(--brass-lo), var(--brass-hi), var(--brass-lo));
   }
+  /* The sidebar's due counts, on the icon's top-right corner; absolute, so the tabs keep their size. */
+  .tab-badge {
+    position: absolute;
+    top: 5px;
+    left: calc(50% + 7px);
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 0.62rem;
+    line-height: 16px;
+    box-shadow: 0 0 0 2px var(--surface), inset 0 1px 0 rgb(255 255 255 / 0.35);
+  }
   .page {
     padding: 18px calc(16px + var(--safe-r)) 40px calc(16px + var(--safe-l));
     gap: 18px;
@@ -472,6 +522,83 @@ button {
   .lede {
     font-size: 0.98rem;
   }
+}
+@media (max-width: 380px) {
+  /* 320px phones: the brand, both stats and three 40px buttons fit without a sideways scroll. */
+  .topbar {
+    gap: 8px;
+    padding-left: calc(12px + var(--safe-l));
+    padding-right: calc(12px + var(--safe-r));
+  }
+  .topbar .mini-stats {
+    gap: 10px;
+  }
+  .topbar .brand {
+    gap: 8px;
+    font-size: 1.2rem;
+  }
+}
+@media (max-width: 360px) {
+  /* With the Install button too, only the brand mark stays (the word is still read out). */
+  .topbar:has(.install-btn) .brand-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+}
+@media (min-width: 600px) and (max-width: 900px) {
+  /* Tablet portrait: wider gutters than a phone, and the five tabs grouped instead of spread out. */
+  .page {
+    padding-top: 24px;
+    padding-left: calc(28px + var(--safe-l));
+    padding-right: calc(28px + var(--safe-r));
+    gap: 22px;
+  }
+  /* The full-bleed lesson bar (pages.css) follows the wider gutter. */
+  .main .lesson-nav {
+    margin-left: calc(-28px - var(--safe-l));
+    margin-right: calc(-28px - var(--safe-r));
+    padding-left: calc(28px + var(--safe-l));
+    padding-right: calc(28px + var(--safe-r));
+  }
+  .tabbar {
+    grid-template-columns: repeat(5, minmax(0, 132px));
+    justify-content: center;
+  }
+  .tab {
+    font-size: 0.76rem;
+  }
+}
+/* Keyboard users jump past the navigation; hidden until focused. */
+.skip-link {
+  position: fixed;
+  z-index: 200;
+  left: calc(12px + var(--safe-l));
+  top: calc(8px + var(--safe-t));
+  padding: 8px 14px;
+  border-radius: var(--radius-s);
+  background: var(--leather);
+  color: var(--leather-ink);
+  font-weight: 650;
+  text-decoration: none;
+  transform: translateY(-160%);
+}
+.skip-link:focus-visible {
+  transform: none;
+  outline: 2px solid var(--leather-accent);
+}
+/* Kids mode's files could not be fetched: a centred notice on the desk, clear of the notch. */
+.load-failed {
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  padding: calc(24px + var(--safe-t)) calc(16px + var(--safe-r)) calc(24px + var(--safe-b)) calc(16px + var(--safe-l));
+  background: var(--grain), var(--lamp), var(--bg);
+}
+.load-failed .brand-mark {
+  margin: 0 auto 14px;
 }
 
 /* ---------- Buttons & controls ---------- */
@@ -597,6 +724,12 @@ button {
   color: var(--bad);
   border-color: color-mix(in oklab, var(--bad) 30%, transparent);
 }
+/* The second step of an erase: solid, so it looks more serious than the first. */
+.btn-danger.btn-confirm {
+  background: var(--bad);
+  color: var(--on-bad);
+  border-color: var(--bad);
+}
 .btn-row {
   display: flex;
   flex-wrap: wrap;
@@ -670,8 +803,9 @@ button {
 }
 .segmented button.on {
   background: var(--surface);
-  color: var(--ink);
-  box-shadow: var(--hl-top), 0 1px 2px rgb(58 38 18 / 0.16), 0 0 0 1px var(--line);
+  /* Brass, as on a selected swatch or level card: the pill alone barely shows on the dark desk. */
+  color: var(--accent-strong);
+  box-shadow: var(--hl-top), 0 1px 2px rgb(58 38 18 / 0.16), 0 0 0 1px color-mix(in oklab, var(--accent) 60%, var(--line));
 }
 @media (pointer: coarse) {
   .segmented button {
@@ -742,6 +876,7 @@ button {
   line-height: 1.1;
 }
 select,
+input:not([type]),
 input[type='text'],
 input[type='number'],
 .import-box,
@@ -756,6 +891,7 @@ input[type='number'],
   transition: border-color 140ms var(--ease), box-shadow 140ms var(--ease);
 }
 select:focus-visible,
+input:not([type]):focus-visible,
 input[type='text']:focus-visible,
 input[type='number']:focus-visible,
 .import-box:focus-visible,
@@ -942,6 +1078,11 @@ button.card:hover,
   border: 1.5px dashed var(--line-strong);
   border-radius: var(--radius-m);
   background: color-mix(in oklab, var(--surface) 50%, transparent);
+}
+/* The heading reads as a heading, not as the muted note under it. */
+.empty h3 {
+  color: var(--ink);
+  margin-bottom: 4px;
 }
 
 /* ---------- Trainer layout ---------- */
@@ -1331,6 +1472,20 @@ button.feedback:hover {
   color: var(--good);
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--good) 40%, transparent);
 }
+.toast-bad .toast-icon {
+  background: var(--bad-soft);
+  color: var(--bad);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--bad) 40%, transparent);
+}
+.toast-info .toast-icon {
+  background: var(--surface-3);
+  color: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+/* A title-only notice ("Sound off") centres on its icon. */
+.toast:not(:has(.toast-body, .toast-action)) {
+  align-items: center;
+}
 .toast-title {
   font: 600 1.05rem var(--font-display);
 }
@@ -1549,9 +1704,6 @@ button.feedback:hover {
   .sound-toggle-row kbd {
     display: none;
   }
-}
-.sound-toggle.off {
-  opacity: 0.75;
 }
 .sound-toggle.off .icon {
   color: var(--bad, #b5483b);

@@ -75,7 +75,8 @@ function useNav(): { groups: { label?: string; items: NavItem[] }[]; tabs: NavIt
     },
   ];
   const tabs: NavItem[] = [
-    { route: 'home', label: 'Today', icon: 'home', match: ['progress', 'settings'] },
+    // Settings is lit on the header's gear instead (it has no tab).
+    { route: 'home', label: 'Today', icon: 'home', match: ['progress'] },
     { route: 'learn', label: 'Learn', icon: 'learn', match: ['lesson'] },
     { route: 'puzzles', label: 'Puzzles', icon: 'puzzle', badge: puzzleDue },
     { route: 'train', label: 'Train', icon: 'target', match: ['openings', 'opening', 'endgames', 'drill', 'vision'], badge: linesDue },
@@ -106,8 +107,9 @@ class KidsLoadFailed extends Component<{ children: ReactNode }, { failed: boolea
   render() {
     if (!this.state.failed) return this.props.children;
     return (
-      <div className="page">
+      <div className="page load-failed">
         <div className="empty">
+          <BrandMark />
           <h3>Kids mode could not load</h3>
           <p style={{ marginTop: 6 }}>Check the internet connection, then try again.</p>
           <div className="btn-row" style={{ justifyContent: 'center', marginTop: 14 }}>
@@ -288,6 +290,17 @@ export function App() {
   return (
     // The computer's pieces glide at the user's reply speed (board.css); Kids mode has its own.
     <div className="app" style={{ '--opp-glide': `${PACES[p.settings.replySpeed].glide}ms` } as CSSProperties}>
+      {/* The hash router would take "#main" for a route, so the link moves focus itself. */}
+      <a
+        className="skip-link"
+        href="#main"
+        onClick={(e) => {
+          e.preventDefault();
+          document.getElementById('main')?.focus();
+        }}
+      >
+        Skip to content
+      </a>
       <aside className="sidebar">
         <button className="brand" onClick={() => navigate('home')}>
           <BrandMark />
@@ -326,18 +339,20 @@ export function App() {
       <header className="topbar">
         <button className="brand" onClick={() => navigate('home')}>
           <BrandMark />
-          Tempo
+          <span className="brand-word">Tempo</span>
         </button>
         <MiniStats streak={streak} rating={p.puzzles.rating}>
-          <InstallButton compact />
-          <SoundToggle compact />
-          <button className="icon-btn" aria-label="Settings" onClick={() => navigate('settings')}>
-            <Icon name="settings" size={18} />
-          </button>
+          <span className="topbar-actions">
+            <InstallButton compact />
+            <SoundToggle compact />
+            <button className="icon-btn" aria-label="Settings" aria-current={section === 'settings' ? 'page' : undefined} onClick={() => navigate('settings')}>
+              <Icon name="settings" size={18} />
+            </button>
+          </span>
         </MiniStats>
       </header>
 
-      <main className="main">
+      <main className="main" id="main" tabIndex={-1}>
         <div className="page" key={route}>
           <Page route={route} />
         </div>
@@ -345,9 +360,10 @@ export function App() {
 
       <nav className="tabbar" aria-label="Main">
         {tabs.map((t) => (
-          <button key={t.route} className={`tab ${isActive(t, section) ? 'active' : ''}`} onClick={() => navigate(t.route)}>
+          <button key={t.route} className={`tab ${isActive(t, section) ? 'active' : ''}`} onClick={() => navigate(t.route)} aria-current={isActive(t, section) ? 'page' : undefined}>
             <Icon name={t.icon} size={22} />
             {t.label}
+            {!!t.badge && <span className="badge tab-badge">{t.badge}</span>}
           </button>
         ))}
       </nav>

@@ -141,6 +141,7 @@ export function SettingsPage() {
           <div className="play-option">
             <span className="stat-label">Daily goal</span>
             <Segmented
+              className="goal-seg"
               label="Daily XP goal"
               value={String(s.dailyGoal)}
               onChange={(v) => set({ dailyGoal: Number(v) })}
@@ -192,14 +193,26 @@ export function SettingsPage() {
             <Button onClick={importData} disabled={!importText.trim()}>
               Import
             </Button>
+          </div>
+          {/* Kept apart from the routine buttons: a divided row, and a solid button for the second step. */}
+          <div className="settings-row settings-danger">
+            <span>
+              <strong>Reset all progress</strong>
+              <span className="muted">{linked ? 'This erases your progress on this device and on every device linked with your sync code. Settings stay.' : 'This erases your progress in this browser. Settings stay.'}</span>
+            </span>
             {!confirmReset ? (
-              <Button variant="danger" onClick={() => setConfirmReset(true)}>
-                Reset all progress
+              <Button size="s" variant="danger" aria-label="Reset all progress" onClick={() => setConfirmReset(true)}>
+                Reset
               </Button>
             ) : (
-              <>
+              <span className="btn-row">
+                <Button size="s" variant="ghost" onClick={() => setConfirmReset(false)}>
+                  Cancel
+                </Button>
                 <Button
+                  size="s"
                   variant="danger"
+                  className="btn-confirm"
                   onClick={() => {
                     // Keeps settings; the reset time syncs, so linked devices drop older progress too.
                     replaceProfile(sinceReset(p, Date.now()));
@@ -209,13 +222,9 @@ export function SettingsPage() {
                 >
                   Yes, erase everything
                 </Button>
-                <Button variant="ghost" onClick={() => setConfirmReset(false)}>
-                  Cancel
-                </Button>
-              </>
+              </span>
             )}
           </div>
-          {confirmReset && <p className="faint">{linked ? 'This erases your progress on this device and on every device linked with your sync code. Settings stay.' : 'This erases your progress in this browser. Settings stay.'}</p>}
         </section>
         <section className="card settings-section">
           <h2>Credits</h2>

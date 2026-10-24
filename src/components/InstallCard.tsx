@@ -64,7 +64,7 @@ export function InstallButton({ compact }: { compact?: boolean }) {
   const s = useInstall();
   if (s.installed || !s.canPrompt) return null;
   return compact ? (
-    <button className="icon-btn" style={{ width: 32, height: 32 }} aria-label="Install Tempo" title="Install Tempo" onClick={() => void install()}>
+    <button className="icon-btn install-btn" style={{ width: 32, height: 32 }} aria-label="Install Tempo" title="Install Tempo" onClick={() => void install()}>
       <Icon name="download" size={18} />
     </button>
   ) : (
