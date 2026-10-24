@@ -907,9 +907,10 @@ function frameCamera(cam, king, fill = 0.88) {
 /**
  * Moves the framed projection up or down so this piece's middle sits `drop` (a fraction of the
  * sprite) below the sprite's centre: every piece stands in the middle of its square, a pawn as
- * much as a king. The small drop leaves room above for the contact shadow's weight below the foot.
+ * much as a king. The drop is negative: a Staunton piece is bottom-heavy (a wide foot and its
+ * contact shadow), so its outline sits a little above the centre to look centred.
  */
-function centerCamera(cam, framed, piece, drop = 0.012) {
+function centerCamera(cam, framed, piece, drop = -0.016) {
   cam.projectionMatrix.copy(framed);
   const [ymin, ymax] = extent(cam, piece);
   const t = -(ymin + ymax) / 2 - 2 * drop;
