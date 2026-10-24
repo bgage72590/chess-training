@@ -120,9 +120,9 @@ function Trainer({ opening, line, mode, onFinish }: { opening: Opening; line: Op
           arrows={arrows}
           tones={tones}
         />
-        <MoveInput id="opening-move" fen={fen} color={learnerTurn} enabled={learnersMove} onMove={onMove} />
+        <MoveInput id="opening-move" fen={fen} color={learnerTurn} enabled={learnersMove} onMove={onMove} idleText={done ? 'Line complete' : undefined} />
       </BoardColumn>
-      <aside className="panel">
+      <aside className="panel coach-first">
         <h2>{line.name}</h2>
         <div className="line-moves mono">
           {/* Played moves and the one expected now; the rest of the line is just a count. */}
