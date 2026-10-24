@@ -123,20 +123,16 @@ function Trainer({ opening, line, mode, onFinish }: { opening: Opening; line: Op
         <MoveInput id="opening-move" fen={fen} color={learnerTurn} enabled={learnersMove} onMove={onMove} />
       </BoardColumn>
       <aside className="panel">
-        <div className="panel-section">
-          <div className="eyebrow">{mode === 'learn' ? 'Learn' : 'Drill from memory'}</div>
-          <h2>{line.name}</h2>
-          <p className="faint" style={{ fontSize: '0.86rem' }}>
-            {opening.name}
-          </p>
-        </div>
+        <h2>{line.name}</h2>
         <div className="line-moves mono">
-          {plies.map((p, i) => (
+          {/* Played moves and the one expected now; the rest of the line is just a count. */}
+          {plies.slice(0, ply + 1).map((p, i) => (
             <span key={i} className={`lm ${i < ply ? 'played' : ''} ${i === ply ? 'cur' : ''}`}>
               {i % 2 === 0 && <span className="faint">{moveNumberLabel(i)}</span>}
               {i < ply || (mode === 'learn' && i === ply) ? p.move.san : '···'}
             </span>
           ))}
+          {plies.length > ply + 1 && <span className="lm lm-rest faint">+{plies.length - ply - 1} moves</span>}
         </div>
         {done ? (
           <Feedback
@@ -147,8 +143,8 @@ function Trainer({ opening, line, mode, onFinish }: { opening: Opening; line: Op
           />
         ) : learnersMove ? (
           <Feedback
-            tone="info"
-            icon={reveal || mode === 'learn' ? 'right' : 'bulb'}
+            tone={flash || (mode === 'drill' && reveal) ? 'warn' : 'info'}
+            icon={flash ? 'x' : reveal || mode === 'learn' ? 'right' : 'bulb'}
             title={mode === 'learn' ? `Play ${plies[ply].move.san}` : reveal ? `The move is ${plies[ply].move.san}` : 'Your move'}
             body={flash && `${flash} is not in your repertoire here.`}
           />
@@ -226,8 +222,8 @@ export function OpeningPage({ id }: { id: string }) {
           }}
         />
         {session.finished && (
-          <div className="lesson-nav">
-            <Button variant="ghost" onClick={() => setSession({ ...session, key: session.key + 1, finished: false })} icon="refresh">
+          <div className="lesson-nav opening-nav">
+            <Button variant="ghost" aria-label="Play the line again" onClick={() => setSession({ ...session, key: session.key + 1, finished: false })} icon="refresh">
               Again
             </Button>
             {session.mode === 'learn' && (
@@ -268,14 +264,6 @@ export function OpeningPage({ id }: { id: string }) {
       <div className="opening-overview">
         <div className="card opening-about">
           <RichText text={opening.summary} />
-          <h3 style={{ marginTop: 6 }}>Plans to remember</h3>
-          <ul className="ideas">
-            {opening.ideas.map((idea, i) => (
-              <li key={i}>
-                <RichText text={idea} />
-              </li>
-            ))}
-          </ul>
           <div className="btn-row">
             {newLines.length > 0 && (
               <Button variant="primary" icon="learn" onClick={() => start('learn', newLines)}>
@@ -291,6 +279,14 @@ export function OpeningPage({ id }: { id: string }) {
               Drill every line
             </Button>
           </div>
+          <h3 className="opening-plans-head">Plans to remember</h3>
+          <ul className="ideas">
+            {opening.ideas.map((idea, i) => (
+              <li key={i}>
+                <RichText text={idea} />
+              </li>
+            ))}
+          </ul>
         </div>
         <div className="line-list">
           {opening.lines.map((l) => {

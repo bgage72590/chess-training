@@ -2,6 +2,8 @@ import { playerWon, useProfile } from '../store/profile';
 import { colorName } from '../chess/utils';
 import { navigate } from '../router';
 import { Button, PageHeader, Pill } from '../components/ui';
+import { Icon } from '../components/Icon';
+import { gameDate } from '../components/GameBits';
 import { LEVELS } from './Play';
 
 export function GamesPage() {
@@ -28,8 +30,12 @@ export function GamesPage() {
                   <strong>
                     vs {lvl?.name} <span className="faint num">~{lvl?.elo}</span>
                   </strong>
-                  <span className="faint">
-                    {colorName(g.playerColor)} · {Math.ceil(g.moves.length / 2)} moves · {g.reason} · {new Date(g.t).toLocaleDateString()}
+                  {/* Separate parts, so a line breaks between them and never after a separator. */}
+                  <span className="game-row-meta faint">
+                    <span>{colorName(g.playerColor)}</span>
+                    <span>{Math.ceil(g.moves.length / 2)} moves</span>
+                    <span>{g.reason}</span>
+                    <span>{gameDate(g.t)}</span>
                   </span>
                 </div>
                 <div className="game-row-acc">
@@ -39,7 +45,10 @@ export function GamesPage() {
                       <span className="stat-label">accuracy</span>
                     </>
                   ) : (
-                    <span className="faint">Not reviewed</span>
+                    <span className="game-row-open">
+                      <Pill tone="accent">Review</Pill>
+                      <Icon name="right" size={16} />
+                    </span>
                   )}
                 </div>
               </button>

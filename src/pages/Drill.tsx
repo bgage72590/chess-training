@@ -181,8 +181,8 @@ function DrillPlayer({ drill }: { drill: EndgameDrill }) {
           <div className="btn-row">
             <Pill tone={drill.goal === 'draw' ? 'info' : 'accent'}>{GOAL_LABEL[drill.goal]}</Pill>
             <Pill>{drill.category}</Pill>
+            <Pill>{drill.level}</Pill>
           </div>
-          <h2>{drill.title}</h2>
           <RichText text={drill.brief} />
         </div>
         <EngineNotice />
@@ -237,11 +237,11 @@ export function DrillPage({ id }: { id: string }) {
           <Icon name="left" />
         </button>
         <div className="lesson-top-text">
-          <div className="eyebrow">Endgame drill · {drill.level}</div>
+          <div className="eyebrow">Endgame drill</div>
           <h1 className="lesson-title">{drill.title}</h1>
         </div>
         {next && (
-          <Button variant="ghost" iconRight="right" onClick={() => navigate(`drill/${next.id}`)}>
+          <Button variant="ghost" iconRight="right" className="next-drill" aria-label={`Next drill: ${next.title}`} onClick={() => navigate(`drill/${next.id}`)}>
             Next drill
           </Button>
         )}

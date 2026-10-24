@@ -109,6 +109,8 @@ export function PlayPage() {
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<{ result: GameRecord['result']; reason: string; id: string } | null>(null);
   const [orientation, setOrientation] = useState<'white' | 'black'>('white');
+  /** Resign asks once: the ply count when it was tapped, so any move cancels the question. */
+  const [resignAsk, setResignAsk] = useState<number | null>(null);
   const engineStatus = useEngineStatus();
   const level = LEVELS[prefs.level - 1];
 
@@ -141,6 +143,10 @@ export function PlayPage() {
       if (d.games.length > 30) d.games.length = 30;
       if (ms.length >= 10) logActivity(d, won ? 35 : 20, 'games');
     });
+    // A coach warning or arrow left over from play means nothing once the game is over.
+    setPending(false);
+    setNote(null);
+    setArrows([]);
     setResult({ result: res, reason, id });
     setPhase('over');
     sound(won ? 'complete' : 'bad');
@@ -208,6 +214,7 @@ export function PlayPage() {
     setArrows([]);
     setNote(null);
     setPending(false);
+    setResignAsk(null);
     setResult(null);
     setPhase('playing');
     scrollToTop(); // the Start button sits below the fold on phones
@@ -308,6 +315,7 @@ export function PlayPage() {
   };
 
   const resign = () => {
+    setResignAsk(null);
     engine.cancelAll();
     gameRef.current++; // drops a coach move still being "thought" about
     setThinking(false);
@@ -332,40 +340,45 @@ export function PlayPage() {
               </button>
             ))}
           </div>
-          <div className="card play-options">
-            <div className="play-option">
-              <span className="stat-label">Your pieces</span>
-              <Segmented
-                label="Your color"
-                value={prefs.color}
-                onChange={(v) => update({ color: v })}
-                options={[
-                  { value: 'w', label: 'White' },
-                  { value: 'random', label: 'Random' },
-                  { value: 'b', label: 'Black' },
-                ]}
-              />
+          <div className="play-side">
+            <div className="card play-options">
+              <div className="play-option">
+                <span className="stat-label">Your pieces</span>
+                <Segmented
+                  label="Your color"
+                  value={prefs.color}
+                  onChange={(v) => update({ color: v })}
+                  options={[
+                    { value: 'w', label: 'White' },
+                    { value: 'random', label: 'Random' },
+                    { value: 'b', label: 'Black' },
+                  ]}
+                />
+              </div>
+              <div className="play-option">
+                <span className="stat-label">Computer reply speed</span>
+                <Segmented
+                  label="Computer reply speed"
+                  value={replySetting}
+                  onChange={(v) => updateProfile((d) => void (d.settings.replySpeed = v))}
+                  options={(Object.keys(REPLY_SPEED_LABELS) as ReplySpeed[]).map((v) => ({ value: v, label: REPLY_SPEED_LABELS[v] }))}
+                />
+              </div>
+              <label className="switch">
+                <input type="checkbox" checked={prefs.coach} onChange={(e) => update({ coach: e.target.checked })} id="coach-mode" />
+                Coach mode: warn me before a mistake, allow take-backs
+              </label>
+              <label className="switch">
+                <input type="checkbox" checked={prefs.evalBar} onChange={(e) => update({ evalBar: e.target.checked })} id="eval-bar" />
+                Show evaluation bar
+              </label>
             </div>
-            <div className="play-option">
-              <span className="stat-label">Computer reply speed</span>
-              <Segmented
-                label="Computer reply speed"
-                value={replySetting}
-                onChange={(v) => updateProfile((d) => void (d.settings.replySpeed = v))}
-                options={(Object.keys(REPLY_SPEED_LABELS) as ReplySpeed[]).map((v) => ({ value: v, label: REPLY_SPEED_LABELS[v] }))}
-              />
+            {/* Outside the card so that, in one column, it can stay pinned while the levels scroll. */}
+            <div className="play-start">
+              <Button variant="primary" size="l" icon="play" onClick={start} disabled={engineStatus === 'failed'}>
+                Start game vs {level.name}
+              </Button>
             </div>
-            <label className="switch">
-              <input type="checkbox" checked={prefs.coach} onChange={(e) => update({ coach: e.target.checked })} id="coach-mode" />
-              Coach mode: warn me before a mistake, allow take-backs
-            </label>
-            <label className="switch">
-              <input type="checkbox" checked={prefs.evalBar} onChange={(e) => update({ evalBar: e.target.checked })} id="eval-bar" />
-              Show evaluation bar
-            </label>
-            <Button variant="primary" size="l" icon="play" onClick={start} disabled={engineStatus === 'failed'}>
-              Start game vs {level.name}
-            </Button>
           </div>
         </div>
       </>
@@ -375,6 +388,7 @@ export function PlayPage() {
   const sans = moves.map((m) => m.san);
   const last = moves[moves.length - 1];
   const won = !!result && playerWon({ result: result.result, playerColor: color });
+  const askingResign = resignAsk === moves.length;
   const boardEl = (
     <Board
       fen={fen}
@@ -426,11 +440,12 @@ export function PlayPage() {
           />
         ) : (
           <div className="to-move">
-            <span className={`side-dot ${turn}`} />
-            {turn === color ? 'Your move' : `${level.name} to move`}
+            {/* While the coach waits on a warning, the decision is the player's. */}
+            <span className={`side-dot ${pending ? color : turn}`} />
+            {pending ? 'Coach check' : turn === color ? 'Your move' : `${level.name} to move`}
           </div>
         )}
-        {note && (
+        {phase === 'playing' && note && (
           <Feedback
             tone={note.kind === 'warn' ? 'warn' : note.kind === 'threat' ? 'bad' : 'info'}
             icon={note.kind === 'warn' ? 'flag' : note.kind === 'threat' ? 'target' : 'bulb'}
@@ -438,7 +453,7 @@ export function PlayPage() {
             body={note.body}
           />
         )}
-        {pending && (
+        {phase === 'playing' && pending && (
           <div className="btn-row">
             <Button variant="primary" icon="undo" onClick={takeBack}>
               Take it back
@@ -449,7 +464,19 @@ export function PlayPage() {
           </div>
         )}
         <MoveList sans={sans} current={sans.length} />
-        {phase === 'playing' ? (
+        {/* While a warning is up, its own two buttons are the only choices. */}
+        {phase === 'playing' && !pending && askingResign && (
+          <div className="btn-row resign-ask" role="group" aria-label="Confirm resignation">
+            <span className="resign-ask-q">Resign this game?</span>
+            <Button variant="danger" icon="flag" onClick={resign}>
+              Yes, resign
+            </Button>
+            <Button variant="ghost" onClick={() => setResignAsk(null)} autoFocus>
+              No
+            </Button>
+          </div>
+        )}
+        {phase === 'playing' && !pending && !askingResign && (
           <div className="btn-row">
             <Button icon="bulb" onClick={hint} disabled={!hintMove || !canMove}>
               Hint
@@ -458,15 +485,16 @@ export function PlayPage() {
               Threat?
             </Button>
             {prefs.coach && (
-              <Button variant="ghost" icon="undo" onClick={takeBack} disabled={moves.length === 0 || pending}>
+              <Button variant="ghost" icon="undo" onClick={takeBack} disabled={moves.length === 0}>
                 Take back
               </Button>
             )}
-            <Button variant="ghost" icon="flag" onClick={resign} disabled={moves.length < 2}>
+            <Button variant="ghost" icon="flag" onClick={() => setResignAsk(moves.length)} disabled={moves.length < 2}>
               Resign
             </Button>
           </div>
-        ) : (
+        )}
+        {phase === 'over' && (
           <div className="btn-row">
             {result && (
               <Button variant="primary" icon="progress" onClick={() => navigate(`review/${result.id}`)}>

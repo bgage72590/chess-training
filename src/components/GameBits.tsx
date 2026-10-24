@@ -14,6 +14,12 @@ function evalBarLabel(score: Score | undefined): string {
   return Math.round(v * 10) >= 100 ? String(Math.min(99, Math.round(v))) : v.toFixed(1);
 }
 
+/** A game's date for headers and lists: "Oct 23", with the year only when it is not this year. */
+export function gameDate(t: number): string {
+  const d = new Date(t);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+}
+
 /** Vertical evaluation bar. `score` is from White's point of view. */
 export function EvalBar({ score, orientation = 'white' }: { score?: Score; orientation?: 'white' | 'black' }) {
   const white = winPercent(score);
@@ -29,11 +35,12 @@ export function EvalBar({ score, orientation = 'white' }: { score?: Score; orien
       <div className="evalbar-white" style={{ height: `${white}%` }} />
       <div
         className={`evalbar-label${!short.includes('.') && short.length > 2 ? ' tight' : ''}`}
-        style={
-          (orientation === 'white') === whiteAhead
-            ? { bottom: 4, color: 'var(--ebony)' }
-            : { top: 4, color: 'var(--ivory)' }
-        }
+        style={{
+          // The end follows the leader's segment, which flips with the board; the ink only depends
+          // on who leads, so it always contrasts with the segment it sits on.
+          [(orientation === 'white') === whiteAhead ? 'bottom' : 'top']: 4,
+          color: whiteAhead ? 'var(--ebony)' : 'var(--ivory)',
+        }}
       >
         {short.includes('.') ? (
           <>
@@ -112,9 +119,11 @@ export function MoveList({
       );
     }
   }
+  // Outside the sunken box: an empty box reads as a text field on touch screens.
+  if (!cells.length) return <p className="moves-empty faint">Your moves will appear here.</p>;
   return (
     <div className="moves" ref={ref}>
-      {cells.length ? cells : <span className="faint" style={{ padding: 8, gridColumn: '1 / -1' }}>No moves yet</span>}
+      {cells}
     </div>
   );
 }
@@ -140,7 +149,8 @@ export function EvalGraph({ evals, current, onSelect, classes }: { evals: Score[
       <line x1="0" x2={W} y1={H / 2} y2={H / 2} stroke="rgb(128 118 104)" strokeWidth="1" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
       {classes?.map((c, i) =>
         c === 'blunder' || c === 'mistake' ? (
-          <circle key={i} cx={x(i + 1)} cy={y(evals[i + 1])} r="4" fill={c === 'blunder' ? 'var(--bad)' : 'var(--mistake)'} vectorEffect="non-scaling-stroke" />
+          // A zero-length round-capped stroke: unlike a circle it stays round when the graph stretches.
+          <line key={i} x1={x(i + 1)} x2={x(i + 1)} y1={y(evals[i + 1])} y2={y(evals[i + 1])} stroke={c === 'blunder' ? 'var(--bad)' : 'var(--mistake)'} strokeWidth="8" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         ) : null,
       )}
       <line x1={x(current)} x2={x(current)} y1="0" y2={H} stroke="var(--accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
