@@ -90,7 +90,7 @@ function CoordsDrill({ mode }: { mode: 'find' | 'name' }) {
     <div className="trainer">
       <BoardColumn>
         <div className="coord-prompt" aria-live="polite">
-          {phase === 'run' ? (mode === 'find' ? <span className="mono">{target}</span> : <span className="faint">Name the marked square</span>) : <span className="faint">{mode === 'find' ? 'Click the named square' : 'Name the marked square'}</span>}
+          {phase === 'run' ? (mode === 'find' ? <span className="mono">{target}</span> : <span className="faint">Name the marked square</span>) : <span className="faint">{mode === 'find' ? 'Find the named square' : 'Name the marked square'}</span>}
         </div>
         <Board
           fen={EMPTY_FEN}
@@ -102,12 +102,6 @@ function CoordsDrill({ mode }: { mode: 'find' | 'name' }) {
         />
       </BoardColumn>
       <aside className="panel">
-        {phase !== 'run' && (
-          <div className="panel-section">
-            <h2>{mode === 'find' ? 'Find the square' : 'Name the square'}</h2>
-            <p className="muted">Strong players see squares as names without thinking. Thirty seconds, as many as you can. Train both sides of the board.</p>
-          </div>
-        )}
         {phase === 'run' && (
           <div className="rush-head">
             <div>
@@ -153,6 +147,8 @@ function CoordsDrill({ mode }: { mode: 'find' | 'name' }) {
             </div>
           </>
         )}
+        {/* The title above names the drill; the call to action comes first, the why after it. */}
+        {phase === 'ready' && <p className="muted">Strong players see squares as names without thinking. Thirty seconds, as many as you can. Train both sides of the board.</p>}
       </aside>
     </div>
   );
@@ -209,6 +205,8 @@ function KnightDrill() {
   const [trail, setTrail] = useState<string[]>([]);
   const used = Math.max(0, trail.length - 1);
   const { later } = useTimeouts();
+  // A run starts from the board's top: the Start button sits below it on phones.
+  useScrollTopOn(phase === 'run');
 
   const newRound = () => {
     let a = randomItem(ALL_SQUARES);
@@ -273,10 +271,27 @@ function KnightDrill() {
         <Board fen={fenWithKnight(pos)} onSquareClick={click} marks={phase === 'run' ? marks : []} arrows={phase === 'run' ? arrows : []} drawable={false} />
       </BoardColumn>
       <aside className="panel">
-        <div className="panel-section">
-          <h2>Knight routes</h2>
+        {phase === 'run' && (
+          <div className="rush-head">
+            <div>
+              <div className="stat-label">Round</div>
+              <div className="stat-value num">
+                {round + 1}/{ROUNDS}
+              </div>
+            </div>
+            <div>
+              <div className="stat-label">Moves</div>
+              <div className="stat-value num">{used}</div>
+            </div>
+            <div>
+              <div className="stat-label">Best possible</div>
+              <div className="stat-value num">{optimal}</div>
+            </div>
+          </div>
+        )}
+        {phase === 'ready' && (
           <p className="muted">Take the knight to the ringed square in as few moves as possible. Knights are the piece club players most often lose track of; this makes their geometry automatic.</p>
-        </div>
+        )}
         {phase === 'done' && <Feedback tone="good" icon="trophy" title={`${perfect}/${ROUNDS} shortest routes`} body={`in ${elapsed} seconds`} />}
         {phase !== 'run' && (
           <Button variant="primary" size="l" icon="play" onClick={start}>
@@ -357,7 +372,6 @@ function ChecksDrill() {
       </BoardColumn>
       <aside className="panel">
         <div className="panel-section">
-          <h2>Find every check</h2>
           <p className="muted">
             Play each checking move on the board. Checks are the first thing to scan for on every move, for you and for your opponent. This position has <strong>{all.length}</strong>.
           </p>
@@ -395,7 +409,7 @@ function ChecksDrill() {
 }
 
 const MODES = [
-  { id: 'coords', title: 'Find the square', text: 'A square name appears; click it. Thirty seconds.', icon: 'target' },
+  { id: 'coords', title: 'Find the square', text: 'A square name appears; find it. Thirty seconds.', icon: 'target' },
   { id: 'name', title: 'Name the square', text: 'A square is marked; pick its name.', icon: 'eye' },
   { id: 'knight', title: 'Knight routes', text: 'Shortest knight paths, eight rounds.', icon: 'play' },
   { id: 'checks', title: 'Find every check', text: 'Scan a real position for all checking moves.', icon: 'bolt' },

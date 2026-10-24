@@ -11,6 +11,7 @@ import { BoardColumn } from './BoardColumn';
 import { MoveInput } from './MoveInput';
 import { Feedback } from './ui';
 import { SoundToggle } from './SoundToggle';
+import { Icon } from './Icon';
 
 export type PuzzleStatus = 'intro' | 'solving' | 'solved' | 'failed' | 'viewing';
 
@@ -27,6 +28,8 @@ interface Props {
   onComplete?: (clean: boolean) => void;
   /** Rush mode: a wrong move ends the puzzle immediately. */
   strict?: boolean;
+  /** Shown in the middle of the caption row instead of the puzzle number (Rush: the clock). */
+  caption?: React.ReactNode;
   children?: (api: SolverApi) => React.ReactNode;
 }
 
@@ -46,7 +49,7 @@ export interface SolverApi {
 
 const MOVE_DELAY = 420;
 
-export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, children }: Props) {
+export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, caption, children }: Props) {
   // The computer's replies wait at the user's reply speed; the timed Rush keeps them short.
   const pace = (ms: number) => (strict ? ms : paceMs(ms));
   const moves = useMemo(() => puzzle.moves.split(' '), [puzzle]);
@@ -216,13 +219,24 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
     <div className="trainer">
       <BoardColumn>
         <div className="board-caption">
-          <span className="player-tag">
-            <span className={`side-dot ${solverColor}`} />
-            {status === 'intro' ? 'Watch the last move' : `${colorName(solverColor)} to play`}
-          </span>
-          <span className="faint">
-            Puzzle <span className="num">{puzzle.id.replace(/^p0*/, '#')}</span>
-          </span>
+          {status === 'failed' || status === 'solved' || status === 'viewing' ? (
+            // The result, where it stays on screen when the panel is below the fold.
+            <span className={`caption-status ${status === 'failed' ? 'bad' : status === 'solved' ? 'good' : ''}`}>
+              <Icon name={status === 'failed' ? 'x' : status === 'solved' ? 'check' : 'eye'} size={14} />
+              {status === 'failed' ? (strict ? 'Strike' : 'Not the move') : status === 'solved' ? 'Solved' : 'Solution'}
+            </span>
+          ) : (
+            <span className="player-tag">
+              <span className={`side-dot ${solverColor}`} />
+              {status === 'intro' ? 'Watch the last move' : `${colorName(solverColor)} to play`}
+            </span>
+          )}
+          {caption ?? (
+            <span className="faint">
+              <span className="puzzle-no-label">Puzzle </span>
+              <span className="num">{puzzle.id.replace(/^p0*/, '#')}</span>
+            </span>
+          )}
           <SoundToggle compact />
         </div>
         <Board
@@ -242,7 +256,9 @@ export function PuzzleSolver({ puzzle, onFirstResult, onComplete, strict, childr
   );
 }
 
-export function PuzzleFeedback({ api, reveal }: { api: SolverApi; reveal?: boolean }) {
+/** The result banner. `strict` (Rush): a wrong move is a strike and the puzzle is over. */
+export function PuzzleFeedback({ api, reveal, strict }: { api: SolverApi; reveal?: boolean; strict?: boolean }) {
+  if (api.status === 'failed' && strict) return <Feedback tone="bad" icon="x" title="Strike" body="The arrow shows the move. Next one coming up." reveal={reveal} />;
   if (api.status === 'failed') return <Feedback tone="bad" icon="x" title="Not the move" body="Look again at checks, captures and threats." reveal={reveal} />;
   if (api.status !== 'solved' && api.status !== 'viewing') return null;
   const solved = api.status === 'solved';
