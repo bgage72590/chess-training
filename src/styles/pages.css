@@ -1634,7 +1634,9 @@
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.18), 0 4px 10px -6px rgb(0 0 0 / 0.5);
 }
 .settings-preview {
-  max-width: 300px;
+  width: 100%;
+  max-width: 320px;
+  margin-inline: auto;
 }
 /* The field skin comes from the shared inputs recipe in app.css. */
 .import-box {

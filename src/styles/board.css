@@ -6,16 +6,16 @@
   /* Board defaults (overridden per theme class on the board) */
   --sq-light: #e2e8ec;
   --sq-dark: #86a0b3;
-  --coord-on-light: #62798c;
-  --coord-on-dark: #f1f4f7;
+  --coord-on-light: #4d6273;
+  --coord-on-dark: #1f2f3d;
   --coord-shadow-light: 0 1px 0 rgb(255 255 255 / 0.45);
-  --coord-shadow-dark: 0 1px 1px rgb(0 0 0 / 0.22);
+  --coord-shadow-dark: 0 1px 0 rgb(255 255 255 / 0.25);
   /* Last move is always a gold/yellow wash; the selected square a different hue (per theme)
      with a ring, so "my selection" and "their last move" never look alike. */
   --hl-last: rgb(247 206 96 / 0.5);
   --hl-select: rgb(84 176 150 / 0.5);
   --hl-select-ring: rgb(44 132 108 / 0.9);
-  --dest-dot: rgb(20 29 39 / 0.3);
+  --dest-dot: rgb(20 29 39 / 0.45);
   --dest-rim: transparent;
   --dest-hover: rgb(20 29 39 / 0.14);
   --tone-a: 0.5;
@@ -102,19 +102,20 @@
 .sq.dark.selected::before {
   background: var(--hl-select-dark, var(--hl-select));
 }
-/* Check: a red glow around the king, pulsing twice when it appears. */
+/* Check: a red glow around the king, pulsing twice when it appears. The colour reaches the edges
+   and corners, so it still shows around a Classic king that fills most of the square. */
 .sq.check::after {
   content: '';
   position: absolute;
   inset: 0;
   background: radial-gradient(
-    circle closest-side,
-    rgb(255 80 60) 0%,
-    rgb(240 44 32 / 0.85) 42%,
-    rgb(214 24 24 / 0.45) 74%,
-    rgb(200 0 0 / 0) 100%
+    ellipse farthest-corner at center,
+    rgb(255 70 50) 0%,
+    rgb(236 36 28 / 0.9) 38%,
+    rgb(214 24 24 / 0.6) 62%,
+    rgb(200 0 0 / 0.2) 100%
   );
-  box-shadow: inset 0 0 max(6px, 1.4cqw) rgb(220 30 30 / 0.55);
+  box-shadow: inset 0 0 max(8px, 1.8cqw) rgb(200 20 20 / 0.7);
   animation: check-pulse 900ms ease-in-out 2;
 }
 @keyframes check-pulse {
@@ -194,6 +195,19 @@
     inset 0 0 0 var(--ring) rgb(255 255 255 / 0.92),
     inset 0 0 0 calc(var(--ring) + 1.5px) rgb(0 0 0 / 0.38);
 }
+/* On touch the fingertip covers the whole square, so a larger soft disc shows around it
+   (clipped at the board's edge); the piece itself is lifted above the finger by Board. */
+.board.touch-drag .drag-hover::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.12);
+}
+.board.touch-drag .drag-hover.is-dest::before {
+  background: rgb(255 255 255 / 0.22);
+  box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.25);
+}
 
 /* ---------- Coordinates: small, soft, engraved into the squares ---------- */
 .coord {
@@ -246,8 +260,11 @@
 .pieces-cburnett .piece {
   filter: drop-shadow(0 max(1px, 0.18cqw) max(1px, 0.2cqw) rgb(0 0 0 / 0.28));
 }
-/* On the textured boards, light 3D pieces on light maple or cream stone need a hint of an edge
-   to keep their silhouette: a faint, tight shadow in the board's own dark tone. */
+/* Light 3D pieces on light squares need a hint of an edge to keep their silhouette: a faint,
+   tight shadow in the board's own dark tone (--pc-edge per theme; textured boards below). */
+.pieces-staunton3d .piece {
+  filter: drop-shadow(0 0 max(0.6px, 0.12cqw) rgb(var(--pc-edge, 28 34 44) / 0.5));
+}
 .board-walnut.pieces-staunton3d .piece {
   filter: drop-shadow(0 0 max(0.6px, 0.12cqw) rgb(52 28 8 / 0.5));
 }
@@ -264,8 +281,14 @@
   filter: none;
   transition: none;
 }
-.board.can-move {
+/* The hand shows only over pieces that can move and over their targets; a closed hand while dragging. */
+.board.can-move .sq.movable,
+.board.can-move .sq:has(> .dest) {
   cursor: pointer;
+}
+.board.is-dragging,
+.board.is-dragging .sq {
+  cursor: grabbing;
 }
 
 /* ---------- Arrows and circles ---------- */
@@ -284,7 +307,7 @@
   position: absolute;
   inset: 0;
   z-index: 30;
-  background: rgb(10 14 20 / 0.5);
+  background: rgb(30 20 12 / 0.5);
   backdrop-filter: blur(1.5px);
 }
 .promo-choice {
@@ -307,6 +330,21 @@
 .promo-choice:hover {
   background-color: var(--accent-soft);
   border-radius: 12%;
+}
+/* The disc follows the piece colour, not the app theme: light pieces on a dark disc in the
+   board's frame tone, dark pieces on cream, so each choice reads in light and dark mode. */
+.promo-choice[class*='pc-w'] {
+  background-color: color-mix(in srgb, var(--frame) 88%, black);
+  box-shadow: var(--shadow-2), inset 0 0 0 1px rgb(255 255 255 / 0.14);
+}
+.promo-choice[class*='pc-w']:hover {
+  background-color: color-mix(in srgb, var(--frame) 55%, var(--accent));
+}
+.promo-choice[class*='pc-b'] {
+  background-color: #f6efe3;
+}
+.promo-choice[class*='pc-b']:hover {
+  background-color: #fbe6bf;
 }
 .promo-cancel {
   position: absolute;
@@ -335,8 +373,11 @@
 .board-slate {
   --sq-light: #e2e8ec;
   --sq-dark: #86a0b3;
-  --coord-on-light: #62798c;
-  --coord-on-dark: #f1f4f7;
+  --coord-on-light: #4d6273;
+  --coord-on-dark: #1f2f3d;
+  --dest-dot-dark: rgb(20 29 39 / 0.5);
+  --dest-rim-dark: rgb(255 255 255 / 0.42);
+  --pc-edge: 30 44 58;
   --hl-select: rgb(72 178 150 / 0.5);
   --hl-select-dark: rgb(84 196 160 / 0.6);
   --hl-select-ring: rgb(36 128 104 / 0.9);
@@ -352,10 +393,12 @@
   --hl-select-ring: rgb(40 110 170 / 0.9);
   --sq-light: #eeeed2;
   --sq-dark: #769656;
-  --coord-on-light: #688748;
-  --coord-on-dark: #f3f4df;
-  --dest-dot: rgb(24 44 12 / 0.3);
-  --dest-dot-dark: rgb(16 34 6 / 0.36);
+  --coord-on-light: #4e6b30;
+  --coord-on-dark: #16260c;
+  --dest-dot: rgb(24 44 12 / 0.45);
+  --dest-dot-dark: rgb(16 34 6 / 0.5);
+  --dest-rim-dark: rgb(255 255 240 / 0.4);
+  --pc-edge: 40 56 24;
   --arrow-green: #13b566;
   --frame: #4b6237;
   --frame-hi: #6c8753;
@@ -364,13 +407,16 @@
 .board-ink {
   --sq-light: #d0d6df;
   --sq-dark: #55637a;
-  --coord-on-light: #55637a;
+  --coord-on-light: #45526a;
   --coord-on-dark: #dde2ea;
+  --coord-shadow-dark: 0 1px 1px rgb(0 0 0 / 0.22);
   --hl-select: rgb(80 186 150 / 0.5);
   --hl-select-dark: rgb(92 200 160 / 0.56);
   --hl-select-ring: rgb(40 140 108 / 0.9);
-  --dest-dot: rgb(12 18 30 / 0.34);
-  --dest-dot-dark: rgb(8 12 22 / 0.45);
+  --dest-dot: rgb(12 18 30 / 0.45);
+  --dest-dot-dark: rgb(8 12 22 / 0.55);
+  --dest-rim-dark: rgb(255 255 255 / 0.38);
+  --pc-edge: 20 26 40;
   --frame: #2b3342;
   --frame-hi: #4a556a;
   --frame-lo: #191e28;
@@ -378,12 +424,15 @@
 .board-rose {
   --sq-light: #f1e4dc;
   --sq-dark: #b7847a;
-  --coord-on-light: #9f6f67;
-  --coord-on-dark: #fbf0ea;
+  --coord-on-light: #86554d;
+  --coord-on-dark: #3a1b16;
   --hl-select: rgb(96 170 140 / 0.5);
   --hl-select-dark: rgb(110 186 150 / 0.58);
   --hl-select-ring: rgb(52 124 98 / 0.9);
-  --dest-dot: rgb(60 22 16 / 0.3);
+  --dest-dot: rgb(60 22 16 / 0.45);
+  --dest-dot-dark: rgb(60 22 16 / 0.5);
+  --dest-rim-dark: rgb(255 246 240 / 0.42);
+  --pc-edge: 70 36 30;
   --frame: #74493f;
   --frame-hi: #9a6b60;
   --frame-lo: #51302a;

@@ -76,7 +76,8 @@ export function NodeBubble({
           </span>
         )}
       </button>
-      {state !== 'soon' && <StarRow stars={np?.skipped ? 0 : np?.stars ?? 0} size={20} golden={np?.golden} />}
+      {/* A locked node shows only its lock: empty stars under every one of them were noise. */}
+      {state === 'open' && <StarRow stars={np?.skipped ? 0 : np?.stars ?? 0} size={20} golden={np?.golden} />}
       {state === 'soon' && <span className="k-node-soon">Coming soon</span>}
       {children}
     </div>
