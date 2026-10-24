@@ -54,9 +54,12 @@ export function BossCard({ node, np, band, next, passed, onPlay, disabled }: { n
         )}
         {!!np?.stars && !skipped && <StarRow stars={np.stars} size={20} golden={np.golden} />}
       </div>
-      <BigButton variant="boss" icon="play" onClick={onPlay} disabled={disabled}>
-        {np?.plays ? 'Again' : 'Play'}
-      </BigButton>
+      {/* Locked: no dead button; the requirement above already says what opens it. */}
+      {!disabled && (
+        <BigButton variant="boss" icon="play" onClick={onPlay}>
+          {np?.plays ? 'Again' : 'Play'}
+        </BigButton>
+      )}
     </div>
   );
 }

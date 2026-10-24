@@ -45,9 +45,14 @@ export function Playground({ kid, entryId }: { kid: KidProfile; entryId?: string
       ) : entries.length ? (
         <div className="k-tiles">
           {entries.map((e) => (
-            <button key={e.id} type="button" className="k-tile" onClick={() => go.playground(e.id)}>
+            <button key={e.id} type="button" className={`k-tile${e.friend ? ' friend' : ''}`} onClick={() => go.playground(e.id)}>
               <span className="k-tile-icon">
                 <KidsIcon name={e.icon} size={44} />
+                {e.friend && (
+                  <span className="k-tile-badge" aria-hidden="true">
+                    <KidsIcon name="user" size={18} />
+                  </span>
+                )}
               </span>
               <span className="k-tile-title">{bandText(e.title, kid.band)}</span>
             </button>
@@ -85,7 +90,7 @@ function PlaygroundGame({ kid, entry }: { kid: KidProfile; entry: PlaygroundEntr
             {kids.map((k) => (
               <button key={k.id} type="button" className="k-avatar-tile" onClick={() => setFriend({ kidId: k.id })}>
                 <PawnBuddy color={k.avatar.color} face={k.avatar.face} hat={k.avatar.hat} size={64} />
-                <span className="k-avatar-name">{k.name}</span>
+                <span className={`k-avatar-name${k.name.length > 9 ? ' long' : ''}`}>{k.name}</span>
               </button>
             ))}
             <button type="button" className="k-avatar-tile" onClick={() => setFriend({ kidId: null })}>

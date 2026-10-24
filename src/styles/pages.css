@@ -1536,17 +1536,11 @@
 .settings-row .muted {
   font-size: 0.88rem;
 }
+/* Equal cards on aligned rows (3 + 3) at every width, instead of a ragged wrap. */
 .theme-swatches {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-}
-@media (max-width: 900px) {
-  /* Equal cards on aligned rows instead of a ragged 3 + 2 wrap. */
-  .theme-swatches {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
-  }
 }
 .swatch {
   display: flex;
@@ -1580,7 +1574,9 @@
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.18), 0 4px 10px -6px rgb(0 0 0 / 0.5);
 }
 .settings-preview {
-  max-width: 300px;
+  width: 100%;
+  max-width: 320px;
+  margin-inline: auto;
 }
 /* The field skin comes from the shared inputs recipe in app.css. */
 .import-box {

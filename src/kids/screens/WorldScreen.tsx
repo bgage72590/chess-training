@@ -73,7 +73,7 @@ export function WorldScreen({ kid, worldId }: { kid: KidProfile; worldId: WorldI
             return <BossCard key={n.id} node={n} np={np} band={kid.band} next={nextW} passed={bossPassed(kid, n)} onPlay={() => go.play(n.id)} disabled={!open} />;
           return (
             <div key={n.id} className={`k-card k-nodecard${!registered ? ' soon' : !open ? ' locked' : ''}${current?.id === n.id ? ' current' : ''}`}>
-              <span className="k-nodecard-icon" style={{ background: `color-mix(in srgb, ${world.accent} 22%, var(--k-card))` }}>
+              <span className="k-nodecard-icon" style={{ ['--acc' as string]: world.accent }}>
                 {registered ? open ? <NodeIcon node={n} size={44} /> : <KidsIcon name="lock" size={30} /> : <KidsIcon name="cloud" size={34} fill />}
               </span>
               <div className="k-nodecard-main">
@@ -87,8 +87,8 @@ export function WorldScreen({ kid, worldId }: { kid: KidProfile; worldId: WorldI
                     <KidsIcon name="plane" size={16} /> Tested out
                   </span>
                 )}
-                {registered && (
-                  <BigButton variant={np?.plays ? 'plain' : 'go'} size="small" icon={np?.plays ? 'again' : 'play'} disabled={!open} onClick={() => go.play(n.id)}>
+                {open && (
+                  <BigButton variant={np?.plays ? 'plain' : 'go'} size="small" icon={np?.plays ? 'again' : 'play'} onClick={() => go.play(n.id)}>
                     {np?.plays ? 'Again' : 'Play'}
                   </BigButton>
                 )}

@@ -12,7 +12,7 @@ export function AvatarTile({ kid, rank, stars, onPick, resting = false, twin = f
         </span>
       )}
       <PawnBuddy color={kid.avatar.color} face={kid.avatar.face} hat={kid.avatar.hat} size={96} />
-      <span className="k-avatar-name">{kid.name || 'Player'}</span>
+      <span className={`k-avatar-name${(kid.name || '').length > 9 ? ' long' : ''}`}>{kid.name || 'Player'}</span>
       {twin && <span className="k-avatar-twin">same name</span>}
       <span className="k-avatar-meta">
         <span className="k-rank-badge">Rank {rank}</span>

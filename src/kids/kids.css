@@ -755,6 +755,11 @@
 .k-word.on {
   border-bottom-color: var(--k-sun);
 }
+/* Night: a translucent sun wash over the navy bubble read as grey; the word itself turns sun instead. */
+.kids-app[data-night='1'] .k-word.on {
+  background-color: transparent;
+  color: var(--k-sun);
+}
 .k-speak {
   flex: none;
   display: grid;
@@ -1239,6 +1244,8 @@
   --coord-on-light: #3b4670;
   --coord-on-dark: #1f2a44;
   --coord-shadow-dark: 0 1px 0 rgb(255 255 255 / 0.3);
+  /* The 3D pieces' edge (board.css) in Kids ink, so the cream pieces keep a silhouette on cream squares. */
+  --pc-edge: 31 42 68;
 }
 .kids-board .board-frame {
   display: none;
@@ -1277,23 +1284,23 @@
 /* Bigger 3D pieces for young eyes. At its true scale the 3D pawn is only half a square tall, so the
    small pieces grow most (pawn 66%, rook 75%, knight 78%, bishop 83%, queen 86%, king 95% of the
    square): still smallest to biggest, and every piece stays inside its square, clear of the
-   coordinates in the corners. The sprites are centred, so they grow about the middle. The classic
-   pieces already fill most of the square and would cover the file letters if they grew. */
+   coordinates in the corners. The sprites are centred, so they grow about the middle (--pc-size, as
+   on the grown-up board). The classic pieces already fill most of the square and would cover the
+   file letters if they grew. */
 .kids-board .board.pieces-staunton3d .piece {
-  background-size: var(--k-piece, 108%) var(--k-piece, 108%);
-  background-position: center;
+  --pc-size: 108%;
 }
 .kids-board .board.pieces-staunton3d .piece:is(.pc-wP, .pc-bP) {
-  --k-piece: 128%;
+  --pc-size: 128%;
 }
 .kids-board .board.pieces-staunton3d .piece:is(.pc-wR, .pc-bR) {
-  --k-piece: 122%;
+  --pc-size: 122%;
 }
 .kids-board .board.pieces-staunton3d .piece:is(.pc-wN, .pc-bN) {
-  --k-piece: 116%;
+  --pc-size: 116%;
 }
 .kids-board .board.pieces-staunton3d .piece:is(.pc-wB, .pc-bB, .pc-wQ, .pc-bQ) {
-  --k-piece: 110%;
+  --pc-size: 110%;
 }
 .kids-board .sq.tone-good::before {
   background: var(--k-good-glow);
@@ -1767,26 +1774,44 @@
   font-variant-numeric: tabular-nums;
 }
 .k-avatar-grid {
-  display: grid;
-  /* minmax, so a 320px phone fits two tiles instead of cutting off the right one */
-  grid-template-columns: repeat(2, minmax(0, 160px));
-  gap: 16px;
+  /* Rows of 2, 3 or 4 tiles (the max-width sets how many), with a short last row centred under
+     the others instead of left behind at the start. Half-width tiles, so a 320px phone fits two. */
+  display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  max-width: 100%;
+  gap: 16px;
+  width: 100%;
+  max-width: 336px;
+}
+.k-avatar-grid > * {
+  width: calc(50% - 8px);
 }
 @media (min-width: 700px) {
   .k-avatar-grid {
-    grid-template-columns: repeat(3, 180px);
     gap: 22px;
+    max-width: 584px;
+  }
+  .k-avatar-grid > * {
+    width: 180px;
   }
 }
 @media (min-width: 1100px) {
   .k-avatar-grid {
-    grid-template-columns: repeat(4, 180px);
+    max-width: 786px;
   }
 }
+/* The friend picker: smaller tiles, only as tall as a pawn and a name. */
 .k-avatar-grid.small {
-  grid-template-columns: repeat(auto-fill, 130px);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 160px));
+  max-width: 100%;
+}
+.k-avatar-grid.small > * {
+  width: auto;
+}
+.k-avatar-grid.small .k-avatar-tile {
+  min-height: 0;
+  padding: 14px 8px 12px;
 }
 .k-avatar-tile {
   display: flex;
@@ -1813,9 +1838,14 @@
   font-size: 22px;
   line-height: 1.1;
   text-align: center;
-  /* A long name with no spaces wraps instead of spilling out of the tile. */
+  /* A long name is set smaller (.long) to stay whole; one that still cannot fit wraps rather than
+     spilling out of the tile. */
   max-width: 100%;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+.k-avatar-name.long {
+  font-size: 18px;
 }
 .k-avatar-meta {
   display: flex;
@@ -1864,6 +1894,8 @@
   justify-content: space-between;
   padding: 10px 14px max(10px, var(--k-safe-b));
   pointer-events: none;
+  /* Fades into the meadow, like the map's Play bar, so cards scrolling under it never show through. */
+  background: linear-gradient(180deg, transparent, var(--k-meadow) 55%);
 }
 .k-corner {
   pointer-events: auto;
@@ -1874,14 +1906,15 @@
   padding: 0 14px;
   border: 0;
   border-radius: var(--k-r-pill);
-  background: rgb(255 255 255 / 0.4);
+  background: var(--k-card);
+  box-shadow: 0 3px 0 var(--k-cream-edge);
   color: var(--k-ink-soft);
   font-family: var(--k-font-body);
   font-size: 15px;
   cursor: pointer;
 }
 .kids-app[data-night='1'] .k-corner {
-  background: rgb(255 255 255 / 0.08);
+  background: var(--k-card-2);
 }
 .k-welcome {
   display: grid;
@@ -2018,6 +2051,19 @@
   padding: 0 18px;
   width: 100%;
 }
+/* A narrow phone: a smaller Pip leaves the bubble room for three or four words a line, and the
+   placeholder fits the field. */
+@media (max-width: 380px) {
+  .k-newkid-coach {
+    --pip-size: 64px;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .k-input {
+    font-size: 21px;
+    padding: 0 14px;
+  }
+}
 .k-or {
   text-align: center;
   margin: 18px 0 10px;
@@ -2096,6 +2142,11 @@
 .k-exp-card.on {
   border-color: var(--k-sun-edge);
   background: color-mix(in srgb, var(--k-sun) 30%, var(--k-card));
+}
+/* Night: sun mixed into navy turns grey-brown; a lighter card ringed in sun instead. */
+.kids-app[data-night='1'] .k-exp-card.on {
+  background: var(--k-card-2);
+  box-shadow: 0 6px 0 var(--k-sun-edge), inset 0 0 0 3px var(--k-sun);
 }
 .k-exp-label {
   font-family: var(--k-font-display);
@@ -2405,8 +2456,18 @@
   background: linear-gradient(180deg, transparent, var(--k-meadow) 45%);
   z-index: 20;
 }
+/* A wide screen: the map and its side panel stay together in a centred 960px column (with the bar
+   above them) instead of drifting to opposite edges; the Play bar follows the map column. */
+.k-map.landscape .k-map-wrap,
+.k-map.landscape .k-mapbar {
+  width: 100%;
+  max-width: 960px;
+  margin-inline: auto;
+}
 .k-map.landscape .k-map-play {
-  right: calc(380px + var(--k-safe-r));
+  --k-map-inset: max(0px, (100vw - 960px) / 2);
+  left: calc(var(--k-safe-l) + var(--k-map-inset));
+  right: calc(380px + var(--k-safe-r) + var(--k-map-inset));
 }
 .k-map-shore {
   height: 40px;
@@ -2693,6 +2754,14 @@
   background: none;
   box-shadow: none;
 }
+/* Night: a navy lock on a see-through navy disc vanished into the world band. */
+.kids-app[data-night='1'] .k-node.locked:not(.castle, .tower) .k-node-btn {
+  opacity: 1;
+  background: var(--k-cloud);
+  border-color: rgb(244 241 255 / 0.35);
+  color: var(--k-ink-soft);
+  box-shadow: 0 5px 0 var(--k-cloud-shade);
+}
 .k-node.soon .k-node-btn {
   cursor: default;
   opacity: 0.55;
@@ -2976,8 +3045,17 @@
   height: 64px;
   border-radius: 50%;
   border: 3px solid #1f2a44;
+  background: color-mix(in srgb, var(--acc) 22%, var(--k-card));
   flex: none;
   color: #1f2a44;
+}
+/* Night: navy rings and locks sank into the navy cards; a light ring, and a cloud disc when locked. */
+.kids-app[data-night='1'] .k-nodecard-icon {
+  border-color: rgb(244 241 255 / 0.4);
+  color: var(--k-ink);
+}
+.kids-app[data-night='1'] .k-nodecard.locked .k-nodecard-icon {
+  background: var(--k-cloud);
 }
 .k-nodecard-main {
   flex: 1;
@@ -3085,6 +3163,7 @@
   cursor: pointer;
 }
 .k-tile-icon {
+  position: relative;
   display: grid;
   place-items: center;
   width: 84px;
@@ -3093,6 +3172,24 @@
   background: var(--k-sun);
   color: #1f2a44;
   box-shadow: 0 5px 0 var(--k-sun-edge);
+}
+/* Games for two: a berry disc with a little player badge, so they don't read as copies of the solo games. */
+.k-tile.friend .k-tile-icon {
+  background: var(--k-berry);
+  box-shadow: 0 5px 0 var(--k-berry-edge);
+}
+.k-tile-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--k-berry-edge);
+  background: var(--k-card-2);
+  color: var(--k-ink);
 }
 .k-tile-title {
   font-family: var(--k-font-display);
@@ -3160,6 +3257,23 @@
   box-shadow: 0 4px 0 var(--k-sun-edge);
   color: var(--k-button-ink, var(--k-ink));
 }
+/* A phone: three equal tabs on one row, each icon over its label, instead of a lone third tab. */
+@media (max-width: 520px) {
+  .k-tabs {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .k-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-height: 60px;
+    padding: 6px 4px;
+    font-size: 16px;
+  }
+}
 .k-book-page {
   --wbg: var(--k-card);
   background: var(--k-card);
@@ -3218,7 +3332,8 @@
   place-items: center;
   border-radius: 50%;
   border: 3px solid #1f2a44;
-  background: radial-gradient(circle at 35% 30%, #fff 0 18%, transparent 19%), color-mix(in srgb, var(--sc) 55%, #fff);
+  /* A soft gloss up in the corner, clear of the art in the middle. */
+  background: radial-gradient(ellipse 30% 18% at 30% 20%, rgb(255 255 255 / 0.8), rgb(255 255 255 / 0) 75%), color-mix(in srgb, var(--sc) 55%, #fff);
   color: #1f2a44;
   box-shadow: 0 5px 0 color-mix(in srgb, var(--sc) 70%, #1f2a44);
   flex: none;
@@ -3561,7 +3676,8 @@
   --k-body: 16px;
   max-width: 1200px;
   margin: 0 auto;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Tempo's own grown-up type (tokens.css), not the kids' rounded faces or a bare system stack. */
+  font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.5;
   padding-bottom: 48px;
@@ -3641,13 +3757,14 @@
   align-items: center;
   overflow-wrap: anywhere;
   gap: 8px;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  font-size: 19px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
   margin-bottom: 10px;
 }
 .k-gu-card h3 {
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   font-size: 15px;
   font-weight: 700;
   margin: 16px 0 6px;
@@ -3741,9 +3858,11 @@
   color: var(--k-ink-soft);
   font-size: 13px;
 }
+/* One row always: a long option wraps inside its own segment instead of dropping to a broken
+   second row. */
 .k-gu-seg {
   display: inline-flex;
-  flex-wrap: wrap;
+  max-width: 100%;
   border: 2px solid var(--k-line);
   border-radius: 12px;
   overflow: hidden;
@@ -3752,7 +3871,9 @@
   flex: 1 1 auto;
   min-height: 44px;
   min-width: 44px;
-  padding: 0 12px;
+  padding: 6px 10px;
+  line-height: 1.2;
+  text-wrap: balance;
   border: 0;
   border-right: 1px solid var(--k-line);
   background: var(--k-card-2);
@@ -4245,6 +4366,29 @@
   .kids-app .k-mapbar .k-stars-total {
     padding: 0 8px;
     font-size: 19px;
+  }
+  /* The activity bar: the pips stay between the buttons and the star chip takes its own row,
+     instead of sliding under the close and hint buttons. */
+  .k-topbar {
+    flex-wrap: wrap;
+    gap: 4px 6px;
+  }
+  .k-topbar .k-round {
+    width: 46px;
+    height: 46px;
+  }
+  .k-topbar-mid {
+    display: contents;
+  }
+  .k-topbar .k-pips {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    gap: 6px;
+  }
+  .k-topbar .k-chip {
+    order: 1;
+    margin: 0 auto 4px;
   }
 }
 

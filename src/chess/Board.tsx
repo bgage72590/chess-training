@@ -83,7 +83,8 @@ export function Board({
   // Drag state lives in a ref: pointer moves update the dragged piece's transform directly
   // instead of re-rendering the whole board. `dragging` only flips once the drag starts.
   // Positions are relative to the board, re-measured on every move so scrolling mid-drag is safe.
-  const drag = useRef<{ from: string; startX: number; startY: number; x: number; y: number; size: number; moved: boolean; wasSelected: boolean } | null>(null);
+  // `touch` lifts the piece above the finger, which would otherwise hide it and the target square.
+  const drag = useRef<{ from: string; startX: number; startY: number; x: number; y: number; size: number; moved: boolean; wasSelected: boolean; touch: boolean } | null>(null);
   const dragEl = useRef<HTMLDivElement>(null);
   // Highlight of the square under the dragged piece, also moved directly by pointer handlers.
   const hoverEl = useRef<HTMLDivElement>(null);
@@ -198,7 +199,7 @@ export function Board({
       const r = ref.current!.getBoundingClientRect();
       const x = e.clientX - r.left;
       const y = e.clientY - r.top;
-      drag.current = { from: sq, startX: x, startY: y, x, y, size: r.width, moved: false, wasSelected: selected === sq };
+      drag.current = { from: sq, startX: x, startY: y, x, y, size: r.width, moved: false, wasSelected: selected === sq, touch: e.pointerType === 'touch' };
       setSelected(sq);
       ref.current!.setPointerCapture?.(e.pointerId);
     } else {
@@ -206,7 +207,11 @@ export function Board({
     }
   };
 
-  const dragTransform = (d: { x: number; y: number; size: number }) => `translate(${d.x - d.size / 16}px, ${d.y - d.size / 16}px) scale(1.12)`;
+  // Only the image is lifted on touch; the drop square is still the one under the finger.
+  const dragTransform = (d: { x: number; y: number; size: number; touch: boolean }) =>
+    d.touch
+      ? `translate(${d.x - d.size / 16}px, ${d.y - d.size / 16 - d.size / 10}px) scale(1.3)`
+      : `translate(${d.x - d.size / 16}px, ${d.y - d.size / 16}px) scale(1.12)`;
 
   /** Board cell (column/row from the top-left) under a drag position, and whether it is a target. */
   const dragCell = (d: { from: string; x: number; y: number; size: number }) => {
@@ -283,6 +288,7 @@ export function Board({
       const sq = FILES[f] + rank;
       const light = (f + rank) % 2 === 0; // a1 (f=0, rank=1) is a dark square
       const cls = ['sq', light ? 'light' : 'dark'];
+      if (dests.has(sq)) cls.push('movable');
       if (lastMove && (lastMove[0] === sq || lastMove[1] === sq)) cls.push('last');
       if (selected === sq) cls.push('selected');
       if (checkSquare === sq) cls.push('check');
@@ -317,7 +323,7 @@ export function Board({
   return (
     <div
       ref={ref}
-      className={`board board-${boardTheme ?? settings.boardTheme} pieces-${pieceSet ?? settings.pieceSet}${canMove ? ' can-move' : ''}${playerColor ? ` opp-${playerColor === 'w' ? 'b' : 'w'}` : ''}`}
+      className={`board board-${boardTheme ?? settings.boardTheme} pieces-${pieceSet ?? settings.pieceSet}${canMove ? ' can-move' : ''}${dragging ? ' is-dragging' : ''}${dragging && drag.current?.touch ? ' touch-drag' : ''}${playerColor ? ` opp-${playerColor === 'w' ? 'b' : 'w'}` : ''}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
