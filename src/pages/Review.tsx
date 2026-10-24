@@ -10,7 +10,7 @@ import { navigate, scrollToTop } from '../router';
 import { BoardColumn } from '../components/BoardColumn';
 import { Button, Feedback, Pill, ProgressBar } from '../components/ui';
 import { Icon } from '../components/Icon';
-import { CLASS_GLYPH, CLASS_LABEL, EvalBar, EvalGraph, MoveList } from '../components/GameBits';
+import { CLASS_GLYPH, CLASS_LABEL, EvalBar, EvalGraph, gameDate, MoveList } from '../components/GameBits';
 import { EngineNotice } from '../components/EngineNotice';
 import { LEVELS } from './Play';
 import { sound } from '../chess/sound';
@@ -158,8 +158,8 @@ export function ReviewPage({ id }: { id: string }) {
           <Icon name="left" />
         </button>
         <div className="lesson-top-text">
-          <div className="eyebrow">
-            Game review · vs {lvl?.name ?? 'Coach'} · {new Date(game.t).toLocaleDateString()}
+          <div className="eyebrow review-eyebrow">
+            <span>vs {lvl?.name ?? 'Coach'}</span> <span>· {gameDate(game.t)}</span>
           </div>
           <h1 className="lesson-title">
             {game.result === '1/2-1/2' ? 'Draw' : playerWon(game) ? 'Win' : 'Loss'} by {game.reason.toLowerCase()}
@@ -226,7 +226,7 @@ export function ReviewPage({ id }: { id: string }) {
             </div>
           )}
           {retry ? (
-            <div className="panel-section">
+            <div className="panel-section review-focus">
               <div className="eyebrow">Retry the moment</div>
               <p>Find a better move than the one you played.</p>
               {retry.msg && <Feedback tone={retry.state === 'good' ? 'good' : 'bad'} icon={retry.state === 'good' ? 'check' : 'x'} body={retry.msg} reveal />}
@@ -258,7 +258,7 @@ export function ReviewPage({ id }: { id: string }) {
             rv &&
             moveIdx >= 0 &&
             cls && (
-              <div className={`move-verdict verdict-${cls}`}>
+              <div className={`move-verdict review-focus verdict-${cls}`}>
                 <div className="verdict-head">
                   <span className="mono">
                     {moves[moveIdx].san}

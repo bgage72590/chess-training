@@ -38,7 +38,7 @@ export function EndgamesPage() {
                       <Board fen={d.fen} orientation={learner} coordinates={false} />
                       {prog?.done && (
                         <span className="drill-done" aria-label="Completed">
-                          <Icon name="check" size={16} />
+                          <Icon name="check" size={14} />
                         </span>
                       )}
                     </div>
