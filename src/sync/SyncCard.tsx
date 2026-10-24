@@ -126,7 +126,7 @@ export function SyncCard() {
             <label htmlFor="sync-code" className="stat-label">
               Sync code from your other device
             </label>
-            <input id="sync-code" className="mono" autoComplete="off" spellCheck={false} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" value={input} onChange={(e) => (setInput(e.target.value), setBad(false))} />
+            <input id="sync-code" type="text" className="mono" autoCapitalize="characters" autoComplete="off" spellCheck={false} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" value={input} onChange={(e) => (setInput(e.target.value), setBad(false))} />
             {bad && <span className="move-input-msg">That is not a sync code (20 letters and digits).</span>}
             <div className="btn-row">
               <Button variant="primary" type="submit">
@@ -171,7 +171,14 @@ export function SyncCard() {
         </div>
       </div>
       <StorageSplitNote mode="synced" />
-      <p className="faint">{STATUS[s.status] ?? `Last synced ${ago(s.lastSyncedAt)}.`}</p>
+      {/* A failed sync is a banner, not a footnote; offline only waits, so it is calmer. */}
+      {s.status === 'error' ? (
+        <Feedback tone="warn" icon="x" title={STATUS.error} />
+      ) : s.status === 'offline' ? (
+        <Feedback tone="info" icon="clock" title={STATUS.offline} />
+      ) : (
+        <p className="faint">{STATUS[s.status] ?? `Last synced ${ago(s.lastSyncedAt)}.`}</p>
+      )}
       <WhatSyncs />
       <Feedback tone="warn" icon="lock" title="Keep this code private" body="Anyone with it can see and change this progress, like a password." />
       <div className="btn-row">
@@ -181,14 +188,22 @@ export function SyncCard() {
         <Button variant="ghost" onClick={() => sync.unlink()}>
           Stop syncing on this device
         </Button>
+      </div>
+      {/* Apart from the routine buttons, as Reset is in Your data. */}
+      <div className="settings-row settings-danger">
         {!confirmDelete ? (
-          <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
+          <Button size="s" variant="danger" onClick={() => setConfirmDelete(true)}>
             Delete synced copy…
           </Button>
         ) : (
-          <Button variant="danger" onClick={() => void deleteSyncedCopy().finally(() => setConfirmDelete(false))}>
-            Delete it for all devices
-          </Button>
+          <span className="btn-row">
+            <Button size="s" variant="ghost" onClick={() => setConfirmDelete(false)}>
+              Cancel
+            </Button>
+            <Button size="s" variant="danger" className="btn-confirm" onClick={() => void deleteSyncedCopy().finally(() => setConfirmDelete(false))}>
+              Delete it for all devices
+            </Button>
+          </span>
         )}
       </div>
     </section>

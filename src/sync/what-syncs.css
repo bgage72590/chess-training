@@ -1,10 +1,17 @@
 /* "What syncs" list on the sync card and the join page. */
 .what-syncs h3 {
   margin: 12px 0 4px;
+  /* A small label like "Sync code", not the display serif every h3 gets. */
+  font-family: var(--font-body);
+  letter-spacing: 0.01em;
+  line-height: 1.3;
 }
 .what-syncs ul {
   margin: 0;
   padding-left: 1.2em;
   display: grid;
   gap: 2px;
+}
+.what-syncs > p {
+  margin-top: 8px;
 }

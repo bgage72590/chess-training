@@ -1504,6 +1504,15 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  /* The swatch and goal grids pick their column count from the card's width. */
+  container-type: inline-size;
+}
+@media (min-width: 1160px) {
+  /* Two columns: the tall Board card (it holds the preview) spans two rows, so App and Sync stack
+     beside it instead of leaving a hole under App. */
+  .settings > .settings-section:first-child {
+    grid-row: span 2;
+  }
 }
 /* The app's address, shown as text to select or type: it may break anywhere on a narrow screen. */
 .settings-section .app-address {
@@ -1536,16 +1545,41 @@
 .settings-row .muted {
   font-size: 0.88rem;
 }
-.theme-swatches {
-  display: flex;
+/* Reset and Delete synced copy: the confirm buttons wrap under the text on a phone. */
+.settings-danger {
   flex-wrap: wrap;
+}
+.settings-danger > span:first-child {
+  flex: 1 1 220px;
+}
+.settings-danger > .btn-row {
+  margin-left: auto;
+}
+/* A status label ("Ready offline") over its sentence, not run into it. */
+.settings-section p > strong:first-child + .muted {
+  display: block;
+  margin-top: 2px;
+}
+/* Daily goal: an even 2 x 2 (or one row of 4) instead of a ragged wrap. */
+.settings-section .goal-seg {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-self: stretch;
+}
+@container (min-width: 500px) {
+  .settings-section .goal-seg {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+/* Equal cards on aligned rows (3 + 3, or one row of 6) instead of a ragged wrap. */
+.theme-swatches {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
-@media (max-width: 900px) {
-  /* Equal cards on aligned rows instead of a ragged 3 + 2 wrap. */
+@container (min-width: 600px) {
   .theme-swatches {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
 .swatch {
@@ -1569,6 +1603,26 @@
 }
 .swatch.on {
   color: var(--accent-strong);
+}
+.swatch {
+  position: relative;
+}
+/* Ink, so a focused swatch does not look selected too (the selected one is brass). */
+.swatch:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+/* A brass dot marks the selected swatch, besides its border. */
+.swatch.on::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface);
 }
 .swatch-squares {
   display: grid;
