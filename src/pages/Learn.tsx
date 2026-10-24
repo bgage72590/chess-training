@@ -7,6 +7,11 @@ import { Icon } from '../components/Icon';
 
 const LEVEL_TONE = { Beginner: 'good', Intermediate: 'info', Advanced: 'accent' } as const;
 
+/** A title whose hyphenated words ('X-ray', 'Back-Rank') never break at the hyphen. */
+export function NoBreakHyphens({ text }: { text: string }) {
+  return text.split(/(\S+-\S+)/).map((part, i) => (i % 2 ? <span key={i} className="keep-word">{part}</span> : part));
+}
+
 export function LearnPage() {
   const p = useProfile();
   const up = nextLesson(p);
@@ -70,7 +75,9 @@ export function LearnPage() {
                             <span className="lesson-state accent">Up next</span>
                           ) : null}
                         </div>
-                        <h3>{l.title}</h3>
+                        <h3>
+                          <NoBreakHyphens text={l.title} />
+                        </h3>
                         <p className="muted">{l.summary}</p>
                         <div className="lesson-meta faint">
                           <span>

@@ -1088,19 +1088,26 @@ button.card:hover,
 /* ---------- Trainer layout ---------- */
 .trainer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
-  gap: 28px;
+  /* The panel stays narrow so the board gets the width on a laptop. */
+  grid-template-columns: minmax(0, 1fr) minmax(296px, 340px);
+  gap: 24px;
   align-items: start;
+}
+@media (min-width: 901px) and (max-width: 1360px) {
+  .trainer {
+    grid-template-columns: minmax(0, 1fr) minmax(296px, 320px);
+    gap: 22px;
+  }
 }
 .trainer-board {
   display: flex;
   flex-direction: column;
   gap: 10px;
   width: 100%;
-  /* --board-fit is measured by BoardColumn so the whole column fits the viewport height. */
+  /* --board-fit is measured by BoardColumn (on .trainer) so the whole column fits the viewport height. */
   max-width: min(100%, var(--board-fit, 100%), 760px);
   min-width: 0;
-  /* Board ambience only: no padding, border, margin or transform here. */
+  /* Board ambience only: no padding, border, margin or transform here (BoardColumn measures it). */
   position: relative;
   isolation: isolate;
 }
@@ -1134,6 +1141,25 @@ button.card:hover,
   font-weight: 650;
   min-height: 26px;
 }
+/* Short caption items never break mid-phrase ('Black to / play'). */
+.board-caption > .player-tag,
+.board-caption > .faint {
+  white-space: nowrap;
+  min-width: 0;
+}
+/* A puzzle result shown where the side to move was: always on screen, unlike the panel. */
+.caption-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.caption-status.good {
+  color: var(--good);
+}
+.caption-status.bad {
+  color: var(--bad);
+}
 .player-tag {
   display: inline-flex;
   align-items: center;
@@ -1152,6 +1178,15 @@ button.card:hover,
 }
 .side-dot.b {
   background: radial-gradient(circle at 35% 30%, #5a4a3e, var(--ebony) 55%, #0c0907);
+}
+/* Dark: the ebony dot needs a lighter ring to stand off the near-black panel. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .side-dot.b {
+    box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--ink) 45%, transparent), 0 1px 2px rgb(0 0 0 / 0.5);
+  }
+}
+:root[data-theme='dark'] .side-dot.b {
+  box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--ink) 45%, transparent), 0 1px 2px rgb(0 0 0 / 0.5);
 }
 .panel {
   display: flex;
@@ -1185,10 +1220,32 @@ button.card:hover,
   .trainer {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
+    /* Room BoardColumn keeps under the board for the start of the panel: the task or the side
+       to move shows on load instead of a board alone (gap included). */
+    --panel-peek: 128px;
   }
-  .panel {
+  /* A board capped by the height sits centred, and the panel lines up with it. */
+  .trainer > .trainer-board {
+    justify-self: center;
+  }
+  .trainer > .panel {
+    width: 100%;
+    max-width: max(min(100%, var(--board-fit, 100%), 760px), 288px);
+    justify-self: center;
     position: static;
     padding: 16px;
+  }
+  /* Coach-first panels: the instruction, its note and the actions come straight under the board. */
+  .panel.coach-first > .feedback,
+  .panel.coach-first > .note-card,
+  .panel.coach-first > .faint,
+  .panel.coach-first > .btn-row,
+  .panel.coach-first > .btn {
+    order: -1;
+  }
+  /* The topbar has the same mute button a few centimetres above. */
+  .board-caption .sound-toggle {
+    display: none;
   }
   .panel-divider {
     margin: 0 -16px;
@@ -1202,6 +1259,10 @@ button.card:hover,
     padding: 10px 16px;
     background: var(--surface);
     border-top: 1px solid var(--line);
+  }
+  /* A result scrolled into view (useReveal) stops clear of that bar. */
+  .main:has(.result-actions) {
+    scroll-padding-bottom: 72px;
   }
 }
 
@@ -1732,10 +1793,13 @@ button.feedback:hover {
   flex: none;
 }
 @media (pointer: coarse) {
-  /* This rule outranks the touch-sized .icon-btn, so it restates the 40px. */
+  /* This rule outranks the touch-sized .icon-btn, so it restates the touch size. */
   .board-caption .sound-toggle {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
+  }
+  .panel .btn-m {
+    min-height: 44px;
   }
   .volume-row input[type='range'] {
     min-height: 40px;

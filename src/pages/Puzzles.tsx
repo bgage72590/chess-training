@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { PuzzleFeedback, PuzzleSolver, type SolverApi } from '../components/PuzzleSolver';
 import { puzzles, puzzleById, THEMES, PRACTICE_THEMES, type Puzzle } from '../data/puzzles';
 import { getProfile, logActivity, updateProfile, useProfile, type Profile } from '../store/profile';
@@ -149,13 +149,17 @@ function PanelBody({ api, puzzle, onNext, nextLabel = 'Next puzzle' }: { api: So
       </div>
       <PuzzleFeedback api={api} reveal />
       {api.status === 'solving' && api.mistakes > 0 && <Feedback tone="warn" icon="refresh" title="Try again" body="This one no longer counts for rating, so take your time." reveal />}
+      {api.status === 'solving' && api.mistakes === 0 && api.hintLevel > 0 && (
+        <Feedback tone="info" icon="bulb" title="Hint" body={api.hintLevel === 1 ? 'Move the highlighted piece.' : 'The arrow shows the move.'} reveal />
+      )}
       {finished && <ThemeList themes={puzzle.themes} />}
       {finished && (
         <p className="faint" style={{ fontSize: '0.82rem' }}>
           Puzzle rating <span className="num">{puzzle.rating}</span>
         </p>
       )}
-      <div className="btn-row result-actions">
+      {/* Only the result's buttons stick to the bottom: Hint and Solution stay under the heading. */}
+      <div className={`btn-row${finished ? ' result-actions' : ''}`}>
         {!finished && (
           <>
             <Button icon="bulb" onClick={api.hint} disabled={api.status !== 'solving'}>
@@ -203,13 +207,13 @@ function ReviewSession() {
     <PuzzleSolver key={key} puzzle={puzzle} onFirstResult={(o) => recordPuzzle(puzzle, o.clean, { rated: false, review: true })}>
       {(api) => (
         <aside className="panel">
-          <div>
-            <div className="stat-label">Review queue</div>
-            <div className="stat-value num">{queue.length}</div>
+          <div className="rating-box">
+            <div>
+              <div className="stat-label">Due now</div>
+              <div className="stat-value num">{queue.length}</div>
+            </div>
           </div>
-          <p className="muted" style={{ fontSize: '0.9rem' }}>
-            You missed these before. Solve each one cleanly to push it further out. Rating is not affected.
-          </p>
+          <p className="muted panel-note">You missed these before. Solve each one cleanly to push it further out. Rating is not affected.</p>
           <div className="panel-divider" />
           <PanelBody
             api={api}
@@ -220,9 +224,16 @@ function ReviewSession() {
               setKey((k) => k + 1);
             }}
           />
-          <div className="faint" style={{ fontSize: '0.8rem' }}>
-            Total in review: {Object.keys(profile.puzzles.review).length}
-          </div>
+          {Object.keys(profile.puzzles.review).length !== queue.length && (
+            <>
+              <div className="panel-divider" />
+              <div className="session-line">
+                <span>
+                  In review: <strong className="num">{Object.keys(profile.puzzles.review).length}</strong>
+                </span>
+              </div>
+            </>
+          )}
         </aside>
       )}
     </PuzzleSolver>
@@ -281,22 +292,52 @@ function RushSession() {
     });
   };
 
+  if (phase === 'over') {
+    const best = score > prevBest.current;
+    return (
+      <div className="rush-intro card">
+        <div className="rush-intro-text">
+          <div className="eyebrow">Puzzle Rush · results</div>
+          <div className="rush-result">
+            <div>
+              <div className="stat-label">Solved</div>
+              <div className="stat-value num rush-score">{score}</div>
+            </div>
+            <div>
+              <div className="stat-label">Strikes</div>
+              <div className="stat-value num">{strikes}/3</div>
+            </div>
+            <div>
+              <div className="stat-label">Best</div>
+              <div className="stat-value num">{profile.puzzles.rushBest}</div>
+            </div>
+          </div>
+          {best && (
+            <Pill tone="good" icon="trophy">
+              New personal best
+            </Pill>
+          )}
+          <p className="muted">Speed comes from patterns you recognise instantly.</p>
+          <div className="btn-row" style={{ marginTop: 8 }}>
+            <Button variant="primary" size="l" icon="clock" onClick={start}>
+              Run it again
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (phase !== 'running' || !puzzle) {
     return (
       <div className="rush-intro card">
         <div className="rush-intro-text">
           <div className="eyebrow">Puzzle Rush</div>
-          <h2>{phase === 'over' ? `You solved ${score}` : 'Three minutes. Three strikes.'}</h2>
-          <p className="muted">
-            {phase === 'over'
-              ? score > prevBest.current
-                ? 'A new personal best. Speed comes from patterns you recognise instantly.'
-                : `Your best is ${profile.puzzles.rushBest}. Speed comes from patterns you recognise instantly.`
-              : 'Puzzles start easy and get harder with every solve. A wrong move costs a strike. Pattern speed is what wins games in time trouble.'}
-          </p>
+          <h2>Three minutes. Three strikes.</h2>
+          <p className="muted">Puzzles start easy and get harder with every solve. A wrong move costs a strike. Pattern speed is what wins games in time trouble.</p>
           <div className="btn-row" style={{ marginTop: 8 }}>
             <Button variant="primary" size="l" icon="clock" onClick={start}>
-              {phase === 'over' ? 'Run it again' : 'Start the clock'}
+              Start the clock
             </Button>
             <span className="muted">
               Best: <strong className="num">{profile.puzzles.rushBest}</strong>
@@ -307,11 +348,29 @@ function RushSession() {
     );
   }
 
+  const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const strikeDots = (
+    <div className="strikes" aria-label={`${strikes} of 3 strikes`}>
+      {[0, 1, 2].map((i) => (
+        <span key={i} className={i < strikes ? 'strike on' : 'strike'}>
+          <Icon name="x" size={14} />
+        </span>
+      ))}
+    </div>
+  );
+
   return (
     <PuzzleSolver
       key={key}
       puzzle={puzzle}
       strict
+      // The clock in the caption stays on screen on phones, where the panel is below the board.
+      caption={
+        <div className="rush-caption">
+          <Countdown endsAt={endsAt} warnAt={10} tick onExpire={end} format={clock} />
+          {strikeDots}
+        </div>
+      }
       onComplete={(clean) => {
         if (clean) {
           scoreRef.current += 1;
@@ -328,28 +387,23 @@ function RushSession() {
       {(api) => (
         <aside className="panel">
           <div className="rush-head">
-            <div>
+            <div className="rush-time">
               <div className="stat-label">Time</div>
-              <Countdown endsAt={endsAt} warnAt={10} tick onExpire={end} format={(s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`} />
+              {/* The caption's clock ticks and ends the run; this copy only shows the time. */}
+              <Countdown endsAt={endsAt} warnAt={10} onExpire={end} format={clock} />
             </div>
             <div>
               <div className="stat-label">Solved</div>
               <div className="stat-value num">{score}</div>
             </div>
-            <div className="strikes" aria-label={`${strikes} of 3 strikes`}>
-              {[0, 1, 2].map((i) => (
-                <span key={i} className={i < strikes ? 'strike on' : 'strike'}>
-                  <Icon name="x" size={14} />
-                </span>
-              ))}
-            </div>
+            {strikeDots}
           </div>
           <div className="panel-divider" />
           <div className="to-move">
             <span className={`side-dot ${api.solverColor}`} />
             {api.status === 'intro' ? 'Get ready…' : api.goal}
           </div>
-          <PuzzleFeedback api={api} />
+          <PuzzleFeedback api={api} strict />
           <Button variant="ghost" icon="flag" onClick={end}>
             End run
           </Button>
@@ -372,8 +426,15 @@ function countThemes() {
 function ThemePicker({ value, onChange }: { value?: string; onChange: (t?: string) => void }) {
   const p = useProfile();
   const counts = countThemes();
+  const ref = useRef<HTMLDivElement>(null);
+  // Keep the chosen chip in view (centred); scrollLeft only, so the page never scrolls.
+  useLayoutEffect(() => {
+    const row = ref.current;
+    const on = row?.querySelector<HTMLElement>('.theme-chip.on');
+    if (row && on) row.scrollLeft = on.offsetLeft - (row.clientWidth - on.offsetWidth) / 2;
+  }, [value]);
   return (
-    <div className="theme-picker">
+    <div className="theme-picker" ref={ref}>
       <button className={`theme-chip ${!value ? 'on' : ''}`} onClick={() => onChange(undefined)}>
         Mixed
       </button>

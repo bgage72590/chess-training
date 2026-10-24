@@ -14,6 +14,7 @@ import { sound } from '../chess/sound';
 import type { Arrow } from '../content/types';
 import { MoveInput } from '../components/MoveInput';
 import { SoundToggle } from '../components/SoundToggle';
+import { NoBreakHyphens } from './Learn';
 
 function findLesson(id: string): { unit: Unit; lesson: Lesson; index: number } | null {
   for (const unit of units) {
@@ -121,7 +122,7 @@ function MoveStepView({ step, onDone }: { step: MoveStep; onDone: (r: StepResult
           marks={idx === 0 && state !== 'done' ? step.marks : undefined}
         />
       }
-      below={<MoveInput id="lesson-move" fen={fen} color={learner} enabled={state === 'solving'} onMove={onMove} />}
+      below={<MoveInput id="lesson-move" fen={fen} color={learner} enabled={state === 'solving'} onMove={onMove} idleText={state === 'done' ? 'Solved' : undefined} />}
       caption={`${colorName(learner)} to play`}
     >
       {step.title && <h2>{step.title}</h2>}
@@ -347,7 +348,9 @@ export function LessonPage({ id }: { id: string }) {
           <Icon name="check" size={34} />
         </div>
         <div className="eyebrow">{unit.title}</div>
-        <h1>{lesson.title}: complete</h1>
+        <h1>
+          <NoBreakHyphens text={`${lesson.title}: complete`} />
+        </h1>
         <p className="lede">
           {graded.length ? (
             <>
@@ -355,10 +358,10 @@ export function LessonPage({ id }: { id: string }) {
             </>
           ) : (
             'Lesson finished.'
-          )}{' '}
-          <span className="xp-chip">+{xpGained} XP</span>
+          )}
         </p>
-        <div className="btn-row" style={{ justifyContent: 'center' }}>
+        <span className="xp-chip">+{xpGained} XP</span>
+        <div className="btn-row">
           {nl && (
             <Button variant="primary" size="l" iconRight="right" onClick={() => navigate(`lesson/${nl.id}`)}>
               Next: {nl.title}
@@ -383,7 +386,9 @@ export function LessonPage({ id }: { id: string }) {
         </button>
         <div className="lesson-top-text">
           <div className="eyebrow">{unit.title}</div>
-          <h1 className="lesson-title">{lesson.title}</h1>
+          <h1 className="lesson-title">
+            <NoBreakHyphens text={lesson.title} />
+          </h1>
         </div>
         <div className="lesson-progress">
           <span className="num faint">

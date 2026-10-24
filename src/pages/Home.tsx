@@ -17,6 +17,16 @@ interface PlanItem {
   progress?: [number, number];
   route: string;
   cta: string;
+  /** The button once done; 'Again' when unset. */
+  doneCta?: string;
+}
+
+/** The id in `records` touched last today (by its `t`), e.g. the lesson finished today. */
+function latestToday<T extends { t: number }>(records: Record<string, T>): string | null {
+  const today = dayKey();
+  let best: [string, number] | null = null;
+  for (const [id, r] of Object.entries(records)) if (dayKey(r.t) === today && (!best || r.t > best[1])) best = [id, r.t];
+  return best?.[0] ?? null;
 }
 
 function buildPlan(p: Profile): PlanItem[] {
@@ -43,7 +53,20 @@ function buildPlan(p: Profile): PlanItem[] {
     cta: 'Solve',
   });
   const up = nextLesson(p);
-  if (up) {
+  // Done today: name the lesson finished today, not the next one, and offer that next one.
+  const doneLesson = today.lessons > 0 ? units.flatMap((u) => u.lessons.map((lesson) => ({ unit: u, lesson }))).find((x) => x.lesson.id === latestToday(p.lessons)) : undefined;
+  if (doneLesson) {
+    items.push({
+      id: 'lesson',
+      icon: 'learn',
+      title: doneLesson.lesson.title,
+      detail: `${doneLesson.unit.title} · ${doneLesson.lesson.minutes} min lesson`,
+      done: true,
+      route: up ? `lesson/${up.lesson.id}` : `lesson/${doneLesson.lesson.id}`,
+      cta: 'Start lesson',
+      doneCta: up ? 'Next lesson' : 'Again',
+    });
+  } else if (up) {
     items.push({
       id: 'lesson',
       icon: 'learn',
@@ -67,7 +90,20 @@ function buildPlan(p: Profile): PlanItem[] {
     });
   } else {
     const fresh = openings.find((o) => o.lines.some((l) => !p.lines[l.id]));
-    if (fresh) {
+    const lineToday = today.lines > 0 ? latestToday(p.lines) : null;
+    const learned = lineToday ? openings.find((o) => o.lines.some((l) => l.id === lineToday)) : undefined;
+    if (learned) {
+      items.push({
+        id: 'lines',
+        icon: 'openings',
+        title: `Learn a line: ${learned.name}`,
+        detail: 'Build your repertoire one line at a time.',
+        done: true,
+        route: `opening/${(fresh ?? learned).id}`,
+        cta: 'Learn',
+        doneCta: fresh ? 'Learn another' : 'Again',
+      });
+    } else if (fresh) {
       items.push({
         id: 'lines',
         icon: 'openings',
@@ -193,7 +229,9 @@ export function HomePage() {
               <span className="stat-label">day streak · best {p.streak.best}</span>
             </div>
             <div className="stat">
-              <span className="stat-value num">{lvl.level}</span>
+              <span className="stat-value num">
+                <Icon name="star" size={22} className="flame-icon level-icon" /> {lvl.level}
+              </span>
               <span className="stat-label">level · {lvl.title}</span>
             </div>
           </div>
@@ -212,7 +250,7 @@ export function HomePage() {
           </div>
           <ol className="plan">
             {plan.map((item, i) => (
-              <li key={item.id} className={`plan-item${item.done ? ' done' : ''}${item === nextUp ? ' next' : ''}`}>
+              <li key={item.id} className={`plan-item${item.done ? ' done' : ''}${item.done && (item.doneCta ?? 'Again') === 'Again' ? ' again' : ''}${item === nextUp ? ' next' : ''}`}>
                 <span className="plan-step num" aria-hidden="true">
                   {item.done ? <Icon name="check" size={16} /> : i + 1}
                 </span>
@@ -232,7 +270,7 @@ export function HomePage() {
                   )}
                 </div>
                 <Button variant={item.done ? 'ghost' : 'secondary'} size="s" onClick={() => navigate(item.route)}>
-                  {item.done ? 'Again' : item.cta}
+                  {item.done ? (item.doneCta ?? 'Again') : item.cta}
                 </Button>
               </li>
             ))}

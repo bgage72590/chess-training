@@ -44,20 +44,24 @@ function actionsAfter(el: HTMLElement) {
 }
 
 /**
- * Scrolls the page to show `ref` and the button row after it when `when` turns true (on phones
- * a result under the board can land below the fold), but never so far that the board's top
- * slides under the header.
+ * Scrolls the page to show `el` and the button row after it (on phones a result under the
+ * board can land below the fold), but never so far that the board's top slides under the
+ * header. It scrolls to an absolute position, so two calls for one result agree.
  */
+export function reveal(el: HTMLElement) {
+  const main = el.closest<HTMLElement>('.main');
+  if (!main) return;
+  const view = main.getBoundingClientRect();
+  const bottom = Math.max(el.getBoundingClientRect().bottom, actionsAfter(el)?.getBoundingClientRect().bottom ?? 0);
+  const below = bottom - view.bottom + (parseFloat(getComputedStyle(main).scrollPaddingBottom) || 0);
+  const board = main.querySelector('.board');
+  const by = Math.min(below, board ? board.getBoundingClientRect().top - view.top : below);
+  if (by > 0) main.scrollTo({ top: main.scrollTop + by, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+
+/** Calls `reveal` on `ref` when `when` turns true. */
 export function useReveal(ref: RefObject<HTMLElement | null>, when: boolean) {
   useEffect(() => {
-    const el = ref.current;
-    const main = el?.closest<HTMLElement>('.main');
-    if (!when || !el || !main) return;
-    const view = main.getBoundingClientRect();
-    const bottom = Math.max(el.getBoundingClientRect().bottom, actionsAfter(el)?.getBoundingClientRect().bottom ?? 0);
-    const below = bottom - view.bottom + (parseFloat(getComputedStyle(main).scrollPaddingBottom) || 0);
-    const board = main.querySelector('.board');
-    const by = Math.min(below, board ? board.getBoundingClientRect().top - view.top : below);
-    if (by > 0) main.scrollBy({ top: by, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    if (when && ref.current) reveal(ref.current);
   }, [ref, when]);
 }

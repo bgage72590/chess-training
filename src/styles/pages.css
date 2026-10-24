@@ -64,7 +64,7 @@
     padding: 24px 20px;
   }
 }
-@container (max-width: 800px) {
+@container (max-width: 720px) {
   /* Too narrow for text and stats side by side: the stats take their own row under a hairline. */
   .today-stats {
     width: 100%;
@@ -134,8 +134,29 @@
 .plan-item:first-child {
   border-top: 0;
 }
-.plan-item:hover {
-  background: color-mix(in oklab, var(--accent) 4%, transparent);
+/* The whole row is the target: its one button's hit area is stretched over it. */
+.plan-item {
+  cursor: pointer;
+}
+.plan-item .btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.plan-item .btn:active:not(:disabled) {
+  /* A transform would shrink the stretched area mid-press and lose the click. */
+  transform: none;
+}
+.plan-item:has(.btn:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+@media (hover: hover) {
+  .plan-item:hover {
+    background: color-mix(in oklab, var(--accent) 4%, transparent);
+  }
+  .plan-item:hover .btn-secondary {
+    border-color: var(--accent);
+  }
 }
 .plan-item.next {
   background: linear-gradient(90deg, color-mix(in oklab, var(--accent) 8%, transparent), transparent 65%);
@@ -193,9 +214,22 @@
   font-size: 0.87rem;
 }
 .plan-item.done .plan-text strong {
+  /* The green tick carries the state; a strikethrough made a finished day a list of chores. */
   color: var(--ink-2);
-  text-decoration: line-through;
-  text-decoration-color: var(--line-strong);
+}
+.plan-item.done .plan-icon {
+  opacity: 0.6;
+}
+@media (hover: hover) {
+  /* 'Again' shows on hover or focus only; touch keeps it visible. */
+  .plan-item.again .btn {
+    opacity: 0;
+    transition: opacity 140ms var(--ease);
+  }
+  .plan-item.again:hover .btn,
+  .plan-item.again .btn:focus-visible {
+    opacity: 1;
+  }
 }
 .plan-progress {
   display: grid;
@@ -459,6 +493,10 @@
 .lesson-card.done h3 {
   color: var(--ink-2);
 }
+/* A hyphenated word in a title stays whole: 'X-ray', not 'X- / ray' (see NoBreakHyphens). */
+.keep-word {
+  white-space: nowrap;
+}
 
 /* Lesson player */
 .lesson-top {
@@ -488,8 +526,28 @@
   width: 100%;
 }
 @media (max-width: 640px) {
+  /* Step count and bar take their own full-width row, so the title keeps the width. */
+  .lesson-top {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
   .lesson-progress {
-    width: 90px;
+    order: 3;
+    width: 100%;
+    flex-direction: row-reverse;
+    align-items: center;
+    gap: 10px;
+  }
+}
+@media (max-width: 400px) {
+  .lesson-top .eyebrow {
+    display: none;
+  }
+}
+@media (pointer: coarse) {
+  .lesson-top .icon-btn {
+    width: 44px;
+    height: 44px;
   }
 }
 .lesson-panel h2 {
@@ -498,6 +556,8 @@
 .page:has(> .lesson-nav) {
   /* BoardColumn leaves 16px under the board; a 24px gap above the sticky nav scrolled the page 8px. */
   row-gap: 16px;
+  /* The nav rests at the bottom on every step, so Continue does not jump on short steps. */
+  min-height: 100%;
 }
 .lesson-nav {
   display: flex;
@@ -510,17 +570,32 @@
   z-index: 20;
   /* The page pads its right edge by the safe area (app.css), and this bar spans it. */
   margin: 0 calc(-32px - var(--safe-r)) -64px -32px;
+  margin-top: auto;
   padding: 12px calc(32px + var(--safe-r)) calc(12px + var(--safe-b)) 32px;
-  background: color-mix(in oklab, var(--bg) 86%, transparent);
+  /* Nearly opaque: lesson text scrolling underneath must not ghost behind the buttons. */
+  background: color-mix(in oklab, var(--bg) 96%, transparent);
   -webkit-backdrop-filter: blur(10px) saturate(1.1);
   backdrop-filter: blur(10px) saturate(1.1);
   border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 18px -12px rgb(58 38 18 / 0.28);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .lesson-nav {
+    box-shadow: 0 -8px 18px -12px rgb(0 0 0 / 0.5);
+  }
+}
+:root[data-theme='dark'] .lesson-nav {
+  box-shadow: 0 -8px 18px -12px rgb(0 0 0 / 0.5);
 }
 @media (max-width: 900px) {
+  /* A lesson is a focused player: its own nav (and the header's back button) replace the tab
+     bar, which would stack a second bar under Back/Continue and push the task off screen. */
+  .app:has(.lesson-nav) .tabbar {
+    display: none;
+  }
   .lesson-nav {
-    /* Under the tab bar, which owns the bottom inset. */
-    margin: 0 calc(-16px - var(--safe-r)) -40px calc(-16px - var(--safe-l));
-    padding: 10px calc(16px + var(--safe-r)) 10px calc(16px + var(--safe-l));
+    margin: auto calc(-16px - var(--safe-r)) -40px calc(-16px - var(--safe-l));
+    padding: 10px calc(16px + var(--safe-r)) calc(10px + var(--safe-b)) calc(16px + var(--safe-l));
   }
 }
 /* A result scrolled into view (useReveal) stops clear of the sticky nav. */
@@ -531,12 +606,15 @@
 .step-wrap {
   animation: fade-in 200ms var(--ease);
 }
+/* Full width, so its edge lines up with the lesson header and nav; the text keeps its measure. */
 .step-solo {
-  max-width: 720px;
   display: flex;
   flex-direction: column;
   gap: 14px;
   padding: 26px 28px;
+}
+.step-solo > * {
+  max-width: 68ch;
 }
 .choices {
   display: flex;
@@ -661,9 +739,27 @@
   gap: 14px;
   text-align: center;
   padding: 44px 24px;
+  /* Without a width the auto margins shrink it to its nowrap buttons, wider than a 320px phone. */
+  width: 100%;
   max-width: 760px;
   margin: 10px auto;
   box-shadow: var(--hl-top), var(--shadow-2);
+}
+.lesson-done .btn-row {
+  justify-content: center;
+}
+@media (max-width: 480px) {
+  .lesson-done {
+    padding: 32px 18px;
+  }
+  .lesson-done .btn-row {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  .lesson-done .btn-row .btn {
+    white-space: normal;
+  }
 }
 .lesson-done-badge {
   display: grid;
@@ -699,6 +795,23 @@
 .rating-box .stat-value {
   font-size: 2.1rem;
   animation: num-roll 260ms var(--ease);
+}
+@media (max-width: 900px) {
+  /* Under the board the rating is one compact line, so the puzzle's heading and result come up. */
+  .rating-box {
+    align-items: center;
+  }
+  .rating-box > div {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .rating-box .stat-value {
+    font-size: 1.45rem;
+  }
+}
+.panel-note {
+  font-size: 0.9rem;
 }
 .delta {
   font-family: var(--font-body);
@@ -740,6 +853,7 @@
   color: var(--ink-2);
 }
 .theme-picker {
+  position: relative;
   display: flex;
   gap: 6px;
   overflow-x: auto;
@@ -783,18 +897,35 @@
   opacity: 0.8;
 }
 @media (pointer: coarse) {
-  .theme-chip {
-    min-height: 40px;
+  .theme-chip,
+  .page-header .segmented button,
+  .panel > .segmented button {
+    min-height: 44px;
   }
 }
 .rush-intro {
+  position: relative;
+  overflow: hidden;
   display: flex;
   padding: 32px;
-  background:
-    repeating-conic-gradient(color-mix(in oklab, var(--accent) 10%, transparent) 0 25%, transparent 0 50%) 100% 0 / 36px 36px no-repeat,
-    var(--surface);
+  background: var(--surface);
+}
+/* A chequered corner that fades out, rather than one clipped two-square tile. */
+.rush-intro::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 144px;
+  height: 144px;
+  pointer-events: none;
+  background: repeating-conic-gradient(color-mix(in oklab, var(--accent) 12%, transparent) 0 25%, transparent 0 50%) 0 0 / 36px 36px;
+  -webkit-mask-image: radial-gradient(circle at 100% 0, #000 0, transparent 72%);
+  mask-image: radial-gradient(circle at 100% 0, #000 0, transparent 72%);
 }
 .rush-intro-text {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -805,6 +936,51 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
+}
+.rush-result {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  align-items: flex-end;
+}
+.rush-result .rush-score {
+  font-size: 3rem;
+  line-height: 1;
+}
+.rush-intro .pill {
+  align-self: flex-start;
+}
+/* The Rush clock and strikes in the board caption: shown where the panel is below the board. */
+.rush-caption {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.rush-caption .stat-value {
+  font: 600 1.1rem var(--font-display);
+}
+@media (min-width: 901px) {
+  .rush-caption {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .rush-head .rush-time,
+  .rush-head .strikes {
+    display: none;
+  }
+}
+/* Vision: the board-side switch spans the panel with equal halves. */
+.panel > .segmented {
+  display: flex;
+}
+.panel > .segmented > button {
+  flex: 1 1 0;
+}
+@media (max-width: 360px) {
+  .board-caption .puzzle-no-label {
+    display: none;
+  }
 }
 .stat-value.danger {
   color: var(--bad);
