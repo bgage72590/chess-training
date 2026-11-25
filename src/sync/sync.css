@@ -27,7 +27,7 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse) {
   .sync-join input {
     min-height: 44px;
   }

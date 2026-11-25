@@ -1,6 +1,7 @@
 // Installing Tempo as an app: registers the offline service worker and captures the browser's
 // install prompt so the app can offer its own "Install" button.
 import { useSyncExternalStore } from 'react';
+import { hasStandaloneApi, isIosDevice } from '../lib/device';
 import { IS_NATIVE } from './native';
 import { recoverFromMissingFiles, watchForUpdates } from './update';
 
@@ -47,9 +48,7 @@ export type InstallState = {
 };
 
 /** An iPhone, iPad or iPod. An iPad in its desktop-class mode says it is a Mac but has a touch screen. */
-export function isIosDevice(ua: string, touchPoints: number): boolean {
-  return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && touchPoints > 1);
-}
+export { hasStandaloneApi, isIosDevice };
 
 /** A page opened inside another app (a social, chat or search app's own browser): those cannot
  *  install web apps, and keep their own storage. */
@@ -58,10 +57,10 @@ const IN_APP = /FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|Messenger|GSA\/|Twitt
 /** Safari's version from its user agent; Infinity when it does not say. */
 const safariMajor = (ua: string) => Number(/Version\/(\d+)/.exec(ua)?.[1] ?? Infinity);
 
-export function detectHow(ua: string, touchPoints: number, elsewhere: boolean): InstallHow {
+export function detectHow(ua: string, touchPoints: number, elsewhere: boolean, standaloneApi = hasStandaloneApi()): InstallHow {
   if (elsewhere) return 'elsewhere';
   if (IN_APP.test(ua)) return 'in-app';
-  if (isIosDevice(ua, touchPoints)) return 'ios';
+  if (isIosDevice(ua, touchPoints, standaloneApi)) return 'ios';
   // Add to Dock came with Safari 17 (macOS 14 Sonoma); the version cannot tell Sonoma from older macOS.
   if (/Macintosh/.test(ua) && /Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua)) return safariMajor(ua) < 17 ? 'safari-old' : 'safari-mac';
   if (/Firefox\//.test(ua)) return 'unsupported';

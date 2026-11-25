@@ -324,9 +324,10 @@ describe('saving a voice on its own', () => {
     expect(mustAskFirst({ type: 'wifi', saveData: true }, false)).toBe(true);
   });
 
-  it('recognises iPhone, iPad (also as a Mac) and not a Mac', () => {
+  it('recognises iPhone, iPad (also as a Mac) and not a Mac, touchscreen or not', () => {
     expect(isIos('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)', 5)).toBe(true);
-    expect(isIos('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 5)).toBe(true);
+    expect(isIos('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 5, true)).toBe(true);
+    expect(isIos('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 10, false)).toBe(false);
     expect(isIos('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 0)).toBe(false);
     expect(isIos('Mozilla/5.0 (X11; Linux x86_64) Chrome/120', 0)).toBe(false);
   });

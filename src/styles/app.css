@@ -22,6 +22,15 @@ body {
 #root {
   height: 100%;
 }
+/* No double-tap zoom wait on controls, on phones and touchscreen laptops alike. */
+button,
+a,
+input,
+select,
+label,
+[role='button'] {
+  touch-action: manipulation;
+}
 h1,
 h2,
 h3,
@@ -274,7 +283,7 @@ button {
 .nav-item .icon {
   color: var(--ink-3);
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse) {
   .nav-item {
     min-height: 40px;
   }
@@ -315,7 +324,7 @@ button {
     flex-basis: 100%;
   }
 }
-.nav-item:hover {
+:root:not([data-input='touch']) .nav-item:hover {
   background: rgb(255 240 220 / 0.05);
   color: var(--ink);
 }
@@ -643,7 +652,7 @@ button {
   padding: 12px 22px;
   font-size: 1.02rem;
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse) {
   .btn-s {
     min-height: 40px;
   }
@@ -670,12 +679,12 @@ button {
   text-shadow: 0 1px 0 rgb(0 0 0 / 0.12);
 }
 /* Light: hover darkens (never brightens) so the label stays >= 4.5:1. */
-.btn-primary:hover:not(:disabled) {
+:root:not([data-input='touch']) .btn-primary:hover:not(:disabled) {
   background: linear-gradient(180deg, var(--accent) 0%, color-mix(in oklab, var(--accent) 88%, var(--brass-lo)) 100%);
 }
 /* Dark: hover brightens; the dark label stays >= 7.4:1 at every stop. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .btn-primary:hover:not(:disabled) {
+  :root:not([data-theme='light']):not([data-input='touch']) .btn-primary:hover:not(:disabled) {
     background: linear-gradient(
       180deg,
       color-mix(in oklab, var(--accent) 70%, var(--brass-hi)),
@@ -684,7 +693,7 @@ button {
     );
   }
 }
-:root[data-theme='dark'] .btn-primary:hover:not(:disabled) {
+:root[data-theme='dark']:not([data-input='touch']) .btn-primary:hover:not(:disabled) {
   background: linear-gradient(
     180deg,
     color-mix(in oklab, var(--accent) 70%, var(--brass-hi)),
@@ -704,7 +713,7 @@ button {
   color: var(--ink);
   box-shadow: var(--hl-top), 0 1px 1px rgb(58 38 18 / 0.06);
 }
-.btn-secondary:hover:not(:disabled) {
+:root:not([data-input='touch']) .btn-secondary:hover:not(:disabled) {
   background: var(--surface-2);
   border-color: color-mix(in oklab, var(--accent) 45%, var(--line-strong));
 }
@@ -715,7 +724,7 @@ button {
   background: transparent;
   color: var(--ink-2);
 }
-.btn-ghost:hover:not(:disabled) {
+:root:not([data-input='touch']) .btn-ghost:hover:not(:disabled) {
   background: color-mix(in oklab, var(--ink) 6%, transparent);
   color: var(--ink);
 }
@@ -749,7 +758,7 @@ button {
   cursor: pointer;
   transition: border-color 140ms var(--ease), color 140ms var(--ease);
 }
-.icon-btn:hover:not(:disabled) {
+:root:not([data-input='touch']) .icon-btn:hover:not(:disabled) {
   color: var(--ink);
   border-color: color-mix(in oklab, var(--accent) 45%, var(--line-strong));
 }
@@ -757,7 +766,7 @@ button {
   opacity: 0.4;
   cursor: not-allowed;
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse) {
   .icon-btn {
     width: 40px;
     height: 40px;
@@ -798,7 +807,7 @@ button {
   cursor: pointer;
   transition: background 140ms var(--ease), color 140ms var(--ease);
 }
-.segmented button:hover:not(.on) {
+:root:not([data-input='touch']) .segmented button:hover:not(.on) {
   color: var(--ink);
 }
 .segmented button.on {
@@ -807,7 +816,7 @@ button {
   color: var(--accent-strong);
   box-shadow: var(--hl-top), 0 1px 2px rgb(58 38 18 / 0.16), 0 0 0 1px color-mix(in oklab, var(--accent) 60%, var(--line));
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse) {
   .segmented button {
     min-height: 40px;
   }
@@ -943,11 +952,13 @@ textarea::placeholder {
 .switch input:checked::after {
   transform: translateX(16px);
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse) {
   .switch {
     min-height: 40px;
   }
-  /* Keyboard shortcut hints mean nothing without a keyboard. */
+}
+@media (pointer: coarse) {
+  /* Keyboard shortcut hints mean nothing without a keyboard (a touchscreen laptop keeps them). */
   .key-hint {
     display: none;
   }
@@ -1014,15 +1025,15 @@ button.card,
 .moment {
   transition: border-color 160ms var(--ease), box-shadow 160ms var(--ease);
 }
-button.card:hover,
-.opening-card:hover,
-.drill-card:hover,
-.hub-card:hover,
-.game-row:hover,
-.rating-card:hover,
-.onboard-option:hover,
-.level-card:hover,
-.moment:hover {
+:root:not([data-input='touch']) button.card:hover,
+:root:not([data-input='touch']) .opening-card:hover,
+:root:not([data-input='touch']) .drill-card:hover,
+:root:not([data-input='touch']) .hub-card:hover,
+:root:not([data-input='touch']) .game-row:hover,
+:root:not([data-input='touch']) .rating-card:hover,
+:root:not([data-input='touch']) .onboard-option:hover,
+:root:not([data-input='touch']) .level-card:hover,
+:root:not([data-input='touch']) .moment:hover {
   border-color: var(--line-strong);
   box-shadow: var(--hl-top), var(--shadow-2);
 }
@@ -1290,7 +1301,7 @@ button.feedback {
   cursor: pointer;
   transition: background 140ms var(--ease);
 }
-button.feedback:hover {
+:root:not([data-input='touch']) button.feedback:hover {
   background: color-mix(in oklab, var(--tone) 14%, var(--surface));
 }
 .feedback .icon {
@@ -1407,10 +1418,10 @@ button.feedback:hover {
   font: inherit;
   color: var(--ink);
 }
-.moves button:hover {
+:root:not([data-input='touch']) .moves button:hover {
   background: var(--surface-3);
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse) {
   .moves button {
     min-height: 40px;
   }
@@ -1570,7 +1581,7 @@ button.feedback:hover {
   color: var(--ink-3);
   cursor: pointer;
 }
-.toast-close:hover {
+:root:not([data-input='touch']) .toast-close:hover {
   color: var(--ink);
 }
 @media (max-width: 900px) {
@@ -1749,7 +1760,7 @@ button.feedback:hover {
   cursor: pointer;
   transition: background 120ms, color 120ms;
 }
-.sound-toggle-row:hover {
+:root:not([data-input='touch']) .sound-toggle-row:hover {
   background: color-mix(in srgb, currentColor 8%, transparent);
 }
 .sound-toggle-row kbd {
@@ -1792,7 +1803,7 @@ button.feedback:hover {
   margin-left: 2px;
   flex: none;
 }
-@media (pointer: coarse) {
+@media (any-pointer: coarse) {
   /* This rule outranks the touch-sized .icon-btn, so it restates the touch size. */
   .board-caption .sound-toggle {
     width: 44px;

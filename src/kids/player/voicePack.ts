@@ -6,6 +6,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { requestPersistence } from '../../lib/storage';
 import { IS_NATIVE } from '../../pwa/native';
+import { hasStandaloneApi, isIosDevice } from '../../lib/device';
 
 /** Cache names shared with the service worker (a test keeps the two in step). */
 export const VOICE_LISTS_CACHE = 'tempo-voice-lists';
@@ -63,8 +64,8 @@ export const isUnmetered = (c: ConnectionInfo | undefined) => !!c && !c.saveData
 /** Whether to ask before downloading: unless the connection is known unmetered, and always on iPhone and iPad. */
 export const mustAskFirst = (c: ConnectionInfo | undefined, ios: boolean) => ios || !isUnmetered(c);
 
-export function isIos(ua = typeof navigator === 'undefined' ? '' : navigator.userAgent, touchPoints = typeof navigator === 'undefined' ? 0 : navigator.maxTouchPoints) {
-  return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && touchPoints > 1);
+export function isIos(ua = typeof navigator === 'undefined' ? '' : navigator.userAgent, touchPoints = typeof navigator === 'undefined' ? 0 : navigator.maxTouchPoints, standaloneApi = hasStandaloneApi()) {
+  return isIosDevice(ua, touchPoints, standaloneApi);
 }
 
 /** Saves a voice on its own only when it has never been saved at this version, is not complete, and the connection is known unmetered. */

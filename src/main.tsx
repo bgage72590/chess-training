@@ -14,12 +14,15 @@ import { getProfile, subscribeProfile } from './store/profile';
 import { startSync } from './sync';
 import { armAudioUnlock } from './lib/audio';
 import { navigate } from './router';
+import { trackInputMode } from './lib/inputMode';
 
 setupInstall();
 // The native smoke build (CI) opens the diagnostics page: src/native/diagnostics.ts.
 if (import.meta.env.MODE === 'native' && import.meta.env.VITE_NATIVE_SMOKE) navigate('diag', { replace: true });
 // The first tap, key press or VoiceOver activation starts the sound (Safari only allows it inside one).
 armAudioUnlock();
+// Touch or trackpad, for touchscreen laptops: src/lib/inputMode.ts.
+trackInputMode();
 persistAfterProgress(subscribeProfile, () => getProfile().xp > 0);
 
 createRoot(document.getElementById('root')!).render(

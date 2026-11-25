@@ -169,7 +169,7 @@
   );
 }
 @media (hover: hover) {
-  .sq:hover > .dest {
+  :root:not([data-input='touch']) .sq:hover > .dest {
     background-color: var(--dest-hover);
   }
 }
@@ -327,7 +327,7 @@
     border-radius 120ms ease,
     background-color 120ms ease;
 }
-.promo-choice:hover {
+:root:not([data-input='touch']) .promo-choice:hover {
   background-color: var(--accent-soft);
   border-radius: 12%;
 }
@@ -337,13 +337,13 @@
   background-color: color-mix(in srgb, var(--frame) 88%, black);
   box-shadow: var(--shadow-2), inset 0 0 0 1px rgb(255 255 255 / 0.14);
 }
-.promo-choice[class*='pc-w']:hover {
+:root:not([data-input='touch']) .promo-choice[class*='pc-w']:hover {
   background-color: color-mix(in srgb, var(--frame) 55%, var(--accent));
 }
 .promo-choice[class*='pc-b'] {
   background-color: #f6efe3;
 }
-.promo-choice[class*='pc-b']:hover {
+:root:not([data-input='touch']) .promo-choice[class*='pc-b']:hover {
   background-color: #fbe6bf;
 }
 .promo-cancel {

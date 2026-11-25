@@ -65,10 +65,15 @@ describe('detectHow', () => {
   });
 
   it('sees an iPad that asks for desktop sites (a Mac user agent with a touch screen)', () => {
-    expect(detectHow(UA.macSafari, 5, false)).toBe('ios');
+    expect(detectHow(UA.macSafari, 5, false, true)).toBe('ios');
     expect(detectHow(UA.macSafari, 0, false)).toBe('safari-mac');
     // A Mac with a trackpad reports no touch points; one point is not a touch screen either.
     expect(detectHow(UA.macSafari, 1, false)).toBe('safari-mac');
+  });
+
+  it('keeps a touchscreen Mac on the Mac steps (it has touch points but no navigator.standalone)', () => {
+    expect(detectHow(UA.macSafari, 10, false, false)).toBe('safari-mac');
+    expect(detectHow(UA.chromeMac, 10, false, false)).toBe('menu');
   });
 
   it('keeps Chrome, Edge and Firefox on iPhone on the Home Screen steps', () => {
@@ -114,7 +119,8 @@ describe('isIosDevice', () => {
     expect(isIosDevice(UA.ipad, 5)).toBe(true);
     expect(isIosDevice(UA.chromeIos, 5)).toBe(true);
     expect(isIosDevice(UA.facebook, 5)).toBe(true);
-    expect(isIosDevice(UA.macSafari, 5)).toBe(true);
+    expect(isIosDevice(UA.macSafari, 5, true)).toBe(true);
+    expect(isIosDevice(UA.macSafari, 5, false)).toBe(false);
   });
   it('is false for a Mac and for other systems', () => {
     expect(isIosDevice(UA.macSafari, 0)).toBe(false);
@@ -148,16 +154,17 @@ describe('detectHow on random user agents', () => {
       const ua = `Mozilla/5.0 ${os} AppleWebKit/605.1.15 (KHTML, like Gecko) ${pick(r, BROWSER)} ${app}`;
       const touch = Math.floor(r() * 6);
       const elsewhere = r() < 0.15;
-      const how = detectHow(ua, touch, elsewhere);
-      const why = `${how} for ${ua} / ${touch} / ${elsewhere}`;
+      const standalone = !/Macintosh|Windows|Linux/.test(os) || r() < 0.5;
+      const how = detectHow(ua, touch, elsewhere, standalone);
+      const why = `${how} for ${ua} / ${touch} / ${elsewhere} / ${standalone}`;
       expect(VALID, why).toContain(how);
       if (elsewhere) expect(how, why).toBe('elsewhere');
       else if (app) expect(how, why).toBe('in-app');
       else if (/iPhone|iPad/.test(os)) expect(how, why).toBe('ios');
-      else if (/Macintosh/.test(os) && touch > 1) expect(how, why).toBe('ios');
+      else if (/Macintosh/.test(os) && touch > 1 && standalone) expect(how, why).toBe('ios');
       if (how === 'safari-mac' || how === 'safari-old') expect(ua, why).toMatch(/Macintosh[^)]*\).*Safari\//);
-      if (/Chrome|Edg\//.test(ua) && !isIosDevice(ua, touch)) expect(how, why).not.toMatch(/safari/);
-      expect(isIosDevice(ua, touch) && !elsewhere && !app, why).toBe(how === 'ios');
+      if (/Chrome|Edg\//.test(ua) && !isIosDevice(ua, touch, standalone)) expect(how, why).not.toMatch(/safari/);
+      expect(isIosDevice(ua, touch, standalone) && !elsewhere && !app, why).toBe(how === 'ios');
     }
   });
 });
