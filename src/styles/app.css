@@ -333,8 +333,7 @@ button {
   box-shadow: inset 0 0 0 1px rgb(215 166 91 / 0.16);
   color: var(--ink);
 }
-.nav-item.active .icon,
-.nav-item[data-route='kids'] .icon {
+.nav-item.active .icon {
   color: var(--brass-hi);
 }
 .nav-item.active::before {
@@ -598,18 +597,6 @@ button {
   transform: none;
   outline: 2px solid var(--leather-accent);
 }
-/* Kids mode's files could not be fetched: a centred notice on the desk, clear of the notch. */
-.load-failed {
-  min-height: 100dvh;
-  display: grid;
-  place-content: center;
-  padding: calc(24px + var(--safe-t)) calc(16px + var(--safe-r)) calc(24px + var(--safe-b)) calc(16px + var(--safe-l));
-  background: var(--grain), var(--lamp), var(--bg);
-}
-.load-failed .brand-mark {
-  margin: 0 auto 14px;
-}
-
 /* ---------- Buttons & controls ---------- */
 .btn {
   display: inline-flex;
@@ -1721,8 +1708,7 @@ button.feedback {
   }
   .nav-item .icon,
   .sidebar .icon,
-  .nav-item.active .icon,
-  .nav-item[data-route='kids'] .icon {
+  .nav-item.active .icon {
     color: CanvasText;
   }
   /* Board-theme previews are the only way to tell the swatches apart: keep their colours. */

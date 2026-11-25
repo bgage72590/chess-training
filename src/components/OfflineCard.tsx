@@ -1,23 +1,17 @@
 import { useEffect, useState } from 'react';
 import { askWorker, offlineState, offlineSupported, workerBlocked, type OfflineState } from '../pwa/offline';
 import { useInstall } from '../pwa/install';
-import { formatSize, loadVoiceNames, voicePacks } from '../kids/player/voicePack';
 import { storageStatus, type StorageStatus } from '../lib/storage';
 import { useSync } from '../sync';
 import { Button } from './ui';
 
-interface SavedVoice {
-  id: string;
-  name: string;
-  size: number;
-  update: boolean;
-}
+/** Megabytes (decimal, as storage screens show them): '44 MB', or '4.4 MB' for small sizes. */
+const formatSize = (bytes: number) => `${bytes / 1e6 < 10 ? (bytes / 1e6).toFixed(1) : Math.round(bytes / 1e6)} MB`;
 
-/** Whether Tempo works without the internet: the app itself, the saved voice, and whether the browser will keep the data. */
+/** Whether Tempo works without the internet: the app itself, and whether the browser will keep the data. */
 export function OfflineCard() {
   const supported = offlineSupported();
   const [app, setApp] = useState<OfflineState | 'checking'>('checking');
-  const [voices, setVoices] = useState<SavedVoice[] | null>(null);
   const [storage, setStorage] = useState<StorageStatus | null>(null);
   const install = useInstall();
   const linked = !!useSync().code;
@@ -44,15 +38,6 @@ export function OfflineCard() {
     const again = () => check();
     navigator.serviceWorker.addEventListener('controllerchange', again);
     void storageStatus().then((s) => live && setStorage(s));
-    void (async () => {
-      const names = await loadVoiceNames();
-      const found: SavedVoice[] = [];
-      for (const id of voicePacks.savedIds()) {
-        const s = await voicePacks.status(id);
-        if (s.kind === 'saved' || s.kind === 'update') found.push({ id, name: names[id] ?? id, size: s.bytes, update: s.kind === 'update' });
-      }
-      if (live) setVoices(found);
-    })();
     return () => {
       live = false;
       navigator.serviceWorker.removeEventListener('controllerchange', again);
@@ -89,13 +74,6 @@ export function OfflineCard() {
           </div>
         </>
       )}
-      {voices && (
-        <p className="muted">
-          {voices.length
-            ? `Pip's voice on this device: ${voices.map((v) => `${v.name} (${formatSize(v.size)}${v.update ? ', update available' : ''})`).join(', ')}. It plays without the internet.`
-            : "Pip's recorded voices stream as they are used, so offline Pip uses this device's own voice for anything not heard yet. To keep a voice for offline use, open Kids mode, then Grown-ups, pick the voice and tap Download."}
-        </p>
-      )}
       {storage?.supported && (
         <>
           <p>
@@ -104,7 +82,7 @@ export function OfflineCard() {
           </p>
           <p className="muted">
             {storage.persisted
-              ? 'The browser has agreed to keep your progress and saved voices, even when the device runs low on space.'
+              ? 'The browser has agreed to keep your progress, even when the device runs low on space.'
               : 'A browser may clear a website’s data when the device runs low on space. Tempo asks it to keep yours once you have finished a lesson, a puzzle or a game.'}
             {safariTab && ' Safari also clears the data of a site opened in a tab after about a week without a visit. '}
             {safariTab && (linked ? 'Your sync code backs up your progress, and the app added to your Home Screen is kept longer.' : 'Turn on sync above: your sync code backs up your progress. The app added to your Home Screen is kept longer.')}

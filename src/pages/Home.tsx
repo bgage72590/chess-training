@@ -340,18 +340,6 @@ export function HomePage() {
               </p>
             )}
           </div>
-          <div className="card kids-card">
-            <button className="link-row" onClick={() => navigate('kids')}>
-              <span>
-                <span className="faint" style={{ fontSize: '0.8rem' }}>
-                  Teaching a kid?
-                </span>
-                <strong>Open Kids mode</strong>
-                <span className="muted kids-card-sub">A playful chess world for young learners</span>
-              </span>
-              <Icon name="right" />
-            </button>
-          </div>
         </aside>
       </div>
     </>

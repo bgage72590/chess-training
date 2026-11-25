@@ -17,7 +17,7 @@ import { sound } from '../chess/sound';
 import { MoveInput } from '../components/MoveInput';
 import type { Arrow } from '../content/types';
 import { SoundToggle } from '../components/SoundToggle';
-import { fernMove, hopMove, oliveMove, tuckMove } from '../kids/activities/playBot/kidBot';
+import { fernMove, hopMove, oliveMove, tuckMove } from '../engine/coachBots';
 
 /** The weaker opponents are small hand-built bots: Stockfish plays far above its label when held back. */
 export type BotStyle = { kind: 'hop' } | { kind: 'tuck' } | { kind: 'fern' } | { kind: 'olive'; noise: number; maxDepth: number; budgetMs: number };

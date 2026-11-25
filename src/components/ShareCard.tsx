@@ -9,7 +9,7 @@ import { APP_ADDRESS } from './InstallCard';
  *  its address holds a private sync code. */
 export const SHARE = {
   title: 'Tempo Chess Gym',
-  text: 'Tempo: chess lessons, rated puzzles and games against Stockfish, plus a Kids mode.',
+  text: 'Tempo: chess lessons, rated puzzles and games against Stockfish.',
   url: APP_URL,
 };
 
@@ -31,41 +31,25 @@ export async function copyAppLink() {
   }
 }
 
-/** Settings and Kids grown-ups: hand Tempo to someone else with a QR code, a link and the share sheet. */
-export function ShareCard({ variant = 'app' }: { variant?: 'app' | 'kids' }) {
-  const kids = variant === 'kids';
+/** Settings: hand Tempo to someone else with a QR code, a link and the share sheet. */
+export function ShareCard() {
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
   return (
-    <section className={kids ? 'k-gu-card ig-share ig-kids' : 'card settings-section ig-share'}>
+    <section className="card settings-section ig-share">
       <h2>Share Tempo</h2>
-      <p className={kids ? 'k-gu-note' : 'muted'}>Show this code to a friend or family member, or send them the link. They open it in their browser and can install Tempo from there. Nothing of yours goes with it.</p>
+      <p className="muted">Show this code to a friend or family member, or send them the link. They open it in their browser and can install Tempo from there. Nothing of yours goes with it.</p>
       <div className="ig-share-body">
         <QrCode text={SHARE.url} label="QR code for the Tempo web address" />
         <div className="ig-share-side">
-          <span className={kids ? 'k-gu-address' : 'mono app-address'}>{APP_ADDRESS}</span>
-          <div className={kids ? 'k-gu-actions' : 'btn-row'}>
-            {kids ? (
-              <>
-                <button type="button" className="k-gu-btn" onClick={() => void copyAppLink()}>
-                  Copy link
-                </button>
-                {canShare && (
-                  <button type="button" className="k-gu-btn" onClick={() => void shareApp(navigator)}>
-                    Share
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                <Button size="s" onClick={() => void copyAppLink()}>
-                  Copy link
-                </Button>
-                {canShare && (
-                  <Button size="s" variant="ghost" onClick={() => void shareApp(navigator)}>
-                    Share
-                  </Button>
-                )}
-              </>
+          <span className="mono app-address">{APP_ADDRESS}</span>
+          <div className="btn-row">
+            <Button size="s" onClick={() => void copyAppLink()}>
+              Copy link
+            </Button>
+            {canShare && (
+              <Button size="s" variant="ghost" onClick={() => void shareApp(navigator)}>
+                Share
+              </Button>
             )}
           </div>
         </div>

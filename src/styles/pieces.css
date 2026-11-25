@@ -18,7 +18,7 @@
    Each sprite carries its own soft contact shadow and is centred in its square. At the sprites' shared
    scale a pawn is only half a square tall, so the board draws them a little larger (--pc-size), the
    small pieces most: pawn 58%, rook 68%, knight 72%, bishop 79%, queen 81%, king 92% of the square.
-   They keep their order of size and stay clear of the corner coordinates. Kids sets larger sizes. */
+   They keep their order of size and stay clear of the corner coordinates. */
 .pieces-staunton3d .piece {
   background-size: var(--pc-size, 104%) var(--pc-size, 104%);
   background-position: center;

@@ -114,7 +114,6 @@ async function load() {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.doUnmock('../src/kids/player/kidSounds');
   vi.doUnmock('../src/store/profile');
   vi.useRealTimers();
 });
@@ -140,7 +139,7 @@ describe('the audio session', () => {
     expect(env.order).toEqual(['session:playback', 'ctx:new']);
   });
 
-  it("leaves the default session alone in the grown-up app, and puts it back when Kids mode closes", async () => {
+  it("leaves the default session alone in the grown-up app, and puts it back when asked", async () => {
     const env = setup();
     const audio = await load();
     audio.getContext();
@@ -223,57 +222,8 @@ describe('the gesture unlock', () => {
     expect(env.contexts[0].sources).toBe(1); // the silent sample that unlocks older iOS
   });
 
-  it('runs an added unlock on each gesture until it works, and waits for it before it lets go', async () => {
-    const env = setup();
-    const audio = await load();
-    let tries = 0;
-    const attempt = vi.fn(async () => ++tries >= 3);
-    const handle = audio.addUnlock(attempt);
-    env.gesture('pointerup');
-    env.gesture('touchend');
-    await flush();
-    expect(attempt).toHaveBeenCalledTimes(2);
-    expect(env.contexts[0].state).toBe('running'); // the context part is done
-    expect(env.listening()).toHaveLength(4); // but the added unlock is not
-    env.gesture('click');
-    await flush();
-    expect(attempt).toHaveBeenCalledTimes(3);
-    expect(env.listening()).toEqual([]);
-    env.gesture('click');
-    expect(attempt).toHaveBeenCalledTimes(3);
-    handle.setDone(false); // refused later: the next gesture is wanted again
-    expect(env.listening()).toHaveLength(4);
-    handle.remove();
-    expect(env.listening()).toEqual([]);
-  });
 
-  it('does not wake the context while the caller does not want sound, and does when it does', async () => {
-    const env = setup();
-    const audio = await load();
-    let on = false;
-    const restore = audio.setAudioWanted(() => on);
-    audio.armAudioUnlock();
-    env.gesture('click');
-    await flush();
-    expect(env.contexts).toHaveLength(0);
-    expect(env.listening()).toHaveLength(4); // still waiting: sound may be switched on
-    on = true;
-    env.gesture('click');
-    await flush();
-    expect(env.contexts).toHaveLength(1);
-    restore();
-  });
 
-  it('gives the wish back when Kids mode closes', async () => {
-    const env = setup();
-    const audio = await load();
-    const restore = audio.setAudioWanted(() => false);
-    restore();
-    audio.armAudioUnlock();
-    env.gesture('click');
-    await flush();
-    expect(env.contexts).toHaveLength(1);
-  });
 
   it('counts a context made inside a gesture that already runs as unlocked', async () => {
     const env = setup({ initial: 'running' });
@@ -402,48 +352,7 @@ describe('a context that stops', () => {
 });
 
 describe('sounds on the shared context', () => {
-  it('the grown-up sounds and the Kids sounds use one context and draw only while it runs', async () => {
-    const env = setup({ initial: 'suspended', resume: 'hang' });
-    const played: string[] = [];
-    vi.doMock('../src/kids/player/kidSounds', () => ({ playKidSound: (_a: unknown, name: string) => void played.push(name) }));
-    vi.doMock('../src/store/profile', () => ({ getSettings: () => ({ sound: true, volume: 0.8 }) }));
-    vi.resetModules();
-    const kids = await import('../src/kids/lib/kidsSound');
-    const chess = await import('../src/chess/sound');
-    const audio = await import('../src/lib/audio');
-    kids.kidSound('pop');
-    chess.sound('move'); // stopped: nothing is drawn, so nothing queues
-    expect(played).toEqual([]);
-    expect(env.contexts).toHaveLength(1);
-    env.contexts[0].state = 'running';
-    kids.kidSound('star');
-    expect(played).toEqual(['star']);
-    expect(audio.getContext()).toBe(env.contexts[0]);
-    kids.setKidSoundEnabled(false);
-    kids.kidSound('chime');
-    expect(played).toEqual(['star']);
-  });
 
-  it("Kids mode asks for a 'playback' session, keeps the context asleep while muted, and gives both back", async () => {
-    const env = setup();
-    vi.doMock('../src/kids/player/kidSounds', () => ({ playKidSound: () => undefined }));
-    vi.resetModules();
-    const { kidsSound } = await import('../src/kids/lib/kidsSound');
-    const nav = navigator as unknown as { audioSession: { type: string } };
-    kidsSound.setEnabled(false); // a muted kid
-    const leave = kidsSound.enter();
-    expect(nav.audioSession.type).toBe('playback');
-    env.gesture('click');
-    await flush();
-    expect(env.contexts).toHaveLength(0); // quiet mode never takes the audio session
-    kidsSound.setEnabled(true);
-    env.gesture('keydown');
-    await flush();
-    expect(env.contexts).toHaveLength(1);
-    expect(env.order.indexOf('session:playback')).toBeLessThan(env.order.indexOf('ctx:new'));
-    leave();
-    expect(nav.audioSession.type).toBe('auto');
-  });
 
   it("the grown-up move sound draws on a running context, not on a stopped one", async () => {
     const env = setup({ initial: 'running' });
@@ -467,32 +376,5 @@ describe('sounds on the shared context', () => {
     env.contexts[0].state = 'interrupted';
     chess.sound('move');
     expect(made).toEqual([]);
-  });
-});
-
-describe('the silent clip', () => {
-  it('is a valid PCM WAV 50 to 100 ms long, not a zero-length one', async () => {
-    const { silentWav } = await load();
-    const uri = silentWav();
-    expect(uri.startsWith('data:audio/wav;base64,')).toBe(true);
-    const bytes = Uint8Array.from(atob(uri.split(',')[1]), (c) => c.charCodeAt(0));
-    const v = new DataView(bytes.buffer);
-    const tag = (at: number) => String.fromCharCode(...bytes.slice(at, at + 4));
-    expect(tag(0)).toBe('RIFF');
-    expect(tag(8)).toBe('WAVE');
-    expect(tag(12)).toBe('fmt ');
-    expect(v.getUint32(4, true)).toBe(bytes.length - 8);
-    expect(v.getUint16(20, true)).toBe(1); // PCM
-    const channels = v.getUint16(22, true);
-    const rate = v.getUint32(24, true);
-    const bits = v.getUint16(34, true);
-    expect(v.getUint32(28, true)).toBe((rate * channels * bits) / 8);
-    expect(tag(36)).toBe('data');
-    const data = v.getUint32(40, true);
-    expect(data).toBe(bytes.length - 44);
-    const ms = (data / ((channels * bits) / 8) / rate) * 1000;
-    expect(ms).toBeGreaterThanOrEqual(50);
-    expect(ms).toBeLessThanOrEqual(100);
-    expect([...bytes.slice(44)].every((b) => b === 0)).toBe(true);
   });
 });

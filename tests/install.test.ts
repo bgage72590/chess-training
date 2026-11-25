@@ -7,8 +7,6 @@ import { storageSplitText } from '../src/components/StorageSplitNote';
 import { InstallCard } from '../src/components/InstallCard';
 import { copyAppLink, SHARE, ShareCard, shareApp } from '../src/components/ShareCard';
 import { toast } from '../src/lib/toast';
-import { kidsFinishedFirst } from '../src/kids/lib/installReady';
-import { newKid } from '../src/kids/store/kidsStore';
 import { SyncCard } from '../src/sync/SyncCard';
 import { SyncJoinPage } from '../src/sync/SyncJoinPage';
 
@@ -326,13 +324,6 @@ describe('the install banner', () => {
     vi.stubGlobal('localStorage', { getItem: () => '1', setItem: () => undefined });
     expect(show({})).toBe('');
   });
-  it('has a Kids grown-ups look, with no link out to the sync settings', () => {
-    const html = show({}, { variant: 'kids' });
-    expect(html).toContain('k-gu-card');
-    expect(html).toContain("Tempo&#x27;s Settings");
-    expect(html).not.toContain('Sync settings');
-    expect(show({})).toContain('Sync settings');
-  });
 });
 
 describe('the storage split note', () => {
@@ -358,15 +349,6 @@ describe('the storage split note', () => {
   it('points to export and import when sync is not available', () => {
     expect(storageSplitText({ ...facts, sync: false })).toContain('export your progress');
     expect(storageSplitText({ ...facts, sync: false })).not.toContain('sync code');
-  });
-  it('tells the grown-up app that Kids mode has its own export, and Kids grown-ups only about theirs', () => {
-    expect(storageSplitText({ ...facts, sync: false })).toContain('Kids mode has a separate export under Grown-ups: Export kids data');
-    expect(storageSplitText({ ...facts, mode: 'installed', installed: true, sync: false })).toContain('Export kids data');
-    expect(storageSplitText({ ...facts, sync: false, kids: true })).not.toContain('Kids mode has a separate export');
-  });
-  it('sends Kids grown-ups to the right places', () => {
-    expect(storageSplitText({ ...facts, kids: true })).toContain("Tempo's Settings");
-    expect(storageSplitText({ ...facts, kids: true })).toContain('Export kids data');
   });
   it('explains on the sync link page that the link opens in Safari, not the installed app', () => {
     const text = storageSplitText({ ...facts, mode: 'join' })!;
@@ -441,11 +423,6 @@ describe('the Share Tempo card', () => {
     expect(html).toContain('Share Tempo');
     expect(html).toContain('Copy link');
   });
-  it('has a Kids grown-ups look', () => {
-    const html = renderToStaticMarkup(createElement(ShareCard, { variant: 'kids' }));
-    expect(html).toContain('k-gu-card');
-    expect(html).toContain(`data-qr="${APP_URL}"`);
-  });
   it('offers Share only where the device has a share sheet', () => {
     vi.stubGlobal('navigator', {});
     expect(renderToStaticMarkup(createElement(ShareCard))).not.toContain('>Share<');
@@ -510,31 +487,5 @@ describe('the sync pages', () => {
   it('adds no notes in Chrome', () => {
     setup({ how: 'menu', ios: false }, 'ABCDEFGHJKMNPQRSTVWX');
     expect(renderToStaticMarkup(createElement(SyncCard))).not.toContain('installed app');
-  });
-});
-
-describe('when the Kids grown-ups banner may show', () => {
-  const kid = () => newKid({ name: 'Sam', band: 'explorer', start: 'new' });
-  const node = (stars: 0 | 1 | 2 | 3, extra: object = {}) => ({ stars, plays: 1, last: 1, box: 1 as const, due: '2026-10-01', masteredDays: [], lastItems: [], losses: 0, ease: 0, ...extra });
-
-  it('waits for a first star or a solved puzzle', () => {
-    expect(kidsFinishedFirst([])).toBe(false);
-    expect(kidsFinishedFirst([kid()])).toBe(false);
-    const played = kid();
-    played.nodes['w1-rook-paint'] = node(0);
-    expect(kidsFinishedFirst([played])).toBe(false);
-    const starred = kid();
-    starred.nodes['w1-rook-paint'] = node(1);
-    expect(kidsFinishedFirst([kid(), starred])).toBe(true);
-    const solver = kid();
-    solver.puzzle.bestStreak = 1;
-    expect(kidsFinishedFirst([solver])).toBe(true);
-  });
-  it('does not count stars a placement test or a skip handed out', () => {
-    const tested = kid();
-    tested.nodes['w1-rook-paint'] = node(3, { tested: true });
-    const skipped = kid();
-    skipped.nodes['w1-rook-paint'] = node(3, { skipped: true });
-    expect(kidsFinishedFirst([tested, skipped])).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 /* Install steps, the install banner and the share card. The pictures draw in currentColor and the
-   shared tokens, so they suit the app and Kids' grown-ups screen alike, in light and dark. */
+   shared tokens, so they suit light and dark alike. */
 .ig {
   display: flex;
   flex-direction: column;
@@ -7,9 +7,6 @@
 }
 .card.ig h2 {
   font-size: 1.3rem;
-}
-.ig-kids {
-  margin-top: 16px;
 }
 .ig-steps {
   list-style: none;
@@ -114,7 +111,6 @@
 }
 
 /* Focus moved here after the install banner is hidden: no ring around the whole page. */
-main[tabindex="-1"]:focus,
-.kids-app[tabindex="-1"]:focus {
+main[tabindex="-1"]:focus {
   outline: none;
 }

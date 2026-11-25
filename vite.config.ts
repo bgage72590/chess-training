@@ -31,8 +31,7 @@ function serviceWorker(): Plugin {
       outDir = path.resolve(c.root, c.build.outDir);
     },
     closeBundle() {
-      // Pip's voice clips (voice/) are cached as they are used, not with the install.
-      const files = listFiles(outDir).filter((f) => f !== 'sw.js' && !f.startsWith('voice/'));
+      const files = listFiles(outDir).filter((f) => f !== 'sw.js');
       const hash = createHash('sha256');
       for (const f of files) hash.update(f).update(fs.readFileSync(path.join(outDir, f)));
       const sw = fs
@@ -46,7 +45,7 @@ function serviceWorker(): Plugin {
 
 /** What the app is built from. A commit that touches none of it (Pip's clips, docs, tests)
  *  builds the same app, so installed copies are not updated for it. */
-const APP_INPUTS = ['--', 'src', 'public', 'index.html', 'package.json', 'package-lock.json', 'vite.config.ts', 'tsconfig.json', 'tsconfig.app.json', 'scripts/copy-engine.mjs', ':(exclude)public/voice'];
+const APP_INPUTS = ['--', 'src', 'public', 'index.html', 'package.json', 'package-lock.json', 'vite.config.ts', 'tsconfig.json', 'tsconfig.app.json', 'scripts/copy-engine.mjs'];
 
 const git = (args: string[]) => {
   try {

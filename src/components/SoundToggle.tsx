@@ -15,12 +15,11 @@ export function toggleSound() {
   toast({ title: on ? 'Sound on' : 'Sound off', icon: on ? 'volume' : 'mute' }, 1600);
 }
 
-/** M toggles sound, except while typing (and in Kids mode). */
+/** M toggles sound, except while typing. */
 export function useSoundShortcut() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'm' && e.key !== 'M') return;
-      if (location.hash.startsWith('#/kids')) return; // Kids mode has its own speaker button
       if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;

@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useEffect, type CSSProperties, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, type CSSProperties, type ReactNode } from 'react';
 import { PACES } from './lib/replyPace';
 import { navigate, routeParts, useRoute } from './router';
 import { Icon } from './components/Icon';
@@ -25,8 +25,6 @@ import { SettingsPage } from './pages/Settings';
 import { TrainPage } from './pages/Train';
 import { SyncJoinPage } from './sync/SyncJoinPage';
 import { SoundToggle, useSoundShortcut } from './components/SoundToggle';
-import { isKidsLocked } from './kids/lock';
-const KidsApp = lazy(() => import('./kids/KidsApp').then((m) => ({ default: m.KidsApp })));
 // Only the native builds carry the diagnostics page (src/native/diagnostics.ts).
 const NativeDiag = import.meta.env.MODE === 'native' ? lazy(() => import('./native/NativeDiag')) : null;
 
@@ -63,7 +61,6 @@ function useNav(): { groups: { label?: string; items: NavItem[] }[]; tabs: NavIt
       items: [
         { route: 'play', label: 'Play the Coach', icon: 'play' },
         { route: 'games', label: 'Game Reviews', icon: 'swords', match: ['review'] },
-        { route: 'kids', label: 'Kids mode', icon: 'star' },
       ],
     },
     {
@@ -96,32 +93,6 @@ function BrandMark() {
       <span />
     </span>
   );
-}
-
-/** Kids mode loads separately: when its files cannot be fetched, say so instead of a blank screen. */
-class KidsLoadFailed extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  render() {
-    if (!this.state.failed) return this.props.children;
-    return (
-      <div className="page load-failed">
-        <div className="empty">
-          <BrandMark />
-          <h3>Kids mode could not load</h3>
-          <p style={{ marginTop: 6 }}>Check the internet connection, then try again.</p>
-          <div className="btn-row" style={{ justifyContent: 'center', marginTop: 14 }}>
-            <Button variant="primary" icon="refresh" onClick={() => location.reload()}>
-              Try again
-            </Button>
-            <Button onClick={() => navigate('home')}>Back to Tempo</Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 }
 
 function Toasts() {
@@ -267,28 +238,13 @@ export function App() {
   useAchievementWatcher();
   useLevelWatcher();
   useSoundShortcut();
-  const locked = isKidsLocked();
+  // Kids mode was removed: an old link or bookmark to it opens Today.
   useEffect(() => {
-    if (locked && section !== 'kids') navigate('kids', { replace: true });
-  }, [locked, section]);
-
-  // Kids mode is its own full-screen app, without the grown-up navigation.
-  if (section === 'kids') {
-    return (
-      <>
-        <KidsLoadFailed>
-          <Suspense fallback={<div className="kids-loading" aria-busy="true" style={{ position: 'fixed', inset: 0, background: '#fffaf0' }} />}>
-            <KidsApp route={route} />
-          </Suspense>
-        </KidsLoadFailed>
-        <Toasts />
-      </>
-    );
-  }
-  if (locked) return null; // avoid a flash of the grown-up app while redirecting
+    if (section === 'kids') navigate('home', { replace: true });
+  }, [section]);
 
   return (
-    // The computer's pieces glide at the user's reply speed (board.css); Kids mode has its own.
+    // The computer's pieces glide at the user's reply speed (board.css).
     <div className="app" style={{ '--opp-glide': `${PACES[p.settings.replySpeed].glide}ms` } as CSSProperties}>
       {/* The hash router would take "#main" for a route, so the link moves focus itself. */}
       <a

@@ -14,8 +14,6 @@ interface Facts {
   linked: boolean;
   /** Sync works here (a backend is configured and this is not an embedded copy). */
   sync: boolean;
-  /** Shown in Kids' grown-ups area, where sync and export live elsewhere. */
-  kids?: boolean;
 }
 
 /**
@@ -23,18 +21,16 @@ interface Facts {
  * separate data, and a sync link opens in the browser, never in the installed app. Progress made
  * before installing therefore has to travel by sync code or by export. Null where that does not apply.
  */
-export function storageSplitText({ mode, how, installed, linked, sync, kids }: Facts): string | null {
+export function storageSplitText({ mode, how, installed, linked, sync }: Facts): string | null {
   if (how !== 'ios' && how !== 'safari-mac') return null;
   if ((mode === 'installed') !== installed) return null;
   const app = how === 'ios' ? 'Home Screen app' : 'Dock app';
   const opens = 'A sync link opens in Safari, not in the installed app';
-  // Settings > Export covers the grown-up profile only; Kids mode keeps its own export.
-  const kidsExport = 'Kids mode has a separate export under Grown-ups: Export kids data';
   switch (mode) {
     case 'install':
-      if (!sync) return `The ${app} keeps its own data, separate from this Safari tab, so your progress does not carry over by itself. Before you install, export your progress${kids ? ' (Export kids data, below)' : ` (Settings, Your data; ${kidsExport})`}. Then open the installed app and paste it into Import.`;
+      if (!sync) return `The ${app} keeps its own data, separate from this Safari tab, so your progress does not carry over by itself. Before you install, export your progress (Settings, Your data). Then open the installed app and paste it into Import.`;
       if (linked) return `The ${app} keeps its own data, separate from this Safari tab. Sync is on, so your progress is safe: after you install, open the installed app, go to Settings, choose “I have a sync code” and type your code. ${opens}, so type the code in.`;
-      return `The ${app} keeps its own data, separate from this Safari tab, so your progress does not carry over by itself. Before you install, turn on sync ${kids ? "in Tempo's Settings" : 'in Settings'} (or export your progress${kids ? ': Export kids data, below' : ''}). Then open the installed app and choose “I have a sync code”. ${opens}, so type the code in.`;
+      return `The ${app} keeps its own data, separate from this Safari tab, so your progress does not carry over by itself. Before you install, turn on sync in Settings (or export your progress). Then open the installed app and choose “I have a sync code”. ${opens}, so type the code in.`;
     case 'join':
       return `Going to use Tempo from your ${how === 'ios' ? 'Home Screen' : 'Dock'}? The installed app keeps its own data, and this link opens in Safari, not in the app. Install Tempo first, open it from its icon, go to Settings, choose “I have a sync code” and type the code above. To keep using Tempo in Safari, link this device here.`;
     case 'synced':
@@ -42,15 +38,15 @@ export function storageSplitText({ mode, how, installed, linked, sync, kids }: F
     case 'installed':
       return sync
         ? `This installed app keeps its own data, separate from Safari. To bring your progress here, turn on sync where it is now, then choose “I have a sync code” here and type the code. ${opens}.`
-        : `This installed app keeps its own data, separate from Safari. To bring your progress here, export it where it is now and paste it into Import (Settings, Your data; ${kidsExport}).`;
+        : `This installed app keeps its own data, separate from Safari. To bring your progress here, export it where it is now and paste it into Import (Settings, Your data).`;
   }
 }
 
 /** A short note that the browser tab and the installed app do not share progress (see storageSplitText). */
-export function StorageSplitNote({ mode, kids }: { mode: StorageMode; kids?: boolean }) {
+export function StorageSplitNote({ mode }: { mode: StorageMode }) {
   const { how, installed } = useInstall();
   const linked = !!useSync().code;
-  const text = storageSplitText({ mode, how, installed, linked, sync: syncAvailable, kids });
+  const text = storageSplitText({ mode, how, installed, linked, sync: syncAvailable });
   if (!text) return null;
   return (
     <p className="ig-note" role="note">

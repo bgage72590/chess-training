@@ -27,43 +27,6 @@ function safeArea() {
   return out;
 }
 
-/** Loads a clip in an <audio> element (what Pip's voice does), then plays it muted: WebKit wants a 206 answer to its
- *  byte-range requests for media, and a scheme handler that only ever answers 200 can break that. */
-async function audioClip(src: string) {
-  return new Promise<Record<string, unknown>>((resolve) => {
-    const a = new Audio();
-    a.preload = 'auto';
-    let done = false;
-    const end = (r: Record<string, unknown>) => {
-      if (done) return;
-      done = true;
-      a.pause();
-      resolve(r);
-    };
-    a.addEventListener('loadedmetadata', () => {
-      const loaded = { loaded: true, duration: Math.round(a.duration * 100) / 100 };
-      a.muted = true; // a muted clip may start without a tap
-      void a.play().then(
-        () => end({ ...loaded, played: true }),
-        (e: Error) => end({ ...loaded, played: false, playError: e.name }),
-      );
-    });
-    a.addEventListener('error', () => end({ loaded: false, code: a.error?.code, message: a.error?.message }));
-    setTimeout(() => end({ loaded: false, timeout: true, readyState: a.readyState, networkState: a.networkState }), 8000);
-    a.src = src;
-    a.load();
-  });
-}
-
-async function speechVoices() {
-  const synth = window.speechSynthesis;
-  if (!synth) return 'no speechSynthesis';
-  const names = () => synth.getVoices().filter((v) => /^en[-_]/i.test(v.lang)).map((v) => v.name);
-  if (!names().length) await new Promise((r) => (synth.addEventListener?.('voiceschanged', () => r(null), { once: true }), setTimeout(r, 2000)));
-  const all = names();
-  return { english: all.length, sample: all.slice(0, 5) };
-}
-
 export async function collectDiagnostics(): Promise<Record<string, unknown>> {
   const nav = navigator as Navigator & { audioSession?: { type: string }; standalone?: boolean };
   const out: Record<string, unknown> = {
@@ -92,17 +55,6 @@ export async function collectDiagnostics(): Promise<Record<string, unknown>> {
     const res = await fetch(url('engine/stockfish.wasm'));
     return { status: res.status, type: res.headers.get('content-type'), bytes: (await res.arrayBuffer()).byteLength };
   });
-  out.voices = await settled(async () => {
-    const list = (await (await fetch(url('voice/voices.json'))).json()) as { default: string; voices: { id: string }[] };
-    const id = list.voices[0].id;
-    const m = (await (await fetch(url(`voice/${id}/manifest.json`))).json()) as { version?: string; clips: Record<string, number> };
-    const key = Object.keys(m.clips)[0];
-    const clip = url(`voice/${id}/${key}.mp3${m.version ? `?v=${encodeURIComponent(m.version)}` : ''}`);
-    const res = await fetch(clip, { headers: { Range: 'bytes=0-1023' } });
-    const audio = await audioClip(clip);
-    return { ids: list.voices.map((v) => v.id), default: list.default, clips: Object.keys(m.clips).length, rangeStatus: res.status, type: res.headers.get('content-type'), bytes: (await res.arrayBuffer()).byteLength, audio };
-  });
-  out.speech = await settled(speechVoices);
   out.engine = await settled(async () => {
     const t0 = performance.now();
     await engine.init();

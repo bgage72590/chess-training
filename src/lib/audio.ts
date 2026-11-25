@@ -2,9 +2,8 @@
 // started and kept going on Apple devices (iPhone, iPad, Mac Safari, the home-screen app, a WKWebView).
 // There, sound only starts inside a real gesture, the ringer switch mutes Web Audio unless the page
 // asks for a 'playback' audio session, and a call, Siri or a lock screen leaves the context
-// 'interrupted' until something resumes it. src/chess/sound.ts and src/kids/lib/kidsSound.ts draw
-// their sounds on getContext() and go through withRunningContext(); Pip's recorded voice (an <audio>
-// element in kids/player/speech.ts) joins the same gesture unlock with addUnlock().
+// 'interrupted' until something resumes it. src/chess/sound.ts draws its sounds on getContext() and
+// goes through withRunningContext().
 
 type SessionType = 'auto' | 'playback';
 
@@ -24,9 +23,9 @@ function applySession() {
 }
 
 /**
- * Sets the audio session type until the returned function puts the old one back. Kids mode asks for
- * 'playback' (Pip's voice is the point, so it plays with the ringer switch on silent); the grown-up app
- * keeps 'auto', so its move sounds never stop the person's music. Applied at once and again just before
+ * Sets the audio session type until the returned function puts the old one back. The app keeps 'auto',
+ * so its move sounds never stop the person's music; 'playback' would play them with the ringer switch
+ * on silent. Applied at once and again just before
  * the first context is made, because Safari reads it when audio starts.
  */
 export function setAudioSession(type: SessionType): () => void {
@@ -38,20 +37,6 @@ export function setAudioSession(type: SessionType): () => void {
       session = before;
       applySession();
     }
-  };
-}
-
-let wanted: () => boolean = () => true;
-
-/**
- * Whether the context should be woken by a gesture at all (Kids mode: not while the kid's sound is off
- * or muted, so quiet mode never takes the audio session). Until the returned function puts the old one back.
- */
-export function setAudioWanted(fn: () => boolean): () => void {
-  const before = wanted;
-  wanted = fn;
-  return () => {
-    if (wanted === fn) wanted = before;
   };
 }
 
@@ -144,7 +129,6 @@ export type UnlockAttempt = () => boolean | Promise<boolean>;
 
 interface Task {
   attempt: UnlockAttempt;
-  wanted: () => boolean;
   done: boolean;
 }
 
@@ -164,7 +148,7 @@ function primeContext(): boolean | Promise<boolean> {
   return running;
 }
 
-const contextTask: Task = { attempt: primeContext, wanted: () => wanted(), done: false };
+const contextTask: Task = { attempt: primeContext, done: false };
 const tasks = new Set<Task>([contextTask]);
 let listening = false;
 
@@ -188,7 +172,7 @@ function run(t: Task): Promise<boolean> {
 }
 
 function onGesture() {
-  for (const t of [...tasks]) if (!t.done && t.wanted()) void run(t);
+  for (const t of [...tasks]) if (!t.done) void run(t);
 }
 
 /** Stops listening once everything is unlocked (and only then). */
@@ -210,8 +194,8 @@ function recheck() {
 }
 
 /**
- * Listens for the next gesture to unlock what is not unlocked yet: creating and resuming the shared context,
- * and whatever was added with addUnlock(). Safe to call again and again (an app root, Kids mode, a context
+ * Listens for the next gesture to unlock what is not unlocked yet: creating and resuming the shared context.
+ * Safe to call again and again (an app root, a context
  * that stopped); it does nothing once everything is unlocked, and starts again when something is not.
  */
 export function armAudioUnlock() {
@@ -236,63 +220,5 @@ export function armAudioUnlock() {
 
 /** Tries every unlock that is still needed right now. Call it inside a gesture. */
 export function unlockAudio(): Promise<boolean[]> {
-  return Promise.all([...tasks].filter((t) => !t.done && t.wanted()).map(run));
-}
-
-export interface UnlockHandle {
-  /** The owner learned that it is unlocked (or, after a refusal, that it is not any more). */
-  setDone(done: boolean): void;
-  remove(): void;
-}
-
-/**
- * Adds something that needs a gesture (Pip's voice: a silent clip on the <audio> element). `attempt` runs
- * inside every gesture until it returns true, or a promise that resolves true. The listeners stay until this
- * and everything else is unlocked.
- */
-export function addUnlock(attempt: UnlockAttempt): UnlockHandle {
-  const t: Task = { attempt, wanted: () => true, done: false };
-  tasks.add(t);
-  armAudioUnlock();
-  return {
-    setDone(done) {
-      t.done = done;
-      if (done) settle();
-      else armAudioUnlock();
-    },
-    remove() {
-      tasks.delete(t);
-      settle();
-    },
-  };
-}
-
-// ---------- a silent clip ----------
-
-/**
- * A valid PCM WAV of silence (mono, 8 kHz, 16 bit) as a data URI, `ms` long. The unlock plays it on an
- * <audio> element; a zero-length one can fail to decode in Safari, which is one more thing that differs
- * from the clips everyone else uses.
- */
-export function silentWav(ms = 80): string {
-  const rate = 8000;
-  const data = Math.max(1, Math.round((rate * ms) / 1000)) * 2;
-  const bytes = new Uint8Array(44 + data); // the samples stay 0
-  const v = new DataView(bytes.buffer);
-  const text = (at: number, s: string) => [...s].forEach((c, i) => v.setUint8(at + i, c.charCodeAt(0)));
-  text(0, 'RIFF');
-  v.setUint32(4, 36 + data, true);
-  text(8, 'WAVEfmt ');
-  v.setUint32(16, 16, true);
-  v.setUint16(20, 1, true); // PCM
-  v.setUint16(22, 1, true); // mono
-  v.setUint32(24, rate, true);
-  v.setUint32(28, rate * 2, true);
-  v.setUint16(32, 2, true);
-  v.setUint16(34, 16, true);
-  text(36, 'data');
-  v.setUint32(40, data, true);
-  let bin = '';
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return `data:audio/wav;base64,${btoa(bin)}`;
+  return Promise.all([...tasks].filter((t) => !t.done).map(run));
 }

@@ -13,10 +13,7 @@ import { __clockForTests } from '../src/sync/clock';
 import { profileSyncParts } from '../src/sync';
 import { newSyncCode } from '../src/sync/code';
 import { getProfile, normalizeProfile, replaceProfile, updateProfile } from '../src/store/profile';
-import { __setKidsStateForTests, defaultKidsState, getKids, newKid, updateKid, type KidsState } from '../src/kids/store/kidsStore';
-import { kidsSyncParts } from '../src/kids/store/syncKids';
-import { setQuiet } from '../src/kids/store/quiet';
-import { mulberry32 } from '../src/kids/lib/rng';
+import { mulberry32 } from '../src/lib/rng';
 
 vi.mock('../src/lib/toast', () => ({ toast: vi.fn() }));
 
@@ -27,29 +24,26 @@ const SKEWS = [0, 0, 0, 10 * 60_000, -10 * 60_000, 3_000, -3_000, YEAR, -YEAR];
 let realNow = T0;
 
 /** The fields the fuzz changes: every change writes a value nobody wrote before, so a value names its change. */
-const FIELDS = ['p.sound', 'p.volume', 'p.theme', 'k.pipVoice', 'k.rate', 'k.name'] as const;
+const FIELDS = ['p.sound', 'p.volume', 'p.theme'] as const;
 type Field = (typeof FIELDS)[number];
 
 class Dev {
   profile = normalizeProfile({ onboarded: true });
-  kids: KidsState = defaultKidsState();
   floor = 0;
   saved: { code: string; lastSyncedAt?: number } | null = null;
   engine: SyncEngine;
   /** The changes this device has seen, per field. */
   known = new Map<Field, Set<number>>();
   constructor(backend: ReturnType<typeof memoryBackend>, public skewMs: number) {
-    this.engine = new SyncEngine(backend, [...profileSyncParts(), ...kidsSyncParts()], { load: () => this.saved, save: (s) => void (this.saved = s) });
+    this.engine = new SyncEngine(backend, profileSyncParts(), { load: () => this.saved, save: (s) => void (this.saved = s) });
   }
   enter() {
     vi.setSystemTime(realNow + this.skewMs);
     __clockForTests.set(this.floor);
     replaceProfile(this.profile, { keepTimestamp: true });
-    __setKidsStateForTests(this.kids);
   }
   leave() {
     this.profile = getProfile();
-    this.kids = getKids();
     this.floor = __clockForTests.get();
   }
   act<T>(fn: () => T): T {
@@ -71,14 +65,10 @@ class Dev {
 }
 
 const valueOf = (d: Dev, f: Field): unknown => {
-  const k = d.kids.kids.find((x) => x.id === 'k-mia');
   switch (f) {
     case 'p.sound': return d.profile.settings.sound;
     case 'p.volume': return d.profile.settings.volume;
     case 'p.theme': return d.profile.settings.boardTheme;
-    case 'k.pipVoice': return k?.settings.pipVoice;
-    case 'k.rate': return k?.settings.rate;
-    case 'k.name': return k?.name;
   }
 };
 
@@ -88,9 +78,6 @@ const valueFor = (f: Field, n: number): unknown => {
     case 'p.sound': return n % 2 === 0; // (a boolean cannot name its change: this field is only checked for agreement)
     case 'p.volume': return 0.001 * n;
     case 'p.theme': return THEMES[n % 5]; // (a few values repeat: the check below accepts any change that stands with that value)
-    case 'k.pipVoice': return `v${n}`;
-    case 'k.rate': return 0.7 + n * 0.0001;
-    case 'k.name': return `N${n}`;
   }
 };
 
@@ -98,7 +85,6 @@ async function run(seed: number, steps: number) {
   const rng = mulberry32(seed);
   const backend = memoryBackend();
   const devs = [0, 1, 2].map(() => new Dev(backend, SKEWS[Math.floor(rng() * SKEWS.length)]));
-  for (const d of devs) d.kids = { ...defaultKidsState(), kids: [newKid({ id: 'k-mia', name: 'Mia', band: 'explorer' as never, start: 'new', now: 1 })], updatedAt: T0 };
   const code = newSyncCode();
   realNow = T0;
   for (const d of devs) {
@@ -125,10 +111,7 @@ async function run(seed: number, steps: number) {
       d.act(() => {
         if (f === 'p.sound') updateProfile((p) => void (p.settings.sound = !p.settings.sound));
         else if (f === 'p.volume') updateProfile((p) => void (p.settings.volume = v as number));
-        else if (f === 'p.theme') updateProfile((p) => void (p.settings.boardTheme = THEMES[id % 5]));
-        else if (f === 'k.pipVoice') updateKid('k-mia', (k) => void (k.settings.pipVoice = v as string));
-        else if (f === 'k.rate') updateKid('k-mia', (k) => void (k.settings.rate = v as number));
-        else updateKid('k-mia', (k) => void (k.name = v as string));
+        else updateProfile((p) => void (p.settings.boardTheme = THEMES[id % 5]));
       });
       if (valueOf(d, f) !== before) {
         changeField.set(id, f);
@@ -136,8 +119,6 @@ async function run(seed: number, steps: number) {
         supersedes.set(id, new Set(seen(d.known, f)));
         seen(d.known, f).add(id);
       }
-    } else if (r < 0.62) {
-      d.act(() => setQuiet('k-mia', rng() < 0.7));
     } else {
       // a sync: this device sees what the copy has, and the copy what it has
       await d.sync();
@@ -192,15 +173,10 @@ describe('three devices with wrong clocks', () => {
       // stamps agree on all devices
       expect(b.profile.settingsStamps).toEqual(a.profile.settingsStamps);
       expect(c.profile.settingsStamps).toEqual(a.profile.settingsStamps);
-      const ka = a.kids.kids[0];
-      expect(b.kids.kids[0].stamps).toEqual(ka.stamps);
-      expect(c.kids.kids[0].stamps).toEqual(ka.stamps);
-      // quiet mode never travels
-      expect(JSON.stringify(data)).not.toMatch(/quiet|muted/);
       // causal: the winner of each field is a change that no later change (made after seeing it) replaced
       const superseded = new Set<number>();
       for (const s of supersedes.values()) for (const x of s) superseded.add(x);
-      for (const f of ['p.volume', 'p.theme', 'k.pipVoice', 'k.rate', 'k.name'] as const) {
+      for (const f of ['p.volume', 'p.theme'] as const) {
         const all = [...changeField].filter(([, ff]) => ff === f).map(([id]) => id);
         if (!all.length) continue;
         const winners = all.filter((id) => valueOfChange.get(id) === valueOf(a, f) && !superseded.has(id));

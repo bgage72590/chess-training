@@ -41,9 +41,8 @@ and works offline, full-strength Stockfish included. Open
 | A page opened inside another app (Instagram, Facebook, Messenger, Snapchat, Line, Google, X) | Open the page in Safari first (**Open in Safari** in that app's menu): those built-in browsers cannot install web apps. Tempo says so when it detects one. |
 | Android | Chrome menu → **Install app** / **Add to Home screen** |
 
-On iPhone, iPad and Mac Safari Tempo shows these steps itself: a banner on the Today page and in
-Kids mode's grown-ups area after the first finished lesson or puzzle (**Hide this** keeps it away),
-and always under **Settings → Install the app**. Chrome and Edge keep their own **Install** button.
+On iPhone, iPad and Mac Safari Tempo shows these steps itself: a banner on the Today page after the
+first finished lesson or puzzle (**Hide this** keeps it away), and always under **Settings → Install the app**. Chrome and Edge keep their own **Install** button.
 
 Right-click (or long-press) the icon for shortcuts to Puzzles, Play and Learn. The app updates
 itself the next time it is opened online.
@@ -52,15 +51,14 @@ itself the next time it is opened online.
 
 On iPhone, iPad and Mac Safari, **the Safari tab and the installed Home Screen (or Dock) app keep
 separate data**, so the installed app starts empty. Before you install, turn on sync (**Settings →
-Sync across devices → Turn on sync**) or export your progress (Settings → Your data; Kids mode has a
-separate **Export kids data** in its Grown-ups area). Then open the installed app and
+Sync across devices → Turn on sync**) or export your progress (Settings → Your data). Then open the installed app and
 choose **I have a sync code** (Settings → Sync across devices) and type the code. A sync link or QR
 code opens in Safari, not in the installed app, so linking by link would link the browser copy
 only. Chrome and Edge share their data between the browser and the installed app.
 
 ### Handing Tempo to someone else
 
-**Settings → Share Tempo** (and the grown-ups area in Kids mode) shows a QR code for the app's
+**Settings → Share Tempo** shows a QR code for the app's
 address, a **Copy link** button and the device's share sheet. It always shares the app's own
 address, never the page you are on: the address of a sync page holds your private sync code.
 
@@ -84,10 +82,8 @@ sync code (with a QR code and a link). On your other phones, tablets and compute
 code, open the link, or type the code under **I have a sync code** (for an installed iPhone, iPad
 or Mac Safari app, always type it: see [Moving your progress](#moving-your-progress)). Progress from every linked
 device is combined, never overwritten: lessons, puzzles, openings, games, streaks and XP made on
-any of them add up, and every setting (sound and volume, Pip's voice, reading mode, speech speed
-...) follows the device where that setting was changed last, one setting at a time. Players in Kids
-mode sync too. The device voice, the parent PIN, the Kids lock, Kids quiet mode and downloaded
-voices stay on each device. Syncing happens in the background a few seconds after you train, when
+any of them add up, and every setting (sound and volume, board and pieces...) follows the device
+where that setting was changed last, one setting at a time. Syncing happens in the background a few seconds after you train, when
 you come back to the app, when a device comes back online, and about every minute while the app is
 open.
 
@@ -99,42 +95,6 @@ backup.
 Synced copies live in a Supabase database (`docs/sync.sql`) that only exposes three functions;
 each copy is stored under a hash of its code, which is 100 random bits and cannot be guessed or
 listed.
-
-## Kids mode
-
-**Kids mode** (in the sidebar, or Settings) is a separate, playful course for ages 4-12: Pip the
-pony guides each child through eight worlds, from how each piece moves to checkmates, tactics and
-full games against seven buddy bots, with stickers, a playground of mini-games, and a placement
-check so older or experienced kids skip what they know. Each child gets a profile; the grown-ups
-area (behind a simple parent check or a PIN) has progress reports, session limits, read-aloud and
-sound settings, and can lock the device to Kids mode.
-
-Pip speaks in one of eight recorded voices (Sunny, Breezy, Sparkle, Honey, Pepper, Willow, Bella
-and Rocket), chosen per child in the grown-ups area, where tapping a voice plays a sample. Every
-fixed line, and every version of lines with a few known values (pieces, squares, numbers, buddy
-and world names), is recorded, so Pip sounds the same on every device; a line made up on the spot
-is said sentence by sentence from recordings where possible, and otherwise by the device's most
-natural voice. The voices are listed in `scripts/voice/voices.json`. To record after changing the
-Kids copy (Google Cloud Text-to-Speech, key in `GOOGLE_TTS_API_KEY` or added to requests by the
-environment; Kokoro also works, locally), see `scripts/voice/render.py`:
-
-```
-npx tsx scripts/voice/collect.ts > /tmp/lines.json
-python3 scripts/voice/render.py /tmp/lines.json --id sunny            # once per voice
-python3 scripts/voice/try_voices.py /tmp/try --engine google Leda Puck   # audition voices
-```
-
-Recorded clips stream as they are used and are kept for next time. To use a voice without the
-internet, open the grown-ups area, pick the voice and tap **Download** under the voice list (about
-40 to 48 MB, one voice at a time, with progress, Pause and Resume). It asks first unless the
-connection reports Wi-Fi or ethernet, and always on iPhone and iPad, where the screen has to stay
-open while it downloads. Only on a connection that says it is Wi-Fi or ethernet is the voice of the
-child in use saved without asking (once per recording). **Settings, Offline** shows whether the app
-is saved for offline use, which voice is on the device, and whether the browser will keep the data
-(Tempo asks it to after your first finished lesson, puzzle or game; a Safari tab can still be
-cleared after a week without a visit, so turn on sync as a backup or add Tempo to the Home Screen).
-`scripts/voice/render.py` writes each voice's size into its `manifest.json`; for manifests recorded
-before that, `python3 scripts/voice/sizes.py` adds it without touching anything else.
 
 ## Getting started
 
@@ -159,7 +119,7 @@ Other scripts:
 
 `.github/workflows/pages.yml` publishes `dist/` to GitHub Pages on every push to the default branch. Enable it once under **Settings → Pages → Source: GitHub Actions**. The engine is single-threaded WASM, so no special cross-origin headers are needed.
 
-The normal build is the installable app: `public/manifest.webmanifest`, the icons in `public/icons/` (regenerate with `node scripts/icons/render-icons.cjs`), and `sw.js`, a service worker written at build time from `src/pwa/sw.template.js` that precaches every built file for offline use. Pip's clips are cached as they are used, one cache per voice (`tempo-voice-<id>`, the voice lists in `tempo-voice-lists`), so a new recording of one voice clears only that voice; the worker moves the single `tempo-voice` cache older versions made into these when it updates.
+The normal build is the installable app: `public/manifest.webmanifest`, the icons in `public/icons/` (regenerate with `node scripts/icons/render-icons.cjs`), and `sw.js`, a service worker written at build time from `src/pwa/sw.template.js` that precaches every built file for offline use. When it updates it deletes every other `tempo-*` cache, including the voice caches Kids mode (since removed) used to keep.
 
 ## How the content is made trustworthy
 
@@ -189,5 +149,4 @@ tests/          Vitest suites
 - Engine: [Stockfish](https://stockfishchess.org) 19 via [stockfish.js](https://github.com/nmrugg/stockfish.js), GPLv3. The engine files are copied from the `stockfish` npm package at install time; its licence ships alongside as `engine/COPYING-stockfish.txt`. Sources: [official-stockfish/Stockfish](https://github.com/official-stockfish/Stockfish), [nmrugg/stockfish.js](https://github.com/nmrugg/stockfish.js) and this app, [bgage72590/chess-training](https://github.com/bgage72590/chess-training). Settings → Credits links all of them.
 - Rules and move generation: [chess.js](https://github.com/jhlywa/chess.js) (BSD-2-Clause).
 - Pieces: "cburnett" set by Colin M.L. Burnett (GPLv2+ / GFDL / BSD), as distributed with lichess chessground. The app icon uses its knight. The 3D Staunton set and the walnut and marble boards are rendered for this app by `scripts/pieces` and `scripts/boards`.
-- Fonts (self-hosted via Fontsource, OFL): Newsreader, Source Sans 3 and IBM Plex Mono; Fredoka and Andika in Kids mode.
-- Pip's voice: recorded with [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0), voice `af_heart`, via [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) (MIT), or with Google Cloud Text-to-Speech.
+- Fonts (self-hosted via Fontsource, OFL): Newsreader, Source Sans 3 and IBM Plex Mono.

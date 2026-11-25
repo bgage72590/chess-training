@@ -85,8 +85,7 @@ describe('audio under random interruptions', () => {
       vi.stubGlobal('navigator', {});
       vi.resetModules();
       const audio = await import('../src/lib/audio');
-      let wantSound = true;
-      let kids: (() => void)[] | null = null;
+      let session: (() => void) | null = null;
       audio.armAudioUnlock();
 
       let drawsWhileStopped = 0;
@@ -96,7 +95,7 @@ describe('audio under random interruptions', () => {
       const last = () => contexts.at(-1);
 
       for (let step = 0; step < 60; step++) {
-        const op = pick(['gesture', 'gesture', 'sound', 'sound', 'state', 'state', 'hide', 'show', 'pageshow', 'answers', 'kids', 'time']);
+        const op = pick(['gesture', 'gesture', 'sound', 'sound', 'state', 'state', 'hide', 'show', 'pageshow', 'answers', 'session', 'time']);
         if (op === 'gesture') win.dispatchEvent(new Event(pick(GESTURES)));
         else if (op === 'sound') audio.withRunningContext(draw);
         else if (op === 'state') last()?.setState(pick(STATES));
@@ -110,13 +109,12 @@ describe('audio under random interruptions', () => {
         else if (op === 'answers') {
           const how = pick(['run', 'hang', 'until-running', 'reject'] as const);
           answers = () => how;
-        } else if (op === 'kids') {
-          if (kids) {
-            kids.forEach((f) => f());
-            kids = null;
+        } else if (op === 'session') {
+          if (session) {
+            session();
+            session = null;
           } else {
-            wantSound = rand() < 0.7;
-            kids = [audio.setAudioSession('playback'), audio.setAudioWanted(() => wantSound)];
+            session = audio.setAudioSession('playback');
             audio.armAudioUnlock();
           }
         } else await vi.advanceTimersByTimeAsync(pick([0, 50, 400, 2000]));
@@ -126,7 +124,7 @@ describe('audio under random interruptions', () => {
         expect(drawsWhileStopped, `step ${step} ${op}`).toBe(0);
         // A context that stopped (and can still be woken) always has a gesture listener waiting for it.
         const c = last();
-        if (c && c.state !== 'running' && c.state !== 'closed' && (kids === null || wantSound)) {
+        if (c && c.state !== 'running' && c.state !== 'closed' && true) {
           const armed = GESTURES.every((g) => (listening.get(g) ?? 0) > 0);
           expect(armed, `step ${step} ${op}: ${c.state} context and no listeners`).toBe(true);
         }
@@ -139,7 +137,7 @@ describe('audio under random interruptions', () => {
 
       // The first gesture that can be heard brings a stopped context back, whatever came before.
       answers = () => 'run';
-      if (kids) kids.forEach((f) => f());
+      session?.();
       audio.getContext();
       const c = last();
       if (c && c.state === 'closed') audio.getContext();

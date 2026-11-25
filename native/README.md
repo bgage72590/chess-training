@@ -22,9 +22,6 @@ The web app builds with `vite build --mode native` (`npm run build:native`), whi
 - skips the engine's start-up network probe (the engine's files are inside the app),
 - hands out the hosted web address (`APP_URL`) in share links and sync links, since `capacitor://` and `tauri://`
   addresses open nowhere else,
-- carries two of Pip's eight voices (Sunny and Rocket, about 84 MB) instead of all of them (about 340 MB, which
-  mp3 does not compress); a voice chosen on another device that the app does not carry falls back to Sunny.
-  `scripts/build-native.mjs --keep sunny,rocket,bella` changes which ones,
 - adds a diagnostics page (`#/diag`, not reachable in a normal build) used by the CI run below.
 
 The iPhone/iPad app also sets its audio session to media playback (`AppDelegate.swift`), so the silent switch on
@@ -39,7 +36,7 @@ repository. Run it from the repository's Actions tab: Native apps, Run workflow.
   (kept 14 days).
 - `ios`: builds the app for the iOS Simulator and runs it on an iPhone and an iPad simulator.
 - `smoke`: each app opens its diagnostics page and posts what works inside it (secure context, the engine's
-  wasm file, voices played in an audio element, Stockfish, whether the sync service can be reached from the
+  wasm file, Stockfish, whether the sync service can be reached from the
   app's origin, safe areas) to a listener on the runner. The reports are printed in the job log and saved with
   the screenshots.
 - `release` and a tag name: also attach the Mac app to a GitHub release, so a link can be handed out.
@@ -50,12 +47,11 @@ Both apps built and ran on `macos-26` runners (real WKWebView, the same web engi
 
 | | Mac app (`tauri://localhost`) | iPad simulator (`capacitor://localhost`) |
 | --- | --- | --- |
-| Build | universal (`x86_64 arm64`), ad-hoc signed (`Signature=adhoc`, no team), `Tempo.app` 157 MiB, `.dmg` 152 MiB, zip 152 MB | builds with `CODE_SIGNING_ALLOWED=NO` for the simulator |
+| Build | universal (`x86_64 arm64`), ad-hoc signed (`Signature=adhoc`, no team), `Tempo.app` 157 MiB, `.dmg` 152 MiB, zip 152 MB (then with two of Kids mode's voices, about 84 MB, since removed) | builds with `CODE_SIGNING_ALLOWED=NO` for the simulator |
 | Secure context, `crypto.subtle`, Cache API, `navigator.share`, clipboard | all present | all present |
 | Service worker | the API exists but the app registers none | absent, as expected |
 | Stockfish | starts as real Stockfish (not the backup engine), first search in 0.2 to 0.3 s | starts as real Stockfish; first search 0.4 to 1 s on the shared CI simulator |
 | `stockfish.wasm` file type | `application/wasm` | `application/wasm` |
-| Pip's voice clips | fetched; a clip loads and plays in an `<audio>` element. The file server answers a byte-range request with the whole file (200) instead of 206, which did not matter | fetched with a 206 range answer; a clip loads and plays in an `<audio>` element |
 | Sync service (Supabase) from the app's origin | reachable (HTTP 200) | reachable (HTTP 200, so cross-origin requests from `capacitor://` are allowed) |
 | Device (system) English voices | 25 | 25 |
 | Safe areas | 0 | top 32 px, bottom 20 px |
@@ -102,11 +98,9 @@ An Apple Silicon Mac can also run the iPhone/iPad app once it is in TestFlight o
 - **Licences.** Stockfish (GPLv3) runs inside the app. Settings, Credits links its source and this repository, which
   is the written source offer. Keep that in any store listing, and decide Tempo's own licence (there is no
   `LICENSE` file yet).
-- **Pip's voices** are Google Cloud Text-to-Speech output. Check Google's current terms for redistributing
-  generated audio inside an app before a store release, or ship the device voice or a Kokoro voice instead.
 - **Privacy.** Sync stores a family's progress under a sync code. A store listing needs a privacy policy.
-- **App Store review** may question an app that only wraps a website; this one carries its own files, engine and
-  voices, and works offline, which helps.
+- **App Store review** may question an app that only wraps a website; this one carries its own files and engine,
+  and works offline, which helps.
 
 ## Working on it
 

@@ -154,16 +154,15 @@ const TITLE: Record<GuideKind, string> = {
  * Tempo and warns that the installed app starts with its own, empty progress. It waits for `ready`
  * (the first finished lesson or puzzle) and can be hidden for good. It sits in the page, never over it.
  */
-export function InstallGuide({ ready, variant = 'app' }: { ready: boolean; variant?: 'app' | 'kids' }) {
+export function InstallGuide({ ready }: { ready: boolean }) {
   const state = useInstall();
   const [dismissed, setDismissed] = useState(readGuideDismissed);
   const ref = useRef<HTMLElement>(null);
   const kind = guideKind(state);
   if (!kind || !shouldShowGuide(kind, ready, dismissed)) return null;
-  const kids = variant === 'kids';
   const hide = () => {
     // The button leaves the page with the banner: keep keyboard and VoiceOver focus in the page, not on the body.
-    const host = ref.current?.closest<HTMLElement>('main, .kids-app');
+    const host = ref.current?.closest<HTMLElement>('main');
     writeGuideDismissed();
     setDismissed(true);
     if (host) {
@@ -172,26 +171,20 @@ export function InstallGuide({ ready, variant = 'app' }: { ready: boolean; varia
     }
   };
   return (
-    <section ref={ref} className={kids ? 'k-gu-card ig ig-kids' : 'card ig'} aria-label="Install Tempo">
+    <section ref={ref} className="card ig" aria-label="Install Tempo">
       <h2>{TITLE[kind]}</h2>
-      {kind !== 'in-app' && <p className={kids ? 'k-gu-note' : 'muted'}>Tempo gets its own icon, opens full screen and works offline, Stockfish included.</p>}
+      {kind !== 'in-app' && <p className="muted">Tempo gets its own icon, opens full screen and works offline, Stockfish included.</p>}
       <InstallSteps kind={kind} />
-      {kind !== 'in-app' && <StorageSplitNote mode="install" kids={kids} />}
+      {kind !== 'in-app' && <StorageSplitNote mode="install" />}
       <div className="ig-actions">
-        {!kids && kind !== 'in-app' && (
+        {kind !== 'in-app' && (
           <Button size="s" onClick={() => navigate('settings')}>
             Sync settings
           </Button>
         )}
-        {kids ? (
-          <button type="button" className="k-gu-btn" onClick={hide}>
-            Hide this
-          </button>
-        ) : (
-          <Button size="s" variant="ghost" onClick={hide}>
-            Hide this
-          </Button>
-        )}
+        <Button size="s" variant="ghost" onClick={hide}>
+          Hide this
+        </Button>
       </div>
     </section>
   );

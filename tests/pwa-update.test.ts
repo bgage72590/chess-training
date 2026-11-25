@@ -200,18 +200,6 @@ describe('an open app picks up a new version', () => {
     expect(win.location.reload).not.toHaveBeenCalled();
   });
 
-  it('Kids mode reloads at the next screen without a notice', async () => {
-    const { watchForUpdates } = await import('../src/pwa/update');
-    const { navigate } = await import('../src/router');
-    win.location.hash = '#/kids/map';
-    caches.set(OLD, new Set([OLD]));
-    const { sw, release } = browser(true);
-    watchForUpdates(reg(), OLD, sw);
-    await release(OLD, NEW);
-    expect(toast).not.toHaveBeenCalled();
-    navigate('kids/world/w1');
-    expect(win.location.reload).toHaveBeenCalledTimes(1);
-  });
 
   it('checks for a new version when the app is shown again, at most once a minute', async () => {
     const { watchForUpdates } = await import('../src/pwa/update');

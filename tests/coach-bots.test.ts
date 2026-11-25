@@ -5,8 +5,8 @@ import { Chess, type Move } from 'chess.js';
 vi.mock('../src/engine/engine', () => ({ engine: { status: 'failed' } }));
 
 import { LEVELS } from '../src/pages/Play';
-import { oliveMove } from '../src/kids/activities/playBot/kidBot';
-import { mulberry32 } from '../src/kids/lib/rng';
+import { oliveMove } from '../src/engine/coachBots';
+import { mulberry32 } from '../src/lib/rng';
 
 /** Flank thrusts (a/h pawn to the 4th or 5th, g/b double steps, f3 or f6), rim knights and king walks. */
 function ugly(m: Move): boolean {

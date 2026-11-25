@@ -14,7 +14,6 @@ import { APP_URL, useInstall } from '../pwa/install';
 import { SyncCard } from '../sync/SyncCard';
 import { embedded, useSync } from '../sync';
 import { sinceReset } from '../sync/merge';
-import { navigate } from '../router';
 
 const SAMPLE = 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4';
 
@@ -152,15 +151,6 @@ export function SettingsPage() {
                 { value: '200', label: 'Intense · 200 XP' },
               ]}
             />
-          </div>
-          <div className="settings-row">
-            <span>
-              <strong>Kids mode</strong>
-              <span className="muted">A playful chess course for ages 4-12</span>
-            </span>
-            <Button size="s" icon="star" aria-label="Open Kids mode" onClick={() => navigate('kids')}>
-              Open
-            </Button>
           </div>
         </section>
         <SyncCard />

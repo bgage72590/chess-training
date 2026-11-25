@@ -313,23 +313,6 @@
   transform: translateX(2px);
   color: var(--accent-strong);
 }
-/* Kids mode entry for grown-ups (the only .kids-* rule in the grown-up app). */
-.kids-card {
-  background:
-    radial-gradient(120% 120% at 100% 0%, color-mix(in oklab, var(--accent) 10%, transparent), transparent 60%),
-    var(--surface);
-}
-.kids-card .link-row {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: 0;
-}
-.kids-card .link-row > span {
-  gap: 1px;
-}
-.kids-card .kids-card-sub {
-  font-size: 0.86rem;
-}
 .onboard {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);

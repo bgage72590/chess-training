@@ -17,8 +17,6 @@ export function updateTookOver() {
   if (pending) return;
   pending = true;
   onNextRouteChange(() => location.reload());
-  // Kids mode only reloads at the next screen: its notices are for the kids.
-  if (location.hash.startsWith('#/kids')) return;
   // A game in progress is not saved, so reloading from the notice ends it.
   const game = location.hash.startsWith('#/play');
   toast(
@@ -83,13 +81,12 @@ export function watchForUpdates(reg: ServiceWorkerRegistration, script = import.
 
 /**
  * A page left open across a release asks for files of its own version that are no longer there
- * (Kids mode loads separately): load the new version instead, at most once a minute so a real
+ * (pages that load separately, like the diagnostics page): load the new version instead, at most once a minute so a real
  * outage cannot reload in a loop.
  */
 export function recoverFromMissingFiles() {
   window.addEventListener('vite:preloadError', () => {
-    // Offline without the offline copy, a reload would only show the browser's error page: Kids
-    // mode says what happened instead.
+    // Offline without the offline copy, a reload would only show the browser's error page.
     if (navigator.onLine === false && !navigator.serviceWorker?.controller) return;
     try {
       if (Date.now() - Number(sessionStorage.getItem(RELOADED_KEY) ?? 0) < 60_000) return;

@@ -72,23 +72,9 @@ const storage = {
   },
 };
 
-/**
- * The Kids part joins sync whenever a device is linked, not when the Kids screens happen to load:
- * a device linked in the main app then uploads and pulls the kids in its first sync. The kids
- * modules (store, merge, progress) are a lazy chunk without the screens.
- */
-let kidsPart: Promise<void> | null = null;
-export function loadKidsPart(): Promise<void> {
-  if (!syncAvailable) return Promise.resolve();
-  return (kidsPart ??= import('../kids/store/syncKids').then(
-    (m) => m.registerKidsSync(),
-    () => void (kidsPart = null), // a chunk that could not load (offline): try again next time
-  ));
-}
+export const sync = new SyncEngine(supabaseBackend(SYNC_URL, SYNC_KEY), profileSyncParts(), storage, () => navigator.onLine);
 
-export const sync = new SyncEngine(supabaseBackend(SYNC_URL, SYNC_KEY), profileSyncParts(), storage, () => navigator.onLine, loadKidsPart);
-
-/** Other modules (e.g. Kids mode) register their data here to be synced too. */
+/** Other modules register their data here to be synced too. */
 export const addSyncPart = (part: SyncPart) => sync.addPart(part);
 
 /** How often a linked page that is showing asks the copy for news (the RPC returns the whole payload). */
@@ -111,8 +97,7 @@ export function startSync() {
   setInterval(() => {
     if (document.visibilityState === 'visible') void sync.syncNow();
   }, POLL_MS);
-  // A linked device syncs the kids too, from the first sync of this page on.
-  void (sync.snapshot.code ? loadKidsPart() : Promise.resolve()).then(() => sync.syncNow());
+  void sync.syncNow();
 }
 
 export function useSync() {

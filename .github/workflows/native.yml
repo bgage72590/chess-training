@@ -4,7 +4,7 @@ name: Native apps (Mac and iPhone/iPad)
 #   - a Mac app (Tauri, universal Intel + Apple silicon, ad-hoc signed: macOS asks once before opening it), and
 #   - an iPhone and iPad app for the iOS Simulator (proof that it runs; a real phone needs signing, see native/README.md).
 # With `smoke` on, each app opens its diagnostics page (#/diag) and posts what works inside it (secure context,
-# the engine's wasm file, voices, the sync service...) to a listener on the runner; the reports are printed in the log.
+# the engine's wasm file, the sync service...) to a listener on the runner; the reports are printed in the log.
 # GitHub-hosted macOS runners are free for a public repository. Nothing here signs or uploads to any store.
 on:
   workflow_dispatch:

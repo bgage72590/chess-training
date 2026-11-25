@@ -56,14 +56,14 @@ export function deleteSyncedCopy(): Promise<void> {
   );
 }
 
-/** The single-file or embedded copy: sync (and Pip's recorded voices) are in the full app. */
+/** The single-file or embedded copy: sync is in the full app. */
 function SyncInFullApp() {
   const cloud = useSyncState();
   return (
     <section className="card settings-section sync-card">
       <h2>Sync across devices</h2>
       <p className="muted">
-        Syncing across devices with a private sync code, and Pip&rsquo;s recorded voices in Kids mode, come with the full app at <span className="mono app-address">{APP_ADDRESS}</span>.
+        Syncing across devices with a private sync code comes with the full app at <span className="mono app-address">{APP_ADDRESS}</span>.
       </p>
       <p>
         <a href={APP_URL} target="_blank" rel="noreferrer">
@@ -100,7 +100,7 @@ export function SyncCard() {
       <section className="card settings-section sync-card">
         <h2>Sync across devices</h2>
         <p className="muted">
-          Keep your progress, and your kids&rsquo; progress, on every phone, tablet and computer. No account or email needed: Tempo gives you a private sync code.
+          Keep your progress on every phone, tablet and computer. No account or email needed: Tempo gives you a private sync code.
         </p>
         {s.error && <Feedback tone="warn" icon="x" title="Sync stopped" body={s.error} />}
         <StorageSplitNote mode="installed" />

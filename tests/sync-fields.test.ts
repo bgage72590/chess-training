@@ -1,6 +1,6 @@
 // Settings that sync field by field: the clock behind the stamps (sync/clock.ts), the merge of stamped
-// fields (sync/fields.ts) and how the grown-up profile and a kid use them. The properties run on
-// seeded random histories, in the style of kids-fuzz.test.ts, so a failure reproduces: the merge is
+// fields (sync/fields.ts) and how the grown-up profile uses them. The properties run on
+// seeded random histories, so a failure reproduces: the merge is
 // symmetric, idempotent and associative on data with and without stamps (older versions) and with
 // stamps far in the future (a wrong clock), and per field the later stamp wins.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,9 +8,7 @@ import { MAX_AHEAD_MS, __clockForTests, nextStamp, observeStamp, observeStamps }
 import { legacyStamps, mergeFields, mirrorOf, readMirror, readStamps, reconcile, stableJson, stampChanges, type Fields } from '../src/sync/fields';
 import { joiningCopy, mergeProfiles } from '../src/sync/merge';
 import { defaultProfile, getProfile, normalizeProfile, replaceProfile, stampsOfSettings, updateProfile, type Profile } from '../src/store/profile';
-import { __setKidsStateForTests, choiceFields, defaultKidsState, getKids, newKid, normalizeKids, stampsOfKid, updateKid, withChoiceFields, type KidProfile } from '../src/kids/store/kidsStore';
-import { mergeKid } from '../src/kids/store/syncKids';
-import { mulberry32 } from '../src/kids/lib/rng';
+import { mulberry32 } from '../src/lib/rng';
 
 const T0 = new Date('2026-09-30T12:00:00Z').getTime();
 const YEAR = 365 * 24 * 3_600_000;
@@ -270,59 +268,6 @@ describe('merging the grown-up settings (seeded random histories, with and witho
   });
 });
 
-const KID_SETTING_CHOICES: Record<string, unknown[]> = {
-  pipVoice: ['', 'honey', 'rocket', 'device'],
-  voice: ['auto', 'first', 'off'],
-  rate: [null, 0.8, 1.1],
-  sound: [true, false],
-  hints: ['generous', 'normal', 'few'],
-  pipVolume: [0.2, 0.9], // a newer version's setting
-};
-
-function randKid(rng: () => number): KidProfile {
-  const k = newKid({ id: 'k-mia', name: pickOf(rng, ['Mia', 'Mimi']), band: pickOf(rng, ['explorer', 'sprout'] as const) as never, start: 'new', now: 1 });
-  const settings = { ...k.settings } as unknown as Record<string, unknown>;
-  for (const [key, vs] of Object.entries(KID_SETTING_CHOICES)) if (rng() < 0.7) settings[key] = pickOf(rng, vs);
-  k.settings = settings as unknown as KidProfile['settings'];
-  if (rng() < 0.4) k.avatar = { ...k.avatar, color: pickOf(rng, ['sea', 'grass', 'sun'] as const) as never };
-  const mode = pickOf(rng, ['fresh', 'legacy', 'stamped', 'future'] as const);
-  if (mode === 'legacy') k.settingsAt = pickOf(rng, [1, T0 - 5000, T0, T0 + YEAR]);
-  if (mode === 'stamped' || mode === 'future') {
-    const stamps: Record<string, number> = {};
-    for (const f of Object.keys(choiceFields(k))) if (rng() < 0.5) stamps[f] = pickOf(rng, mode === 'future' ? [T0 + YEAR, T0 + 1000] : [T0 - 2000, T0, T0 + 1000, 3]);
-    k.stamps = stamps;
-    k.settingsAt = Math.max(0, ...Object.values(stamps)) || undefined;
-  }
-  return k;
-}
-const kidView = (k: KidProfile) => stableJson({ choices: choiceFields(k), stamps: Object.fromEntries(Object.entries(stampsOfKid(k)).filter(([, t]) => t > 0)), at: k.settingsAt ?? 0 });
-
-describe("merging a kid's name, avatar, age group and settings (seeded random histories)", () => {
-  it('is symmetric, idempotent and associative, with and without stamps, and keeps fields a newer version added', () => {
-    for (let seed = 1; seed <= 300; seed++) {
-      const rng = mulberry32(seed * 41);
-      const [a, b, c] = [randKid(rng), randKid(rng), randKid(rng)];
-      const ab = mergeKid(a, b);
-      expect(kidView(ab), `seed ${seed}`).toBe(kidView(mergeKid(b, a)));
-      expect(kidView(mergeKid(a, a)), `seed ${seed}`).toBe(kidView(a));
-      expect(kidView(mergeKid(ab, ab)), `seed ${seed}`).toBe(kidView(ab));
-      expect(kidView(mergeKid(ab, c)), `seed ${seed}`).toBe(kidView(mergeKid(a, mergeKid(b, c))));
-      const m = mergeKid(ab, c);
-      expect(m.settingsAt ?? 0).toBe(Math.max(0, ...Object.values(stampsOfKid(m))));
-      for (const key of Object.keys(a.settings)) expect(key in m.settings, `seed ${seed} ${key}`).toBe(true);
-    }
-  });
-
-  it('withChoiceFields is choiceFields the other way round', () => {
-    for (let seed = 1; seed <= 50; seed++) {
-      const k = randKid(mulberry32(seed));
-      expect(stableJson(choiceFields(withChoiceFields(k, choiceFields(k))))).toBe(stableJson(choiceFields(k)));
-    }
-  });
-});
-
-// ---------- the stores ----------
-
 describe('updateProfile stamps each setting on its own', () => {
   beforeEach(() => replaceProfile(defaultProfile(), { keepTimestamp: true }));
 
@@ -374,32 +319,5 @@ describe('updateProfile stamps each setting on its own', () => {
     replaceProfile(normalizeProfile({ onboarded: true, settingsStamps: { sound: T0 + 90_000 }, settingsAt: T0 + 90_000 }), { keepTimestamp: true });
     updateProfile((d) => void (d.settings.volume = 0.5));
     expect(getProfile().settingsStamps!.volume).toBe(T0 + 90_001);
-  });
-});
-
-describe('a kid changes stamp each choice on its own', () => {
-  const kid = () => newKid({ id: 'k-mia', name: 'Mia', band: 'explorer' as never, start: 'new', now: 1 });
-  beforeEach(() => __setKidsStateForTests({ ...defaultKidsState(), kids: [kid()] }));
-
-  it("a grown-up's choices are stamped one at a time, play is not, and settingsAt is the highest stamp", () => {
-    updateKid('k-mia', (k) => void (k.nodes['w1-a'] = { stars: 1, plays: 1, last: 5, box: 1, due: '2026-09-30', masteredDays: [], lastItems: [], losses: 0, ease: 0 }));
-    expect(getKids().kids[0].stamps).toBeUndefined();
-    updateKid('k-mia', (k) => void (k.settings.pipVoice = 'rocket'));
-    const first = getKids().kids[0];
-    expect(first.stamps).toEqual({ 'settings.pipVoice': first.settingsAt });
-    vi.setSystemTime(T0 + 3000);
-    updateKid('k-mia', (k) => void ((k.name = 'Mimi'), (k.settings.rate = 1.1)));
-    const k = getKids().kids[0];
-    expect(k.stamps!['settings.pipVoice']).toBe(first.settingsAt);
-    expect(k.stamps!.name).toBe(k.stamps!['settings.rate']);
-    expect(k.settingsAt).toBe(k.stamps!.name);
-    expect(getKids().updatedAt).toBe(k.settingsAt);
-  });
-
-  it('settings a newer version added survive being read, and quiet mode saved as a setting is dropped from them', () => {
-    const s = normalizeKids({ v: 1, kids: [{ id: 'k1', name: 'Mia', settings: { pipVolume: 0.5, muted: true, 'bad key': 1, deep: { a: [1, 2] } } }], family: {}, device: {} });
-    expect(s.kids[0].settings).toMatchObject({ pipVolume: 0.5, deep: { a: [1, 2] } });
-    expect(s.kids[0].settings).not.toHaveProperty('muted');
-    expect(s.kids[0].settings).not.toHaveProperty('bad key');
   });
 });
